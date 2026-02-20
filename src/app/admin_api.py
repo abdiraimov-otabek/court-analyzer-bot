@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from src.app.config import load_config
 from src.app.container import Container
-from src.app.logging import clear_request_context, configure_logging, log_event, new_request_id, set_request_context
+from src.app.bot_logging import clear_request_context, configure_logging, log_event, new_request_id, set_request_context
 
 configure_logging("admin-api")
 logger = logging.getLogger("admin_api")

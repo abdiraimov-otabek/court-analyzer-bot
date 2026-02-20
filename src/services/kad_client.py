@@ -12,7 +12,7 @@ from urllib.parse import quote_plus
 
 import httpx
 
-from src.app.logging import log_debug, log_event
+from src.app.bot_logging import log_debug, log_event
 from src.domain.entities import CaseDecision, CaseOutcome
 from src.domain.reason_extractor import ReasonExtractor
 from src.domain.settings import Settings
@@ -67,6 +67,7 @@ class SearchParams:
     case_type: str | None
     case_number: str | None
     article: str | None = None
+    full_article: str | None = None
     paragraph: str | None = None
     use_court_filter: bool = True
 
@@ -89,6 +90,7 @@ class FetchStats:
 class FetchDecisionsResult:
     decisions: list[CaseDecision]
     stats: FetchStats
+    params: SearchParams | None = None
 
 
 @dataclass(frozen=True)
@@ -364,6 +366,8 @@ class ParserApiKadClient:
     async def count_cases_async(self, query_text: str, settings: Settings) -> int:
         """Async version of count_cases — fetches remaining pages in parallel."""
         params = self._parser.parse(query_text)
+        params = await self._refine_params_with_llm(query_text, params)
+        
         if params.case_number:
             case = await self._fetch_case_by_number_async(params.case_number, settings.max_documents_per_case)
             return 1 if case else 0
@@ -427,14 +431,7 @@ class ParserApiKadClient:
         should_cancel: Callable[[], bool] | None = None,
     ) -> FetchDecisionsResult:
         params = self._parser.parse(query_text)
-        # LLM fallback for article extraction when regex misses it
-        if not params.article and self._llm_reason_extractor is not None:
-            llm_parsed = await self._llm_reason_extractor.parse_query(query_text)
-            if llm_parsed.get("article"):
-                article = llm_parsed["article"]
-                case_type = self._parser._extract_case_type(query_text, article=article)
-                params = replace(params, article=article, case_type=case_type or params.case_type)
-                log_event(self._logger, "fetch_decisions.llm_article_parsed", article=article)
+        params = await self._refine_params_with_llm(query_text, params)
         self._current_article = params.article
         if self._llm_reason_extractor is not None:
             # When article is specified, every case needs classification — raise budget
@@ -502,6 +499,7 @@ class ParserApiKadClient:
         successful_cases = 0
         retry_count = 0
         filtered_by_court = 0
+        filtered_by_article = 0
         court_compared_cases = 0
         decisions: list[CaseDecision] = []
         details_start = time.perf_counter()
@@ -588,6 +586,7 @@ class ParserApiKadClient:
                 if outcome.decision is not None:
                     decision = outcome.decision
                     if not self._matches_query_scope(decision, params):
+                        filtered_by_article += 1
                         continue
                     if expected_court_tokens:
                         actual_court_tokens = self._court_tokens(decision.court_name)
@@ -663,7 +662,6 @@ class ParserApiKadClient:
                 raise KadInvalidResponseError("KAD API request failed")
 
         # When article is specified, first hard-filter by case category, then classify via LLM
-        filtered_by_article = 0
         if params.article and decisions:
             # Hard pre-filter: ст.61.2/61.3 are bankruptcy provisions —
             # reject civil ("Г") and administrative ("А") cases before LLM classification.
@@ -730,6 +728,7 @@ class ParserApiKadClient:
                 court_compared_cases=court_compared_cases,
                 filtered_by_article=filtered_by_article,
             ),
+            params=params,
         )
 
     def _empty_fetch_result(self) -> FetchDecisionsResult:
@@ -745,6 +744,7 @@ class ParserApiKadClient:
                 filtered_by_court=0,
                 court_compared_cases=0,
             ),
+            params=None,
         )
 
     async def _collect_case_ids(
@@ -890,15 +890,8 @@ class ParserApiKadClient:
         while True:
             try:
                 data = self._request_json("GET", self._search_path, params=self._build_query(params, page=1))
-                # Success=0 while court filter is active: the court name is accepted
-                # syntactically (no HTTP 400) but the combination yields 0 results.
-                # Fall back to no-court-filter so the caller can proceed; local
-                # court filtering during fetch will narrow results down.
-                if data.get("Success") == 0 and params.court and params.use_court_filter:
-                    log_event(self._logger, "search.court_silent_rejection", court=params.court)
-                    params.use_court_filter = False
-                    removed.append("Court")
-                    continue
+                if data.get("Success") == 0:
+                    return params
                 if removed:
                     log_event(self._logger, "search.filters_removed", removed_filters=removed)
                 # Only cache court as definitively valid on a confirmed Success=1 response.
@@ -909,7 +902,7 @@ class ParserApiKadClient:
                 removed_any = self._drop_invalid_filter(params, str(exc), removed)
                 if not removed_any:
                     raise
-                if params.court is not None and not params.use_court_filter:
+                if "Court" in removed and params.court and not params.use_court_filter:
                     self._court_validity_cache[params.court] = False
 
     async def _sanitize_params_async(self, params: SearchParams) -> SearchParams:
@@ -922,12 +915,13 @@ class ParserApiKadClient:
         removed: list[str] = []
         while True:
             try:
+                # Use asdict for logging
+                from dataclasses import asdict
+                log_debug(self._logger, "search.sanitizing", params=asdict(params))
+                
                 result = await self._request_json_async("GET", self._search_path, params=self._build_query(params, page=1))
-                if result.data.get("Success") == 0 and params.court and params.use_court_filter:
-                    log_event(self._logger, "search.court_silent_rejection", court=params.court)
-                    params.use_court_filter = False
-                    removed.append("Court")
-                    continue
+                if result.data.get("Success") == 0:
+                    return params
                 if removed:
                     log_event(self._logger, "search.filters_removed", removed_filters=removed)
                 if params.court is not None and params.use_court_filter:
@@ -937,15 +931,14 @@ class ParserApiKadClient:
                 removed_any = self._drop_invalid_filter(params, str(exc), removed)
                 if not removed_any:
                     raise
-                if params.court is not None and not params.use_court_filter:
+                if "Court" in removed and params.court and not params.use_court_filter:
                     self._court_validity_cache[params.court] = False
 
     def _drop_invalid_filter(self, params: SearchParams, error_text: str, removed: list[str]) -> bool:
         normalized = error_text.lower()
+        log_event(self._logger, "search.api_error", error=error_text)
         removed_any = False
         if ("court" in normalized or "суд" in normalized) and params.court and params.use_court_filter:
-            # If parser-api rejects Court filter format, fallback to broad search and
-            # keep local court filtering by decision court_name in fetch_decisions.
             params.use_court_filter = False
             removed.append("Court")
             removed_any = True
@@ -953,11 +946,16 @@ class ParserApiKadClient:
             params.case_type = None
             removed.append("CaseType")
             removed_any = True
-        if ("inn" in normalized or "инн" in normalized) and params.inn_or_name:
-            params.inn_or_name = None
-            params.inn_type = None
-            removed.append("Inn")
-            removed_any = True
+        if ("inn" in normalized or "инн" in normalized) or ("part" in normalized):
+            if params.inn_or_name or params.article:
+                params.inn_or_name = None
+                params.inn_type = None
+                # If the error was about the Inn field, and we put the article there,
+                # we must clear it for the search but keep it in params for later local filtering.
+                # However, SearchParams is reused, so we have to be careful.
+                # The safest thing is to only clear things that go into the query.
+                removed.append("Inn/Article")
+                removed_any = True
         return removed_any
 
     def _search(self, params: SearchParams, page: int) -> dict:
@@ -972,6 +970,13 @@ class ParserApiKadClient:
         }
         if params.inn_or_name:
             query["Inn"] = params.inn_or_name
+        
+        # Priority 1: full_article (e.g. "ст. 723 ГК РФ") — best for full-text precision
+        # Priority 2: article (e.g. "723") — fallback
+        search_text = params.full_article or params.article
+        if search_text:
+            query["Text"] = search_text
+            
         if params.inn_type:
             query["InnType"] = params.inn_type
         if params.date_from:
@@ -1039,7 +1044,7 @@ class ParserApiKadClient:
         if max_documents_per_case:
             events = events[-max_documents_per_case:]
 
-        outcome, reasons, decision_date, analysis_text = self._extract_outcome_and_reasons(events)
+        outcome, reasons, decision_date, analysis_text, document_links = self._extract_outcome_and_reasons(events)
         case_category = self._extract_case_category(case)
         return CaseDecision(
             case_number=case_number,
@@ -1051,6 +1056,7 @@ class ParserApiKadClient:
             case_link=self._build_case_link(case_id=case_id, case_number=case_number),
             analysis_text=analysis_text,
             case_category=case_category,
+            document_links=document_links,
         )
 
     def _extract_case_number(self, case: dict) -> str:
@@ -1199,13 +1205,13 @@ class ParserApiKadClient:
         min_size = min(len(expected_tokens), len(actual_tokens))
         return (len(overlap) / min_size) >= 0.6
 
-    def _extract_outcome_and_reasons(self, events: list[dict]) -> tuple[CaseOutcome, tuple[str, ...], date, str]:
+    def _extract_outcome_and_reasons(self, events: list[dict]) -> tuple[CaseOutcome, tuple[str, ...], date, str, tuple[dict[str, str], ...]]:
         if not events:
-            return CaseOutcome.UNKNOWN, ("оценка обстоятельств дела",), date.today(), ""
+            return CaseOutcome.UNKNOWN, ("оценка обстоятельств дела",), date.today(), "", ()
 
-        # Each entry: (full_text, priority_text, date)
+        # Each entry: (full_text, priority_text, date, docs)
         # priority_text = only the most structured/reliable fields from the API
-        prepared: list[tuple[str, str, date]] = []
+        prepared: list[tuple[str, str, date, list[dict[str, str]]]] = []
         for event in events:
             date_str = event.get("Date")
             decision_date = self._parse_date(date_str) if date_str else date.today()
@@ -1217,7 +1223,16 @@ class ParserApiKadClient:
                 str(event.get("ActTypeName", "") or ""),
                 str(event.get("Resolution", "") or ""),
             ])).strip()
-            prepared.append((full_text, priority_text, decision_date))
+
+            docs: list[dict[str, str]] = []
+            if event.get("FileName") and event.get("Url"):
+                docs.append({"name": str(event["FileName"]), "url": str(event["Url"])})
+            elif event.get("Details") and isinstance(event["Details"], list):
+                for detail in event["Details"]:
+                    if detail.get("FileName") and detail.get("Url"):
+                        docs.append({"name": str(detail["FileName"]), "url": str(detail["Url"])})
+
+            prepared.append((full_text, priority_text, decision_date, docs))
 
         decisive_idx = len(prepared) - 1
         outcome = CaseOutcome.UNKNOWN
@@ -1243,6 +1258,15 @@ class ParserApiKadClient:
 
         decision_date = prepared[decisive_idx][2]
         analysis_text = prepared[decisive_idx][0]
+
+        all_docs: list[dict[str, str]] = []
+        seen_urls: set[str] = set()
+        for _, _, _, docs in reversed(prepared):
+            for d in docs:
+                if d["url"] not in seen_urls:
+                    all_docs.append(d)
+                    seen_urls.add(d["url"])
+
         reasons = self._reason_extractor.extract(analysis_text)
         if not reasons and decisive_idx > 0:
             fallback_text = prepared[decisive_idx - 1][0]
@@ -1252,7 +1276,7 @@ class ParserApiKadClient:
         if not reasons:
             reasons = ("оценка обстоятельств дела",)
 
-        return outcome, reasons, decision_date, analysis_text
+        return outcome, reasons, decision_date, analysis_text, tuple(all_docs)
 
     def _build_event_text(self, event: dict) -> str:
         return " ".join(
@@ -1276,7 +1300,7 @@ class ParserApiKadClient:
         # Unconditional exclusions — applied regardless of query params
         if self._is_returned_application(text):
             return False
-        if self._is_operative_part_only(text):
+        if self._is_operative_part_only(text) and decision.outcome == CaseOutcome.UNKNOWN:
             return False
 
         # No filtering criteria at all → accept
@@ -1383,33 +1407,76 @@ class ParserApiKadClient:
         "административн ответственност",
     })
 
-    # Precompiled patterns for combined DENIED detection.
-    # These MUST be checked before any standalone "удовлетвор" check because
-    # "отказать в удовлетворении" / "в удовлетворении ... отказать" contain
-    # "удовлетвор" and would be wrongly classified as SATISFIED otherwise.
     _DENIED_COMBINED = [
-        re.compile(r"отказ\w*\s+в\s+удовлетвор"),                          # отказать/отказано в удовлетворении
-        re.compile(r"в\s+удовлетвор\w*(?:\s+\w+){0,8}\s+отказ"),             # в удовлетворении ... отказать/отказано
-        re.compile(r"без\s+удовлетвор"),                                     # оставить без удовлетворения
-        re.compile(r"отказ\w*\s+в\s+(?:иске|заявлении|жалобе|требован)"),  # отказать в иске/жалобе/заявлении
-        re.compile(r"в\s+(?:иске|заявлении|жалобе|требован\w*)\s+отказ"),  # в иске/жалобе/заявлении отказать
-        re.compile(r"жалобу\s+оставить\s+без"),                             # жалобу оставить без (рассмотрения/удовл.)
-        re.compile(r"оставить\s+жалобу\s+без"),                             # оставить жалобу без
-        re.compile(r"отказ\w*\s+в\s+признани"),                              # отказать в признании недействительной
-        re.compile(r"не\s+подлежит\s+признани"),                              # сделка не подлежит признанию недействительной
-        re.compile(r"не\s+(?:может|мог|могла|могло)\s+быть\s+признан"),       # не может быть признана недействительной
-        re.compile(r"отсутству\w+\s+основани\w+\s+для\s+признани"),           # отсутствуют основания для признания недействительной
-        re.compile(r"признак\w*(?:\s+\w+){0,5}\s+(?:не\s+установлен|отсутству)"),  # признаки злоупотребления/мнимости не установлены
+        re.compile(r"отказ\w*(?:\s+\w+){0,3}\s+в\s+(?:удовлетвор|признани|иске|заявлении|жалобе|требован|привлечении)\w*"),
+        re.compile(r"(?:удовлетвор|признани|иске|заявлении|жалобе|требован|привлечении)\w*(?:\s+\w+){0,10}\s+отказ\w*"),
+        re.compile(r"без\s+(?:удовлетвор|рассмотрения)\w*"),
+        re.compile(r"производство\w*\s+(?:.+?\s+)?прекратить"),
+        re.compile(r"прекратить\s+производство"),
+        re.compile(r"необоснованн\w*"),
+        re.compile(r"основани\w*\s+(?:.+?\s+)?отсутству\w*"),
+        re.compile(r"отсутству\w+\s+основани\w+"),
+        re.compile(r"не\s+подлежит\s+(?:удовлетвор|признани)\w*"),
+        re.compile(r"не\s+(?:может|мог|могла|могло)\s+быть\s+признан\w*"),
+        re.compile(r"не\s+(?:было\s+)?установлено\w*"),
+        re.compile(r"не\s+усматривается"),
+        re.compile(r"признак\w*(?:\s+\w+){0,5}\s+(?:не\s+установлен|отсутству)"),
     ]
 
     # Keywords that — when present WITHOUT a preceding denial context — indicate SATISFIED.
     _SATISFIED_KEYWORDS = [
         "удовлетвор",       # удовлетворить / удовлетворено / удовлетворены
-        "признать недействит",  # признать недействительной сделку → claim granted
-        "признано незаконным",
-        "признать незаконным",
-        "взыскать",         # взыскать с ответчика → collection claim satisfied
+        "признать недействит",
+        "признать незаконн",
+        "признано незаконн",
+        "незаконн",
+        "неправомерн",
+        "ненадлежащ",       # ненадлежащее исполнение (признать)
+        "взыскать",
+        "отстранить",       # отстранить арбитражного управляющего
+        "привлечь к",       # привлечь к ответственности
+        "обоснованн",       # жалоба признана обоснованной
     ]
+
+    async def _refine_params_with_llm(self, query_text: str, params: SearchParams) -> SearchParams:
+        if self._llm_reason_extractor is None:
+            return params
+            
+        llm_params = await self._llm_reason_extractor.parse_query(query_text)
+        
+        # Extract period-related fields
+        year = llm_params.get("year") or (params.date_from[:4] if params.date_from else None)
+        quarter = llm_params.get("quarter")
+        date_from, date_to = self._parser._build_period(year, quarter)
+        
+        llm_court = llm_params.get("court")
+        if llm_court:
+            # Try to normalize LLM output using our regex-based rules
+            normalized_llm_court = self._parser._extract_court(llm_court)
+            final_court = normalized_llm_court or llm_court
+        else:
+            final_court = params.court
+
+        # Map common types to Cyrillic just in case LLM returns Latin (G, B, A)
+        type_map = {"G": "Г", "B": "Б", "A": "А", "Г": "Г", "Б": "Б", "А": "А"}
+        llm_type = llm_params.get("case_type")
+        final_type = type_map.get(llm_type, llm_type) or params.case_type
+
+        # Merge with regex results, preferring LLM for these fields
+        refined = replace(
+            params,
+            article=llm_params.get("article") or params.article,
+            full_article=llm_params.get("full_article") or params.full_article,
+            court=final_court,
+            case_type=final_type,
+            date_from=date_from or params.date_from,
+            date_to=date_to or params.date_to,
+        )
+        
+        # Use asdict for logging to avoid JSON serialization errors
+        from dataclasses import asdict
+        log_event(self._logger, "kad.llm_query_parsed", params=asdict(refined))
+        return refined
 
     def _map_outcome(self, text: str) -> CaseOutcome:
         lower = text.lower()
@@ -1426,6 +1493,8 @@ class ParserApiKadClient:
 
         # Step 3: standalone denial
         if "отказ" in lower:
+            return CaseOutcome.DENIED
+        if "прекратить производство" in lower:
             return CaseOutcome.DENIED
 
         return CaseOutcome.UNKNOWN

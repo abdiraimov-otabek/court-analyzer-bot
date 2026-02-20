@@ -57,7 +57,16 @@ class JsonFormatter(logging.Formatter):
             payload.update(data)
         if record.exc_info:
             payload["exc_info"] = self.formatException(record.exc_info)
-        return json.dumps(payload, ensure_ascii=True)
+        def default_serializer(obj: Any) -> Any:
+            try:
+                from dataclasses import asdict, is_dataclass
+                if is_dataclass(obj):
+                    return asdict(obj)
+            except ImportError:
+                pass
+            return str(obj)
+
+        return json.dumps(payload, ensure_ascii=True, default=default_serializer)
 
 
 def configure_logging(app_name: str) -> None:

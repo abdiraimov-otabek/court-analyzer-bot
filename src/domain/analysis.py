@@ -7,11 +7,14 @@ from src.domain.entities import AnalysisResult, CaseDecision, CaseOutcome
 
 
 class AnalysisService:
-    def build_result(self, court: str, period: str, decisions: list[CaseDecision], article: str | None = None) -> AnalysisResult:
+    def __init__(self, llm_reason_extractor: LLMReasonExtractor | None = None) -> None:
+        self._llm_reason_extractor = llm_reason_extractor
+
+    async def build_result(self, court: str, period: str, decisions: list[CaseDecision], article: str | None = None) -> AnalysisResult:
         total = len(decisions)
-        satisfied = sum(1 for decision in decisions if self._normalize_outcome(decision) == CaseOutcome.SATISFIED)
-        denied = sum(1 for decision in decisions if self._normalize_outcome(decision) == CaseOutcome.DENIED)
-        unknown = sum(1 for decision in decisions if self._normalize_outcome(decision) == CaseOutcome.UNKNOWN)
+        satisfied = sum(1 for decision in decisions if self.normalize_outcome(decision) == CaseOutcome.SATISFIED)
+        denied = sum(1 for decision in decisions if self.normalize_outcome(decision) == CaseOutcome.DENIED)
+        unknown = sum(1 for decision in decisions if self.normalize_outcome(decision) == CaseOutcome.UNKNOWN)
 
         satisfied_pct = self._percentage(satisfied, total)
         denied_pct = self._percentage(denied, total)
@@ -20,13 +23,13 @@ class AnalysisService:
         satisfied_reasons = Counter(
             reason
             for decision in decisions
-            if self._normalize_outcome(decision) == CaseOutcome.SATISFIED
+            if self.normalize_outcome(decision) == CaseOutcome.SATISFIED
             for reason in decision.reasons
         )
         denied_reasons = Counter(
             reason
             for decision in decisions
-            if self._normalize_outcome(decision) == CaseOutcome.DENIED
+            if self.normalize_outcome(decision) == CaseOutcome.DENIED
             for reason in decision.reasons
         )
         all_reasons = Counter(
@@ -52,14 +55,27 @@ class AnalysisService:
             fallback=all_reasons,
         )
 
-        article_line = f"Статья: {article} | " if article else ""
-        summary = (
-            "СВОДКА ПО ЗАПРОСУ:\n"
-            f"Суд: {court} | Период: {period} | {article_line}Всего дел: {total}\n"
-            f"Статистика: {stats}\n"
-            f"Топ-2 основания для удовлетворения: {top_satisfied}\n"
-            f"Топ-2 основания для отказа: {top_denied}"
-        )
+        if self._llm_reason_extractor:
+            summary = await self._llm_reason_extractor.generate_summary(
+                court=court,
+                period=period,
+                article=article,
+                total=total,
+                satisfied=satisfied,
+                denied=denied,
+                unknown=unknown,
+                top_satisfied_reasons=[r for r, _ in satisfied_reasons.most_common(5)],
+                top_denied_reasons=[r for r, _ in denied_reasons.most_common(5)]
+            )
+        else:
+            article_line = f"Статья: {article} | " if article else ""
+            summary = (
+                "СВОДКА ПО ЗАПРОСУ:\n"
+                f"Суд: {court} | Период: {period} | {article_line}Всего дел: {total}\n"
+                f"Статистика: {stats}\n"
+                f"Топ-2 основания для удовлетворения: {top_satisfied}\n"
+                f"Топ-2 основания для отказа: {top_denied}"
+            )
 
         case_list = self.build_case_list(decisions)
         return AnalysisResult(summary=summary, case_list=case_list)
@@ -105,33 +121,46 @@ class AnalysisService:
         court = decision.court_name or "Суд не указан"
         reason = self._format_reason(decision)
         link = decision.case_link or "https://kad.arbitr.ru/"
+        docs_text = ""
+        if decision.document_links:
+            doc_links = [f"[{d['name']}]({d['url']})" for d in decision.document_links]
+            docs_text = " | Документы: " + ", ".join(doc_links)
         return (
             f"{case_label} | {self._format_date(decision.decision_date)} | "
-            f"{self._format_outcome(decision)} | Суд: {court} | Основание: {reason} | Ссылка: {link}"
+            f"{self._format_outcome(decision)} | Суд: {court} | Основание: {reason} | Ссылка: {link}{docs_text}"
         )
 
     def _format_date(self, value: date) -> str:
         return value.strftime("%d.%m.%Y")
 
     def _format_outcome(self, decision: CaseDecision) -> str:
-        normalized = self._normalize_outcome(decision)
+        normalized = self.normalize_outcome(decision)
         if normalized == CaseOutcome.SATISFIED:
             return "Удовлетворено"
         if normalized == CaseOutcome.DENIED:
             return "Отказано"
         return "Не определено"
 
-    def _normalize_outcome(self, decision: CaseDecision) -> CaseOutcome:
+    def normalize_outcome(self, decision: CaseDecision) -> CaseOutcome:
         outcome = decision.outcome
         if isinstance(outcome, CaseOutcome):
             return outcome
         normalized = str(outcome).strip().lower()
-        if normalized in {CaseOutcome.SATISFIED.value, "удовлетворено", "удовлетворить"}:
+        satisfied_variants = {
+            CaseOutcome.SATISFIED.value, "удовлетворено", "удовлетворить", 
+            "удовлетворить частично", "признать незаконным", "признать недействительным",
+            "обоснованно"
+        }
+        if any(v in normalized for v in satisfied_variants):
             return CaseOutcome.SATISFIED
-        if normalized in {CaseOutcome.DENIED.value, "отказано", "отказать"}:
+        
+        denied_variants = {
+            CaseOutcome.DENIED.value, "отказано", "отказать", 
+            "прекратить производство", "необоснованно", "без удовлетворения"
+        }
+        if any(v in normalized for v in denied_variants):
             return CaseOutcome.DENIED
-        if normalized in {CaseOutcome.UNKNOWN.value, "не определено", "неизвестно"}:
-            return CaseOutcome.UNKNOWN
+            
         return CaseOutcome.UNKNOWN
 
     def _format_reason(self, decision: CaseDecision) -> str:

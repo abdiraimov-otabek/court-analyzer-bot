@@ -78,13 +78,31 @@ class LLMReasonExtractor:
         self._budget_remaining = None
 
     async def parse_query(self, query_text: str) -> dict[str, str | None]:
-        """Extract article number from a natural language query using LLM.
+        """Extract search parameters from a natural language query using LLM.
 
-        Returns dict with 'article' key (str or None).
+        Returns dict with 'article', 'court', 'year', 'quarter', 'case_type'.
         """
         if not query_text or not query_text.strip():
-            return {"article": None}
+            return {"article": None, "court": None, "year": None, "quarter": None, "case_type": None}
         try:
+            prompt = (
+                f"Ты — эксперт по поиску в судебных базах данных (КАД Арбитр).\n"
+                f"Твоя задача — извлечь параметры поиска из запроса пользователя для API.\n\n"
+                f"Запрос: {query_text}\n\n"
+                f"Извлеки следующие поля в формате JSON:\n"
+                f"1. \"article\": только номер статьи (например, \"61.2\" или \"723\").\n"
+                f"2. \"full_article\": номер статьи с названием кодекса/закона для поиска (например, \"ст. 723 ГК РФ\", \"ст. 61.2 закона о банкротстве\").\n"
+                f"3. \"court\": официальное название суда или его часть (например, \"АС города Москвы\", \"15 ААС\").\n"
+                f"4. \"year\": год в формате ГГГГ.\n"
+                f"5. \"quarter\": номер квартала (1, 2, 3 или 4).\n"
+                f"6. \"case_type\": тип дела - \"Б\" (банкротство), \"Г\" (гражданское), \"А\" (административное) или null.\n\n"
+                f"ПРАВИЛА:\n"
+                f"- В поле \"full_article\" ДОБАВЛЯЙ аббревиатуру кодекса (ГК, НК, УК) или краткое название закона, если они упомянуты или понятны из контекста.\n"
+                f"- Если статья из ГК РФ или других кодексов (кроме Закона о банкротстве), ставь case_type: \"Г\".\n"
+                f"- Если в запросе есть слово \"банкротство\" или ст. 61.2, 61.3, 127-ФЗ, ставь case_type: \"Б\".\n"
+                f"- Если параметр не указан, ставь null.\n\n"
+                f"Верни ТОЛЬКО чистый JSON."
+            )
             response = await self._http_client.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={
@@ -95,19 +113,9 @@ class LLMReasonExtractor:
                 },
                 json={
                     "model": self._model,
-                    "messages": [{"role": "user", "content": (
-                        f"Извлеки номер статьи закона из запроса пользователя.\n\n"
-                        f"Запрос: {query_text}\n\n"
-                        f"Верни ТОЛЬКО JSON: {{\"article\": \"номер\"}} или {{\"article\": null}} "
-                        f"если статья не указана.\n"
-                        f"Примеры:\n"
-                        f"\"практика по ст 61.2\" -> {{\"article\": \"61.2\"}}\n"
-                        f"\"статье 60 закона о банкротстве\" -> {{\"article\": \"60\"}}\n"
-                        f"\"723 ГК РФ\" -> {{\"article\": \"723\"}}\n"
-                        f"\"АС Москвы 2024\" -> {{\"article\": null}}"
-                    )}],
+                    "messages": [{"role": "user", "content": prompt}],
                     "temperature": 0,
-                    "max_tokens": 30,
+                    "max_tokens": 150,
                 },
                 timeout=self._timeout,
             )
@@ -119,13 +127,83 @@ class LLMReasonExtractor:
                     content = content[4:]
                 content = content.strip()
             parsed = json.loads(content)
-            if isinstance(parsed, dict) and "article" in parsed:
-                val = parsed["article"]
-                self._logger.info("llm.parse_query", extra={"data": {"article": val}})
-                return {"article": str(val) if val else None}
+            self._logger.info("llm.parse_query.v2", extra={"data": parsed})
+            return {
+                "article": str(parsed.get("article")) if parsed.get("article") else None,
+                "full_article": str(parsed.get("full_article")) if parsed.get("full_article") else None,
+                "court": parsed.get("court"),
+                "year": str(parsed.get("year")) if parsed.get("year") else None,
+                "quarter": str(parsed.get("quarter")) if parsed.get("quarter") else None,
+                "case_type": parsed.get("case_type"),
+            }
         except Exception as exc:
             self._logger.warning("llm.parse_query_failed", extra={"data": {"error": str(exc)}})
-        return {"article": None}
+        return {"article": None, "full_article": None, "court": None, "year": None, "quarter": None, "case_type": None}
+
+    async def generate_summary(
+        self, 
+        court: str, 
+        period: str, 
+        article: str | None, 
+        total: int, 
+        satisfied: int, 
+        denied: int, 
+        unknown: int,
+        top_satisfied_reasons: list[str],
+        top_denied_reasons: list[str]
+    ) -> str:
+        """Generate a professional legal summary of the analysis results."""
+        prompt = (
+            f"Сформулируй краткую и профессиональную правовую сводку на основе статистики судебных дел.\n\n"
+            f"Параметры запроса:\n"
+            f"- Суд: {court}\n"
+            f"- Период: {period}\n"
+            f"- Статья: {article if article else 'не указана'}\n\n"
+            f"Статистика:\n"
+            f"- Всего дел: {total}\n"
+            f"- Удовлетворено: {satisfied} ({round(satisfied/total*100 if total>0 else 0)}%)\n"
+            f"- Отказано: {denied} ({round(denied/total*100 if total>0 else 0)}%)\n"
+            f"- Не определено: {unknown} ({round(unknown/total*100 if total>0 else 0)}%)\n\n"
+            f"Типовые основания для удовлетворения:\n"
+            + "\n".join(f"- {r}" for r in top_satisfied_reasons) + "\n\n"
+            f"Типовые основания для отказа:\n"
+            + "\n".join(f"- {r}" for r in top_denied_reasons) + "\n\n"
+            f"Твоя задача — написать 3-4 предложения, которые резюмируют практику. "
+            f"Избегай шаблонных фраз вроде 'Решение суда удовлетворяет иск'. "
+            f"Пиши как опытный юрист для другого юриста. Акцентируй внимание на шансах успеха.\n"
+            f"Начни сразу с текста сводки."
+        )
+        try:
+            response = await self._http_client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self._api_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://github.com/kad-bot",
+                    "X-Title": "KAD Bot",
+                },
+                json={
+                    "model": self._model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.5,
+                    "max_tokens": 400,
+                },
+                timeout=self._timeout,
+            )
+            response.raise_for_status()
+            summary_text = response.json()["choices"][0]["message"]["content"].strip()
+            
+            header = (
+                f"⚖️ СВОДКА ПРАКТИКИ:\n"
+                f"📍 Суд: {court} | 📅 Период: {period}\n"
+                f"📝 Статья: {article if article else '—'} | 📊 Всего дел: {total}\n"
+                f"✅ Удовл: {satisfied} | ❌ Отказ: {denied} (не опред: {unknown})\n\n"
+            )
+            return header + summary_text
+        except Exception as exc:
+            self._logger.warning("llm.generate_summary_failed", extra={"data": {"error": str(exc)}})
+            # Fallback to simple template
+            return f"Суд: {court}\nВсего дел: {total}\nУдовлетворено: {satisfied}\nОтказано: {denied}"
 
     async def extract(self, text: str, outcome: CaseOutcome) -> tuple[str, ...]:
         if not text or not text.strip():
@@ -231,25 +309,21 @@ class LLMReasonExtractor:
         )
         query_hint = f"Запрос пользователя: {query_text}\n" if query_text else ""
         prompt = (
-            f"Ты юрист-аналитик.\n\n"
+            f"Ты — высококвалифицированный юрист Арбитражных судов РФ.\n\n"
             f"{query_hint}"
-            f"{context}\n"
-            f"Результат: {outcome_ru}\n\n"
-            f"Задача: определи, относится ли данный судебный акт к ст.{article}.\n\n"
-            f"ВАЖНО: Дело найдено поисковой системой КАД по запросу, содержащему ст.{article}. "
-            f"Текст события — это краткая карточка судебного акта, которая часто НЕ содержит "
-            f"номер статьи напрямую. Это нормально.\n\n"
-            f"ПРАВИЛО: По умолчанию дело РЕЛЕВАНТНО (доверяем поиску КАД).\n"
-            f"Считай НЕ релевантным ТОЛЬКО если из контекста ЯВНО видно, что дело "
-            f"относится к совершенно другой теме (например, чисто налоговый спор, "
-            f"трудовой спор, или дело вообще не связано с банкротством, хотя "
-            f"категория указана как банкротство).\n\n"
-            f"Чисто процедурные действия в рамках банкротного дела (принятие заявления, "
-            f"подготовка к заседанию, определения и решения) — считай РЕЛЕВАНТНЫМИ, "
-            f"если категория дела — банкротство.\n\n"
-            f"Если РЕЛЕВАНТНО — верни 1–3 коротких правовых основания (свободный текст).\n"
-            f'Если НЕ РЕЛЕВАНТНО — верни ["НЕ_РЕЛЕВАНТНО"].\n\n'
-            f"Ответь ТОЛЬКО JSON-массивом строк, без пояснений."
+            f"Контекст из системы КАД Арбитр:\n{context}\n"
+            f"Исход дела: {outcome_ru}\n\n"
+            f"ТВОЯ ЗАДАЧА:\n"
+            f"1. Проверь, относится ли этот судебный акт к спору по статье {article}.\n"
+            f"2. Если акт релевантен, извлеки 1-3 ключевых правовых тезиса.\n\n"
+            f"КРИТЕРИИ РЕЛЕВАНТНОСТИ:\n"
+            f"- ТАК КАК ПОИСК УЖЕ БЫЛ ВЫПОЛНЕН ПО СТАТЬЕ {article}, СЧИТАЙ АКТ РЕЛЕВАНТНЫМ, если краткий контекст не содержит явных противоречий (например, упоминания совсем другой статьи или категории спора).\n"
+            f"- Если это процедурное определение (назначение дела, перенос) БЕЗ упоминания сути — ВСЕ РАВНО ОТМЕЧАЙ КАК РЕЛЕВАНТНОЕ (это часть спора по нужной статье).\n"
+            f"- Только если из текста очевидно, что спор касается ДРУГИХ правоотношений — ставь НЕ_РЕЛЕВАНТНО.\n\n"
+            f"ФОРМАТ ОТВЕТА:\n"
+            f"- Если релевантно: JSON массив строк. Если в тексте нет оснований для анализа, пиши [\"оценка обстоятельств дела\"].\n"
+            f"- Если НЕ релевантно (явное несовпадение): JSON массив [\"НЕ_РЕЛЕВАНТНО\"].\n\n"
+            f"Ответь ТОЛЬКО JSON-массивом."
         )
         response = await self._http_client.post(
             "https://openrouter.ai/api/v1/chat/completions",

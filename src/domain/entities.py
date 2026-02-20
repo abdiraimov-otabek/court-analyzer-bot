@@ -22,6 +22,7 @@ class CaseDecision:
     case_link: str = ""
     analysis_text: str = ""
     case_category: str = ""   # "Б", "Г", "А", or "" if unknown
+    document_links: tuple[dict[str, str], ...] = ()
 
 
 @dataclass(frozen=True)

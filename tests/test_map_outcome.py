@@ -129,6 +129,33 @@ def test_denied_beats_satisfied_keyword(client):
     assert outcome(client, text) == CaseOutcome.DENIED
 
 
+# ── Bankruptcy / Article 60 specifics ───────────────────────────────
+
+def test_satisfied_nezakonnym_bezdeystviye(client):
+    assert outcome(client, "Признать незаконным бездействие арбитражного управляющего") == CaseOutcome.SATISFIED
+
+def test_satisfied_nenadlezhashcheye_ispolneniye(client):
+    assert outcome(client, "Признать ненадлежащим исполнение обязанностей управляющим") == CaseOutcome.SATISFIED
+
+def test_satisfied_privlech_k_otvetstvennosti(client):
+    assert outcome(client, "Привлечь к административной ответственности") == CaseOutcome.SATISFIED
+
+def test_satisfied_zhaloba_obosnovanna(client):
+    assert outcome(client, "Жалоба признана обоснованной") == CaseOutcome.SATISFIED
+
+def test_denied_proizvodstvo_prekratit(client):
+    assert outcome(client, "Производство по жалобе прекратить") == CaseOutcome.DENIED
+
+def test_denied_bez_rassmotreniya_short(client):
+    assert outcome(client, "Оставить без рассмотрения") == CaseOutcome.DENIED
+
+def test_denied_neobosnovanna(client):
+    assert outcome(client, "Жалобу признать необоснованной") == CaseOutcome.DENIED
+
+def test_denied_otsutstvuyut_pravovye_osnovaniya(client):
+    assert outcome(client, "Правовые основания для удовлетворения жалобы отсутствуют") == CaseOutcome.DENIED
+
+
 # ── UNKNOWN ───────────────────────────────────────────────────────────────────
 
 def test_unknown_when_nothing_matches(client):

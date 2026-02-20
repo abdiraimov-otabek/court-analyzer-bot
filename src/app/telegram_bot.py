@@ -9,7 +9,7 @@ from aiogram.types import BufferedInputFile, Message
 from src.app.analysis_notifications import send_slow_alert_if_needed
 from src.app.config import load_config
 from src.app.container import Container
-from src.app.logging import clear_request_context, configure_logging, log_event, new_request_id, set_request_context
+from src.app.bot_logging import clear_request_context, configure_logging, log_event, new_request_id, set_request_context
 from src.domain.value_objects import UserId
 from src.services.hashing import HashingService
 from src.services.kad_client import KadAccessError, KadInvalidResponseError, KadRateLimitError, KadUnavailableError

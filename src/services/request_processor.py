@@ -10,7 +10,7 @@ from src.domain.analysis import AnalysisService
 from src.domain.entities import AnalysisResult, CaseDecision, CaseOutcome
 from src.domain.settings import Settings
 from src.domain.value_objects import UserId
-from src.app.logging import log_event
+from src.app.bot_logging import log_event
 from src.services.active_requests import ActiveRequestRegistry
 from src.services.hashing import HashingService
 from src.services.kad_client import KadClient, KadUnavailableError, QueryParser
@@ -178,7 +178,38 @@ class RequestProcessor:
                 court_for_summary = Counter(known_courts).most_common(1)[0][0]
 
         build_start = datetime.now()
-        result = self._analysis_service.build_result(court_for_summary, metadata.period, decisions, article=metadata.article)
+        if fetch_result.params:
+            p = fetch_result.params
+            # Priority: LLM extracted court > existing metadata (regex)
+            metadata = QueryMetadata(
+                court=p.court or metadata.court,
+                period=metadata.period,  # We'll update period below if dates match
+                article=p.article or metadata.article
+            )
+            
+            if p.date_from and p.date_to:
+                m_from, m_to = int(p.date_from[5:7]), int(p.date_to[5:7])
+                year = p.date_from[:4]
+                if m_from == 1 and m_to == 3: dp = f"1 квартал {year} года"
+                elif m_from == 4 and m_to == 6: dp = f"2 квартал {year} года"
+                elif m_from == 7 and m_to == 9: dp = f"3 квартал {year} года"
+                elif m_from == 10 and m_to == 12: dp = f"4 квартал {year} года"
+                elif m_from == 1 and m_to == 12: dp = f"{year} год"
+                else: dp = f"{p.date_from} - {p.date_to}"
+                metadata = QueryMetadata(court=metadata.court, period=dp, article=metadata.article)
+
+        court_for_summary = metadata.court
+        if court_for_summary == "суд не указан" or not court_for_summary:
+            known_courts = [d.court_name for d in decisions if d.court_name and d.court_name != "Суд не указан"]
+            if known_courts:
+                court_for_summary = Counter(known_courts).most_common(1)[0][0]
+
+        result = await self._analysis_service.build_result(
+            court=court_for_summary,
+            period=metadata.period,
+            decisions=decisions,
+            article=metadata.article,
+        )
         build_duration_ms = int((datetime.now() - build_start).total_seconds() * 1000)
 
         # Skip quality gate when article classification already filtered the set —
@@ -261,15 +292,7 @@ class RequestProcessor:
         return sum(1 for decision in decisions if self._normalize_outcome(decision) == target)
 
     def _normalize_outcome(self, decision: CaseDecision) -> CaseOutcome:
-        outcome = decision.outcome
-        if isinstance(outcome, CaseOutcome):
-            return outcome
-        normalized = str(outcome).strip().lower()
-        if normalized in {CaseOutcome.SATISFIED.value, "удовлетворено", "удовлетворить"}:
-            return CaseOutcome.SATISFIED
-        if normalized in {CaseOutcome.DENIED.value, "отказано", "отказать"}:
-            return CaseOutcome.DENIED
-        return CaseOutcome.UNKNOWN
+        return self._analysis_service.normalize_outcome(decision)
 
     def _get_quality_reason(
         self,

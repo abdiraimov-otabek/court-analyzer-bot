@@ -6,7 +6,7 @@ import logging
 import re
 from typing import Protocol
 
-from src.app.logging import log_event
+from src.app.bot_logging import log_event
 from src.domain.settings import Settings
 from src.domain.value_objects import QueryText, UserId
 from src.services.access_control import AccessControlList

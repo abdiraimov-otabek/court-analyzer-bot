@@ -20,6 +20,10 @@ class QueryValidator:
         self._parser = parser or QueryParser()
 
     def validate(self, query_text: str) -> QueryValidationResult:
+        if len(query_text.strip()) > 30:
+            # Assume it's a natural language query that LLM will handle
+            return QueryValidationResult(missing_court=False, missing_period=False)
+            
         params = self._parser.parse(query_text)
         return QueryValidationResult(
             missing_court=not bool(params.court),

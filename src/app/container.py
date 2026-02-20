@@ -57,9 +57,10 @@ class Container:
         )
 
     def build_request_processor(self) -> RequestProcessor:
+        llm_extractor = self._get_llm_reason_extractor()
         return RequestProcessor(
             kad_client=self._get_kad_client(),
-            analysis_service=AnalysisService(),
+            analysis_service=AnalysisService(llm_reason_extractor=llm_extractor),
             active_requests=self.active_requests,
             cache_repository=self.cache_repository,
             log_repository=self.log_repository,
@@ -74,20 +75,22 @@ class Container:
     def _build_kad_client(self) -> ParserApiKadClient:
         if not self.config.kad_api_base_url or not self.config.kad_api_key:
             raise RuntimeError("KAD API config is missing")
-        llm_extractor = None
-        if self.config.openrouter_api_key:
-            llm_extractor = LLMReasonExtractor(
-                http_client=self.async_http_client,
-                api_key=self.config.openrouter_api_key,
-            )
         return ParserApiKadClient(
             base_url=self.config.kad_api_base_url,
             api_key=self.config.kad_api_key,
             sync_http_client=self.sync_http_client,
             async_http_client=self.async_http_client,
             details_cache_repository=self.case_details_cache_repository,
-            llm_reason_extractor=llm_extractor,
+            llm_reason_extractor=self._get_llm_reason_extractor(),
         )
+
+    def _get_llm_reason_extractor(self) -> LLMReasonExtractor | None:
+        if self.config.openrouter_api_key:
+            return LLMReasonExtractor(
+                http_client=self.async_http_client,
+                api_key=self.config.openrouter_api_key,
+            )
+        return None
 
     def _build_hashing_service(self) -> HashingService:
         if not self.config.hash_salt:
