@@ -1,0 +1,30 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import date
+from enum import Enum
+
+
+class CaseOutcome(str, Enum):
+    SATISFIED = "satisfied"
+    DENIED = "denied"
+    UNKNOWN = "unknown"
+
+
+@dataclass(frozen=True)
+class CaseDecision:
+    case_number: str
+    decision_date: date
+    outcome: CaseOutcome
+    reasons: tuple[str, ...]
+    case_id: str = ""
+    court_name: str = ""
+    case_link: str = ""
+    analysis_text: str = ""
+    case_category: str = ""   # "Б", "Г", "А", or "" if unknown
+
+
+@dataclass(frozen=True)
+class AnalysisResult:
+    summary: str
+    case_list: str

@@ -1,0 +1,101 @@
+from __future__ import annotations
+
+import httpx
+
+from src.app.config import AppConfig
+from src.core.bot_logic import BotLogic
+from src.core.estimation import estimate_minutes
+from src.domain.analysis import AnalysisService
+from src.infrastructure.access_repository import AllowedUsersRepository
+from src.infrastructure.access_store import DatabaseAccessStore
+from src.infrastructure.active_requests_repository import ActiveRequestsRepository
+from src.infrastructure.cache_repository import AnalysisCacheRepository
+from src.infrastructure.case_details_cache_repository import CaseDetailsCacheRepository
+from src.infrastructure.log_repository import LogRepository
+from src.infrastructure.settings_repository import SettingsRepository
+from src.infrastructure.sqlite import SqliteConnection
+from src.services.access_control import AccessControlList
+from src.services.active_requests import ActiveRequestRegistry
+from src.services.hashing import HashingService
+from src.services.kad_client import ParserApiKadClient
+from src.services.llm_reason_extractor import LLMReasonExtractor
+from src.services.quarter_selection import QuarterSelectionRegistry
+from src.services.rate_limit import HourlyRateLimiter
+from src.services.request_processor import RequestProcessor
+from src.services.settings_service import SettingsService
+
+
+class Container:
+    def __init__(self, config: AppConfig) -> None:
+        self.config = config
+        self.connection = SqliteConnection(config.database_path)
+        self.settings_repository = SettingsRepository(self.connection)
+        self.settings_service = SettingsService(self.settings_repository)
+        self.allowed_users_repository = AllowedUsersRepository(self.connection)
+        self.access_control = AccessControlList(DatabaseAccessStore(self.allowed_users_repository))
+        db_repo = ActiveRequestsRepository(self.connection)
+        self.active_requests = ActiveRequestRegistry(db_repo=db_repo)
+        self.quarter_selections = QuarterSelectionRegistry()
+        self.rate_limiter = HourlyRateLimiter(limit=10)
+        self.cache_repository = AnalysisCacheRepository(self.connection, ttl_seconds=24 * 60 * 60)
+        self.case_details_cache_repository = CaseDetailsCacheRepository(self.connection, ttl_seconds=24 * 60 * 60)
+        self.log_repository = LogRepository(self.connection)
+        limits = httpx.Limits(max_connections=100, max_keepalive_connections=50)
+        self.sync_http_client = httpx.Client(timeout=30, limits=limits)
+        self.async_http_client = httpx.AsyncClient(timeout=30, limits=limits)
+        self.kad_client: ParserApiKadClient | None = None
+
+    def build_bot_logic(self) -> BotLogic:
+        return BotLogic(
+            access_control=self.access_control,
+            rate_limiter=self.rate_limiter,
+            active_requests=self.active_requests,
+            quarter_selections=self.quarter_selections,
+            count_provider=self._get_kad_client(),
+            settings_provider=self.settings_service,
+            estimate_minutes=estimate_minutes,
+        )
+
+    def build_request_processor(self) -> RequestProcessor:
+        return RequestProcessor(
+            kad_client=self._get_kad_client(),
+            analysis_service=AnalysisService(),
+            active_requests=self.active_requests,
+            cache_repository=self.cache_repository,
+            log_repository=self.log_repository,
+            hashing_service=self._build_hashing_service(),
+        )
+
+    def _get_kad_client(self) -> ParserApiKadClient:
+        if self.kad_client is None:
+            self.kad_client = self._build_kad_client()
+        return self.kad_client
+
+    def _build_kad_client(self) -> ParserApiKadClient:
+        if not self.config.kad_api_base_url or not self.config.kad_api_key:
+            raise RuntimeError("KAD API config is missing")
+        llm_extractor = None
+        if self.config.openrouter_api_key:
+            llm_extractor = LLMReasonExtractor(
+                http_client=self.async_http_client,
+                api_key=self.config.openrouter_api_key,
+            )
+        return ParserApiKadClient(
+            base_url=self.config.kad_api_base_url,
+            api_key=self.config.kad_api_key,
+            sync_http_client=self.sync_http_client,
+            async_http_client=self.async_http_client,
+            details_cache_repository=self.case_details_cache_repository,
+            llm_reason_extractor=llm_extractor,
+        )
+
+    def _build_hashing_service(self) -> HashingService:
+        if not self.config.hash_salt:
+            raise RuntimeError("HASH_SALT is not configured")
+        return HashingService(self.config.hash_salt)
+
+    async def aclose(self) -> None:
+        if self.kad_client is not None:
+            await self.kad_client.aclose()
+        await self.async_http_client.aclose()
+        self.sync_http_client.close()

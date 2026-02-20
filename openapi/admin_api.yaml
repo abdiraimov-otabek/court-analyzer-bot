@@ -1,0 +1,198 @@
+openapi: 3.0.3
+info:
+  title: KAD Bot Admin API
+  version: 0.1.0
+servers:
+  - url: http://localhost:8000
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+  /settings:
+    get:
+      summary: Get settings
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+    put:
+      summary: Update settings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Settings"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+  /access/users:
+    get:
+      summary: List allowed users
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Allowed users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AllowedUser"
+    post:
+      summary: Grant access to user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AllowedUser"
+      responses:
+        "201":
+          description: User added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AllowedUser"
+    delete:
+      summary: Revoke access from user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AllowedUser"
+      responses:
+        "204":
+          description: User removed
+  /requests/active:
+    get:
+      summary: List active requests
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Active requests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requests:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ActiveRequest"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: token
+  schemas:
+    Settings:
+      type: object
+      properties:
+        max_cases:
+          type: integer
+          example: 500
+        max_documents_per_case:
+          type: integer
+          example: 5
+        max_pages:
+          type: integer
+          example: 20
+        fetch_concurrency_min:
+          type: integer
+          example: 6
+        fetch_concurrency_max:
+          type: integer
+          example: 10
+        slow_alert_minutes:
+          type: integer
+          example: 5
+        details_cache_ttl_seconds:
+          type: integer
+          example: 86400
+        allow_all_users:
+          type: boolean
+          example: false
+        analysis_prompt:
+          type: string
+          example: "Сформируй статистику по результатам рассмотрения..."
+      required:
+        - max_cases
+        - max_documents_per_case
+        - max_pages
+        - fetch_concurrency_min
+        - fetch_concurrency_max
+        - slow_alert_minutes
+        - details_cache_ttl_seconds
+        - allow_all_users
+        - analysis_prompt
+    AllowedUser:
+      type: object
+      properties:
+        telegram_id:
+          type: string
+          example: "123456789"
+      required:
+        - telegram_id
+    ActiveRequest:
+      type: object
+      properties:
+        telegram_id:
+          type: string
+          example: "123456789"
+        phase:
+          type: string
+          example: analyzing
+        total_cases:
+          type: integer
+          example: 42
+        collected_cases:
+          type: integer
+          example: 42
+        processed_cases:
+          type: integer
+          example: 10
+        attempted_cases:
+          type: integer
+          example: 10
+        successful_cases:
+          type: integer
+          example: 8
+        retry_count:
+          type: integer
+          example: 2

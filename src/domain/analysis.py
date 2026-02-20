@@ -1,0 +1,140 @@
+from __future__ import annotations
+
+from collections import Counter
+from datetime import date
+
+from src.domain.entities import AnalysisResult, CaseDecision, CaseOutcome
+
+
+class AnalysisService:
+    def build_result(self, court: str, period: str, decisions: list[CaseDecision], article: str | None = None) -> AnalysisResult:
+        total = len(decisions)
+        satisfied = sum(1 for decision in decisions if self._normalize_outcome(decision) == CaseOutcome.SATISFIED)
+        denied = sum(1 for decision in decisions if self._normalize_outcome(decision) == CaseOutcome.DENIED)
+        unknown = sum(1 for decision in decisions if self._normalize_outcome(decision) == CaseOutcome.UNKNOWN)
+
+        satisfied_pct = self._percentage(satisfied, total)
+        denied_pct = self._percentage(denied, total)
+        unknown_pct = self._percentage(unknown, total)
+
+        satisfied_reasons = Counter(
+            reason
+            for decision in decisions
+            if self._normalize_outcome(decision) == CaseOutcome.SATISFIED
+            for reason in decision.reasons
+        )
+        denied_reasons = Counter(
+            reason
+            for decision in decisions
+            if self._normalize_outcome(decision) == CaseOutcome.DENIED
+            for reason in decision.reasons
+        )
+        all_reasons = Counter(
+            reason
+            for decision in decisions
+            for reason in decision.reasons
+        )
+
+        stats = (
+            f"Удовлетворено - {satisfied} ({satisfied_pct}%), "
+            f"Отказано - {denied} ({denied_pct}%), "
+            f"Не определено - {unknown} ({unknown_pct}%)"
+        )
+
+        top_satisfied = self._format_top_distinct(
+            primary=satisfied_reasons,
+            secondary=denied_reasons,
+            fallback=all_reasons,
+        )
+        top_denied = self._format_top_distinct(
+            primary=denied_reasons,
+            secondary=satisfied_reasons,
+            fallback=all_reasons,
+        )
+
+        article_line = f"Статья: {article} | " if article else ""
+        summary = (
+            "СВОДКА ПО ЗАПРОСУ:\n"
+            f"Суд: {court} | Период: {period} | {article_line}Всего дел: {total}\n"
+            f"Статистика: {stats}\n"
+            f"Топ-2 основания для удовлетворения: {top_satisfied}\n"
+            f"Топ-2 основания для отказа: {top_denied}"
+        )
+
+        case_list = self.build_case_list(decisions)
+        return AnalysisResult(summary=summary, case_list=case_list)
+
+    def build_case_list(self, decisions: list[CaseDecision]) -> str:
+        return "\n".join(self._format_case(decision) for decision in decisions)
+
+    def _percentage(self, part: int, total: int) -> int:
+        if total == 0:
+            return 0
+        return round(part / total * 100)
+
+    def _format_top_distinct(self, primary: Counter[str], secondary: Counter[str], fallback: Counter[str]) -> str:
+        if not primary:
+            return self._format_fallback_top(fallback)
+        exclusive = [
+            (reason, count)
+            for reason, count in primary.most_common()
+            if secondary.get(reason, 0) == 0
+        ]
+        if exclusive:
+            return "; ".join(reason for reason, _ in exclusive[:2])
+        ranked = sorted(
+            (
+                (reason, count, count - secondary.get(reason, 0))
+                for reason, count in primary.items()
+            ),
+            key=lambda item: (item[2], item[1]),
+            reverse=True,
+        )
+        top = [reason for reason, _, score in ranked if score > 0][:2]
+        if not top:
+            return self._format_fallback_top(fallback)
+        return "; ".join(top)
+
+    def _format_fallback_top(self, reasons: Counter[str]) -> str:
+        if not reasons:
+            return "оценка обстоятельств дела"
+        return "; ".join(reason for reason, _ in reasons.most_common(2))
+
+    def _format_case(self, decision: CaseDecision) -> str:
+        case_label = decision.case_number or (f"ID:{decision.case_id}" if decision.case_id else "Номер дела не указан")
+        court = decision.court_name or "Суд не указан"
+        reason = self._format_reason(decision)
+        link = decision.case_link or "https://kad.arbitr.ru/"
+        return (
+            f"{case_label} | {self._format_date(decision.decision_date)} | "
+            f"{self._format_outcome(decision)} | Суд: {court} | Основание: {reason} | Ссылка: {link}"
+        )
+
+    def _format_date(self, value: date) -> str:
+        return value.strftime("%d.%m.%Y")
+
+    def _format_outcome(self, decision: CaseDecision) -> str:
+        normalized = self._normalize_outcome(decision)
+        if normalized == CaseOutcome.SATISFIED:
+            return "Удовлетворено"
+        if normalized == CaseOutcome.DENIED:
+            return "Отказано"
+        return "Не определено"
+
+    def _normalize_outcome(self, decision: CaseDecision) -> CaseOutcome:
+        outcome = decision.outcome
+        if isinstance(outcome, CaseOutcome):
+            return outcome
+        normalized = str(outcome).strip().lower()
+        if normalized in {CaseOutcome.SATISFIED.value, "удовлетворено", "удовлетворить"}:
+            return CaseOutcome.SATISFIED
+        if normalized in {CaseOutcome.DENIED.value, "отказано", "отказать"}:
+            return CaseOutcome.DENIED
+        if normalized in {CaseOutcome.UNKNOWN.value, "не определено", "неизвестно"}:
+            return CaseOutcome.UNKNOWN
+        return CaseOutcome.UNKNOWN
+
+    def _format_reason(self, decision: CaseDecision) -> str:
+        if not decision.reasons:
+            return "не указано"
+        return "; ".join(decision.reasons[:2])

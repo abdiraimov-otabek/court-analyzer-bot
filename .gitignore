@@ -1,0 +1,32 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# macOS
+.DS_Store
+
+# local env/secrets
+.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# local runtime artifacts
+logs/
+*.log
+*.log.*
+:data:
+:memory:
+
+# sqlite/db files
+*.db
+*.sqlite
+*.sqlite3
+
+# large/binary test artifacts
+*.img
