@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from datetime import datetime, timedelta
 
 from src.domain.entities import AnalysisResult
@@ -7,14 +8,20 @@ from src.infrastructure.sqlite import SqliteConnection
 
 
 class AnalysisCacheRepository:
-    def __init__(self, connection: SqliteConnection, ttl_seconds: int = 24 * 60 * 60) -> None:
+    def __init__(
+        self, connection: SqliteConnection, ttl_seconds: int = 24 * 60 * 60
+    ) -> None:
         if ttl_seconds <= 0:
             raise ValueError("ttl_seconds must be positive")
         self._connection = connection
+        self._last_cleanup_at = 0.0
         self._ttl = timedelta(seconds=ttl_seconds)
 
     def get(self, cache_key: str, now: datetime) -> AnalysisResult | None:
-        self._cleanup(now)
+        t_now = time.time()
+        if t_now - self._last_cleanup_at > 60:
+            self._cleanup(now)
+            self._last_cleanup_at = t_now
         with self._connection.connect() as conn:
             row = conn.execute(
                 "select summary, case_list, expires_at from analysis_cache where cache_key = ?",
@@ -41,7 +48,13 @@ class AnalysisCacheRepository:
                     created_at=excluded.created_at,
                     expires_at=excluded.expires_at
                 """,
-                (cache_key, result.summary, result.case_list, now.isoformat(), expires_at.isoformat()),
+                (
+                    cache_key,
+                    result.summary,
+                    result.case_list,
+                    now.isoformat(),
+                    expires_at.isoformat(),
+                ),
             )
             conn.commit()
 
@@ -52,5 +65,7 @@ class AnalysisCacheRepository:
 
     def _cleanup(self, now: datetime) -> None:
         with self._connection.connect() as conn:
-            conn.execute("delete from analysis_cache where expires_at <= ?", (now.isoformat(),))
+            conn.execute(
+                "delete from analysis_cache where expires_at <= ?", (now.isoformat(),)
+            )
             conn.commit()

@@ -19,11 +19,31 @@ class LLMReasonExtractor:
     """
 
     _CANONICAL_LABELS = [
+        # Bankruptcy-specific (ст.61.2, 61.3, Закон о банкротстве)
         "неравноценное встречное исполнение (п.1 ст.61.2)",
         "причинение вреда кредиторам (п.2 ст.61.2)",
         "подозрительность сделки (ст.61.2)",
         "сделка с предпочтением (ст.61.3)",
         "нарушение очередности удовлетворения требований",
+        "осведомленность контрагента о банкротстве",
+        "аффилированность сторон",
+        "заинтересованность контрагента",
+        "признаки неплатежеспособности должника",
+        "добросовестность контрагента",
+        "безвозмездность сделки",
+        "оспаривание сделки по ст.61.2 Закона о банкротстве",
+        "оспаривание сделки по ст.61.3 Закона о банкротстве",
+        "нарушение обязанностей арбитражного управляющего",
+        "применение последствий недействительности сделки",
+        "субсидиарная ответственность",
+        "включение в реестр требований кредиторов",
+        "исключение из реестра требований кредиторов",
+        "утверждение мирового соглашения",
+        "отказ в утверждении мирового соглашения",
+        "жалоба на действия арбитражного управляющего",
+        "оспаривание торгов",
+        "распределение конкурсной массы",
+        # General civil law
         "злоупотребление правом (ст.10 ГК)",
         "мнимость сделки (ст.170 ГК)",
         "притворность сделки (ст.170 ГК)",
@@ -33,18 +53,26 @@ class LLMReasonExtractor:
         "недостаточность доказательств",
         "необоснованность требований",
         "отсутствие правовых оснований",
-        "осведомленность контрагента о банкротстве",
-        "аффилированность сторон",
-        "заинтересованность контрагента",
-        "признаки неплатежеспособности должника",
-        "добросовестность контрагента",
-        "безвозмездность сделки",
-        "оспаривание сделки по ст.61.2 Закона о банкротстве",
-        "оспаривание сделки по ст.61.3 Закона о банкротстве",
         "ненадлежащий ответчик",
-        "нарушение обязанностей арбитражного управляющего",
-        "применение последствий недействительности сделки",
         "крупная сделка",
+        "нарушение договорных обязательств",
+        "ненадлежащее исполнение обязательств",
+        "взыскание задолженности",
+        "взыскание убытков",
+        "взыскание неустойки",
+        "неосновательное обогащение",
+        "признание права собственности",
+        "расторжение договора",
+        "возмещение ущерба",
+        "нарушение условий договора",
+        "ненадлежащее качество работ",
+        "нарушение сроков исполнения",
+        # Administrative
+        "нарушение антимонопольного законодательства",
+        "административное правонарушение",
+        "оспаривание решения государственного органа",
+        "оспаривание ненормативного правового акта",
+        "налоговое правонарушение",
     ]
 
     _FALLBACK: tuple[str, ...] = ("оценка обстоятельств дела",)
@@ -56,19 +84,63 @@ class LLMReasonExtractor:
         self,
         http_client: httpx.AsyncClient,
         api_key: str,
-        model: str = "openai/gpt-4o-mini",
+        model: str = "anthropic/claude-3-5-sonnet",
+        fast_model: str = "google/gemini-flash-1.5",
         timeout: int = 15,
         max_concurrent: int = 8,
     ) -> None:
         self._http_client = http_client
         self._api_key = api_key
         self._model = model
+        self._fast_model = fast_model
         self._timeout = timeout
         self._semaphore = asyncio.Semaphore(max_concurrent)
         self._cache: dict[str, tuple[str, ...]] = {}
-        self._classify_cache: dict[str, tuple[bool, tuple[str, ...]]] = {}
+        self._classify_cache: dict[
+            str, tuple[bool, tuple[str, ...], str, str | None]
+        ] = {}
+        self._outcome_cache: dict[str, tuple[tuple[str, ...], str | None]] = {}
+        self._MAX_CACHE_SIZE = 2000
         self._budget_remaining: int | None = None
         self._logger = logging.getLogger("llm_reason_extractor")
+
+    def _clean_llm_json(self, content: str) -> str:
+        """Extract and clean JSON string from LLM response."""
+        content = content.strip()
+        # Handle markdown code blocks
+        if "```" in content:
+            try:
+                # Try to find content between first and last ```
+                parts = content.split("```")
+                # Parts are: [text, block1, text, block2, text]
+                # Usually it's in the second part if there's only one block
+                for i in range(1, len(parts), 2):
+                    block = parts[i].strip()
+                    if block.startswith("json"):
+                        block = block[4:].strip()
+                    if block:
+                        return block
+            except Exception:
+                pass
+
+        # If no code block or split failed, try to find first '[' or '{'
+        start_idx = -1
+        for i, char in enumerate(content):
+            if char in "[{":
+                start_idx = i
+                break
+
+        if start_idx != -1:
+            end_idx = -1
+            target = "]" if content[start_idx] == "[" else "}"
+            for i in range(len(content) - 1, start_idx, -1):
+                if content[i] == target:
+                    end_idx = i
+                    break
+            if end_idx != -1:
+                return content[start_idx : end_idx + 1]
+
+        return content
 
     def set_fetch_budget(self, max_calls: int) -> None:
         """Cap LLM calls for this fetch batch to avoid surprise costs."""
@@ -83,23 +155,29 @@ class LLMReasonExtractor:
         Returns dict with 'article', 'court', 'year', 'quarter', 'case_type'.
         """
         if not query_text or not query_text.strip():
-            return {"article": None, "court": None, "year": None, "quarter": None, "case_type": None}
+            return {
+                "article": None,
+                "court": None,
+                "year": None,
+                "quarter": None,
+                "case_type": None,
+            }
         try:
             prompt = (
                 f"Ты — эксперт по поиску в судебных базах данных (КАД Арбитр).\n"
                 f"Твоя задача — извлечь параметры поиска из запроса пользователя для API.\n\n"
                 f"Запрос: {query_text}\n\n"
                 f"Извлеки следующие поля в формате JSON:\n"
-                f"1. \"article\": только номер статьи (например, \"61.2\" или \"723\").\n"
-                f"2. \"full_article\": номер статьи с названием кодекса/закона для поиска (например, \"ст. 723 ГК РФ\", \"ст. 61.2 закона о банкротстве\").\n"
-                f"3. \"court\": официальное название суда или его часть (например, \"АС города Москвы\", \"15 ААС\").\n"
-                f"4. \"year\": год в формате ГГГГ.\n"
-                f"5. \"quarter\": номер квартала (1, 2, 3 или 4).\n"
-                f"6. \"case_type\": тип дела - \"Б\" (банкротство), \"Г\" (гражданское), \"А\" (административное) или null.\n\n"
+                f'1. "article": только номер статьи (например, "61.2" или "723").\n'
+                f'2. "full_article": номер статьи с названием кодекса/закона для поиска (например, "ст. 723 ГК РФ", "ст. 61.2 закона о банкротстве").\n'
+                f'3. "court": официальное название суда или его часть (например, "АС города Москвы", "15 ААС").\n'
+                f'4. "year": год в формате ГГГГ.\n'
+                f'5. "quarter": номер квартала (1, 2, 3 или 4).\n'
+                f'6. "case_type": тип дела - "Б" (банкротство), "Г" (гражданское), "А" (административное) или null.\n\n'
                 f"ПРАВИЛА:\n"
-                f"- В поле \"full_article\" ДОБАВЛЯЙ аббревиатуру кодекса (ГК, НК, УК) или краткое название закона, если они упомянуты или понятны из контекста.\n"
-                f"- Если статья из ГК РФ или других кодексов (кроме Закона о банкротстве), ставь case_type: \"Г\".\n"
-                f"- Если в запросе есть слово \"банкротство\" или ст. 61.2, 61.3, 127-ФЗ, ставь case_type: \"Б\".\n"
+                f'- В поле "full_article" ДОБАВЛЯЙ аббревиатуру кодекса (ГК, НК, УК) или краткое название закона, если они упомянуты или понятны из контекста.\n'
+                f'- Если статья из ГК РФ или других кодексов (кроме Закона о банкротстве), ставь case_type: "Г".\n'
+                f'- Если в запросе есть слово "банкротство" или ст. 61.2, 61.3, 127-ФЗ, ставь case_type: "Б".\n'
                 f"- Если параметр не указан, ставь null.\n\n"
                 f"Верни ТОЛЬКО чистый JSON."
             )
@@ -112,7 +190,7 @@ class LLMReasonExtractor:
                     "X-Title": "KAD Bot",
                 },
                 json={
-                    "model": self._model,
+                    "model": self._fast_model,
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": 0,
                     "max_tokens": 150,
@@ -120,37 +198,48 @@ class LLMReasonExtractor:
                 timeout=self._timeout,
             )
             response.raise_for_status()
-            content = response.json()["choices"][0]["message"]["content"].strip()
-            if content.startswith("```"):
-                content = content.split("```", 2)[1]
-                if content.startswith("json"):
-                    content = content[4:]
-                content = content.strip()
+            content = response.json()["choices"][0]["message"]["content"]
+            content = self._clean_llm_json(content)
             parsed = json.loads(content)
             self._logger.info("llm.parse_query.v2", extra={"data": parsed})
             return {
-                "article": str(parsed.get("article")) if parsed.get("article") else None,
-                "full_article": str(parsed.get("full_article")) if parsed.get("full_article") else None,
+                "article": str(parsed.get("article"))
+                if parsed.get("article")
+                else None,
+                "full_article": str(parsed.get("full_article"))
+                if parsed.get("full_article")
+                else None,
                 "court": parsed.get("court"),
                 "year": str(parsed.get("year")) if parsed.get("year") else None,
-                "quarter": str(parsed.get("quarter")) if parsed.get("quarter") else None,
+                "quarter": str(parsed.get("quarter"))
+                if parsed.get("quarter")
+                else None,
                 "case_type": parsed.get("case_type"),
             }
         except Exception as exc:
-            self._logger.warning("llm.parse_query_failed", extra={"data": {"error": str(exc)}})
-        return {"article": None, "full_article": None, "court": None, "year": None, "quarter": None, "case_type": None}
+            self._logger.warning(
+                "llm.parse_query_failed", extra={"data": {"error": str(exc)}}
+            )
+        return {
+            "article": None,
+            "full_article": None,
+            "court": None,
+            "year": None,
+            "quarter": None,
+            "case_type": None,
+        }
 
     async def generate_summary(
-        self, 
-        court: str, 
-        period: str, 
-        article: str | None, 
-        total: int, 
-        satisfied: int, 
-        denied: int, 
+        self,
+        court: str,
+        period: str,
+        article: str | None,
+        total: int,
+        satisfied: int,
+        denied: int,
         unknown: int,
         top_satisfied_reasons: list[str],
-        top_denied_reasons: list[str]
+        top_denied_reasons: list[str],
     ) -> str:
         """Generate a professional legal summary of the analysis results."""
         prompt = (
@@ -161,17 +250,19 @@ class LLMReasonExtractor:
             f"- Статья: {article if article else 'не указана'}\n\n"
             f"Статистика:\n"
             f"- Всего дел: {total}\n"
-            f"- Удовлетворено: {satisfied} ({round(satisfied/total*100 if total>0 else 0)}%)\n"
-            f"- Отказано: {denied} ({round(denied/total*100 if total>0 else 0)}%)\n"
-            f"- Не определено: {unknown} ({round(unknown/total*100 if total>0 else 0)}%)\n\n"
+            f"- Удовлетворено: {satisfied} ({round(satisfied / total * 100 if total > 0 else 0)}%)\n"
+            f"- Отказано: {denied} ({round(denied / total * 100 if total > 0 else 0)}%)\n"
+            f"- Не определено: {unknown} ({round(unknown / total * 100 if total > 0 else 0)}%)\n\n"
             f"Типовые основания для удовлетворения:\n"
-            + "\n".join(f"- {r}" for r in top_satisfied_reasons) + "\n\n"
-            f"Типовые основания для отказа:\n"
-            + "\n".join(f"- {r}" for r in top_denied_reasons) + "\n\n"
-            f"Твоя задача — написать 3-4 предложения, которые резюмируют практику. "
-            f"Избегай шаблонных фраз вроде 'Решение суда удовлетворяет иск'. "
-            f"Пиши как опытный юрист для другого юриста. Акцентируй внимание на шансах успеха.\n"
-            f"Начни сразу с текста сводки."
+            + "\n".join(f"- {r}" for r in top_satisfied_reasons)
+            + "\n\n"
+            "Типовые основания для отказа:\n"
+            + "\n".join(f"- {r}" for r in top_denied_reasons)
+            + "\n\n"
+            "Твоя задача — написать 3-4 предложения, которые резюмируют практику. "
+            "Избегай шаблонных фраз вроде 'Решение суда удовлетворяет иск'. "
+            "Пиши как опытный юрист для другого юриста. Акцентируй внимание на шансах успеха.\n"
+            "Начни сразу с текста сводки."
         )
         try:
             response = await self._http_client.post(
@@ -185,23 +276,30 @@ class LLMReasonExtractor:
                 json={
                     "model": self._model,
                     "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.5,
+                    "temperature": 0,
                     "max_tokens": 400,
                 },
                 timeout=self._timeout,
             )
             response.raise_for_status()
             summary_text = response.json()["choices"][0]["message"]["content"].strip()
-            
+
+            article_line = f"Статья: {article} | " if article else ""
+            satisfied_pct = round(satisfied / total * 100) if total > 0 else 0
+            denied_pct = round(denied / total * 100) if total > 0 else 0
+            unknown_pct = round(unknown / total * 100) if total > 0 else 0
             header = (
-                f"⚖️ СВОДКА ПРАКТИКИ:\n"
-                f"📍 Суд: {court} | 📅 Период: {period}\n"
-                f"📝 Статья: {article if article else '—'} | 📊 Всего дел: {total}\n"
-                f"✅ Удовл: {satisfied} | ❌ Отказ: {denied} (не опред: {unknown})\n\n"
+                f"СВОДКА ПО ЗАПРОСУ:\n"
+                f"Суд: {court} | Период: {period} | {article_line}Всего дел: {total}\n"
+                f"Статистика: Удовлетворено - {satisfied} ({satisfied_pct}%), "
+                f"Отказано - {denied} ({denied_pct}%), "
+                f"Не определено - {unknown} ({unknown_pct}%)\n\n"
             )
             return header + summary_text
         except Exception as exc:
-            self._logger.warning("llm.generate_summary_failed", extra={"data": {"error": str(exc)}})
+            self._logger.warning(
+                "llm.generate_summary_failed", extra={"data": {"error": str(exc)}}
+            )
             # Fallback to simple template
             return f"Суд: {court}\nВсего дел: {total}\nУдовлетворено: {satisfied}\nОтказано: {denied}"
 
@@ -220,6 +318,13 @@ class LLMReasonExtractor:
         try:
             async with self._semaphore:
                 result = await self._call_with_retry(text, outcome)
+            # item 1.7: Bounded Cache
+            if len(self._cache) > self._MAX_CACHE_SIZE:
+                # Simple eviction: clear 25% if full
+                keys_to_remove = list(self._cache.keys())[:500]
+                for k in keys_to_remove:
+                    self._cache.pop(k, None)
+
             self._cache[cache_key] = result
             self._logger.info(
                 "llm.extracted",
@@ -230,48 +335,350 @@ class LLMReasonExtractor:
             self._logger.warning("llm.failed", extra={"data": {"error": str(exc)}})
             return self._FALLBACK  # never let LLM failures crash the pipeline
 
-    async def classify_and_extract(
-        self, decision: CaseDecision, article: str, query_text: str = "",
-    ) -> tuple[bool, tuple[str, ...]]:
-        """Classify whether a case is relevant to a specific article and extract reasons.
+    async def extract_with_outcome(
+        self, decision: CaseDecision
+    ) -> tuple[tuple[str, ...], str | None]:
+        """Extract both legal grounds and outcome mapping for a SINGLE case.
+        Unlike classify_batch, this is used for per-case enrichment."""
+        ctx = self._build_case_context(decision)
+        if not ctx:
+            return self._FALLBACK, None
 
-        Returns (is_relevant, reasons). When irrelevant, reasons = ("НЕ_РЕЛЕВАНТНО",).
-        """
-        context = self._build_case_context(decision)
-        if not context.strip():
-            return False, self._NOT_RELEVANT
-        cache_key = hashlib.sha256(
-            f"classify:{article}:{query_text}:{decision.outcome.value}:{decision.case_id}:{context}".encode()
-        ).hexdigest()
-        if cache_key in self._classify_cache:
-            self._logger.debug("llm.classify_cache_hit")
-            return self._classify_cache[cache_key]
+        cache_key = hashlib.sha256(ctx.encode()).hexdigest()
+        if cache_key in self._outcome_cache:
+            return self._outcome_cache[cache_key]
+
         if self._budget_remaining is not None:
             if self._budget_remaining <= 0:
-                self._logger.debug("llm.budget_exhausted")
-                return True, self._FALLBACK  # keep case when budget exhausted
+                self._logger.debug(
+                    "llm.budget_exhausted", extra={"method": "extract_with_outcome"}
+                )
+                return self._FALLBACK, None
             self._budget_remaining -= 1
         try:
             async with self._semaphore:
-                result = await self._call_classify_with_retry(context, decision.outcome, article, query_text)
-            self._classify_cache[cache_key] = result
-            self._logger.info(
-                "llm.classified",
-                extra={"data": {
-                    "article": article,
-                    "case_number": decision.case_number,
-                    "relevant": result[0],
-                    "labels": list(result[1]),
-                }},
-            )
-            return result
-        except Exception as exc:
-            self._logger.warning("llm.classify_failed", extra={"data": {"error": str(exc)}})
-            return True, self._FALLBACK  # on error, keep the case (safe default)
+                reasons, outcome = await self._call_extract_api(ctx)
 
-    @staticmethod
-    def _build_case_context(decision: CaseDecision) -> str:
-        """Build rich context string from all available case data."""
+            # item 1.7: Bounded Cache
+            if len(self._outcome_cache) > self._MAX_CACHE_SIZE:
+                keys_to_remove = list(self._outcome_cache.keys())[:500]
+                for k in keys_to_remove:
+                    self._outcome_cache.pop(k, None)
+
+            self._outcome_cache[cache_key] = (reasons, outcome)
+            return reasons, outcome
+        except Exception as exc:
+            self._logger.warning(
+                "llm.extract_with_outcome_failed",
+                extra={"data": {"error": str(exc)}},
+            )
+            return self._FALLBACK, None
+
+    async def _call_extract_with_outcome(
+        self, text: str, outcome: CaseOutcome
+    ) -> tuple[tuple[str, ...], str | None]:
+        outcome_ru = {"satisfied": "Удовлетворено", "denied": "Отказано"}.get(
+            outcome.value, "Не определено"
+        )
+        prompt = (
+            f"Ты анализируешь судебный акт арбитражного суда.\n"
+            f"Текст события: {text}\n"
+            f"Текущий автоопределённый результат: {outcome_ru}\n\n"
+            f"Задача 1: Выбери 1-3 правовых основания (например: 'взыскание задолженности', 'неустойка', 'оспаривание сделки').\n"
+            f'Задача 2: Определи исход дела: "satisfied" (удовлетворено), "denied" (отказано), или "unknown".\n\n'
+            f'Ответь JSON: {{"reasons": ["основание1"], "outcome": "satisfied"}}\n'
+            f"Без пояснений, только JSON."
+        )
+        response = await self._http_client.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {self._api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com/kad-bot",
+                "X-Title": "KAD Bot",
+            },
+            json={
+                "model": self._model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0,
+                "max_tokens": 200,
+            },
+            timeout=self._timeout,
+        )
+        response.raise_for_status()
+        content = response.json()["choices"][0]["message"]["content"].strip()
+        content = self._clean_llm_json(content)
+        parsed = json.loads(content)
+
+        if isinstance(parsed, list):
+            # LLM returned list instead of dict — extract reasons from first element
+            valid = tuple(r for r in parsed if isinstance(r, str) and r.strip())
+            return (valid if valid else self._FALLBACK), None
+
+        if isinstance(parsed, dict):
+            reasons_raw = parsed.get("reasons", [])
+            if not isinstance(reasons_raw, list):
+                reasons_raw = [self._FALLBACK[0]]
+            valid = tuple(r for r in reasons_raw if isinstance(r, str) and r.strip())
+            raw_outcome = str(parsed.get("outcome", "") or "").strip().lower()
+            llm_outcome: str | None = None
+            if raw_outcome == "satisfied":
+                llm_outcome = "satisfied"
+            elif raw_outcome == "denied":
+                llm_outcome = "denied"
+            return (valid if valid else self._FALLBACK), llm_outcome
+
+        return self._FALLBACK, None
+
+    async def classify_and_extract(
+        self,
+        decision: CaseDecision,
+        article: str,
+        query_text: str = "",
+    ) -> tuple[bool, tuple[str, ...], str, str | None]:
+        """Compatibility wrapper for classify_batch."""
+        results = await self.classify_batch([decision], article, query_text)
+        return results[0]
+
+    async def classify_batch(
+        self,
+        decisions: list[CaseDecision],
+        article: str,
+        query_text: str = "",
+    ) -> list[tuple[bool, tuple[str, ...], str, str | None]]:
+        """Classify a batch of decisions using batch LLM calls for efficiency.
+
+        Returns list of (is_relevant, reasons, proof_quote, llm_outcome).
+        llm_outcome is "satisfied"/"denied"/None — used when rule-based detection fails.
+        """
+        results: list[tuple[bool, tuple[str, ...], str, str | None] | None] = [
+            None
+        ] * len(decisions)
+        to_fetch_indices: list[int] = []
+
+        # 1. Check cache first
+        for i, decision in enumerate(decisions):
+            context = self._build_case_context(decision)
+            if not context.strip():
+                results[i] = (False, self._NOT_RELEVANT, "", None)
+                continue
+
+            cache_key = hashlib.sha256(
+                f"classify:v8:{article}:{query_text}:{decision.outcome.value}:{decision.case_id}:{context}".encode()
+            ).hexdigest()
+
+            if cache_key in self._classify_cache:
+                results[i] = self._classify_cache[cache_key]
+            else:
+                to_fetch_indices.append(i)
+
+        if not to_fetch_indices:
+            return [res for res in results if res is not None]
+
+        # 2. Process missing cases in sub-batches of 10
+        batch_size = 10
+        for i in range(0, len(to_fetch_indices), batch_size):
+            chunk_indices = to_fetch_indices[i : i + batch_size]
+            chunk_decisions = [decisions[idx] for idx in chunk_indices]
+
+            if self._budget_remaining is not None:
+                if self._budget_remaining <= 0:
+                    for idx in chunk_indices:
+                        results[idx] = (False, self._FALLBACK, "", None)
+                    continue
+                self._budget_remaining -= 1  # Each batch counts as 1 call for budget
+
+            try:
+                async with self._semaphore:
+                    batch_results = await self._call_classify_batch_api(
+                        chunk_decisions, article, query_text
+                    )
+
+                for idx, res in zip(chunk_indices, batch_results):
+                    results[idx] = res
+                    # Cache individual result
+                    decision = decisions[idx]
+                    context = self._build_case_context(decision)
+                    cache_key = hashlib.sha256(
+                        f"classify:v8:{article}:{query_text}:{decision.outcome.value}:{decision.case_id}:{context}".encode()
+                    ).hexdigest()
+                    self._classify_cache[cache_key] = res
+
+            except Exception as exc:
+                self._logger.warning(
+                    "llm.batch_classify_failed", extra={"data": {"error": str(exc)}}
+                )
+                for idx in chunk_indices:
+                    results[idx] = (False, self._FALLBACK, "", None)
+
+        return [res for res in results if res is not None]
+
+    async def _call_classify_batch_api(
+        self,
+        decisions: list[CaseDecision],
+        article: str,
+        query_text: str = "",
+    ) -> list[tuple[bool, tuple[str, ...], str, str | None]]:
+        items = []
+        for i, d in enumerate(decisions):
+            outcome_ru = {"satisfied": "Удовлетворено", "denied": "Отказано"}.get(
+                d.outcome.value, "Не определено"
+            )
+            context = self._build_case_context(d)
+            items.append(
+                f"--- АКТ №{i + 1} ---\nИсход (автоматический): {outcome_ru}\nКонтекст:\n{context}"
+            )
+
+        cases_text = "\n\n".join(items)
+
+        prompt = (
+            f"Ты — элитный юрист-аналитик. Твоя задача — отобрать ТОЛЬКО релевантные судебные акты и предоставить безупречную аналитику.\n\n"
+            f"ЗАПРОС ПОЛЬЗОВАТЕЛЯ: {query_text}\n"
+            f"ЦЕЛЕВАЯ СТАТЬЯ: {article}\n\n"
+            f"АКТЫ ДЛЯ АНАЛИЗА:\n"
+            f"{cases_text}\n\n"
+            f"СТРОГИЕ КРИТЕРИИ РЕЛЕВАНТНОСТИ:\n"
+            f"1. **Суть**: Акт релевантен только если в нем рассматривается спор или ходатайство, прямо связанное со ст. {article} в контексте запроса пользователя.\n"
+            f"2. **Процессуальный мусор**: Обычное упоминание номера статьи в названии документа (например, 'ходатайство №60') БЕЗ связи со ст. {article} — это НЕ РЕЛЕВАНТНО (relevant: false).\n"
+            f"3. **Контекст**: Если целевая статья упоминается лишь в списке других статей без обсуждения её сути — relevant: false.\n\n"
+            f"ТРЕБОВАНИЯ К ПОЛЯМ ОТВЕТА:\n"
+            f"- **reasons**: Пиши профессиональным юридическим языком суть спора (например: 'Оспаривание бездействия управляющего в порядке ст. 60', 'Рассмотрение жалобы на действия АУ по ст. 60'). Избегай общих фраз типа 'упоминание статьи'.\n"
+            f"- **proof_quote**: ОБЯЗАТЕЛЬНОЕ ПОЛЕ. Если relevant: true, ты ДОЛЖЕН привести прямую цитату из текста, которая подтверждает релевантность. Если цитаты нет — relevant должен быть false.\n"
+            f'- **outcome**: ОБЯЗАТЕЛЬНОЕ ПОЛЕ для релевантных актов. Определи исход дела на основе текста: "satisfied" (удовлетворено/обоснованно), "denied" (отказано/необоснованно), или "unknown" (невозможно определить). Анализируй резолютивную часть, не заголовки.\n\n'
+            f"ФОРМАТ ОТВЕТА — СТРОГИЙ JSON-МАССИВ (ровно {len(decisions)} элементов):\n"
+            f"[\n"
+            f'  {{"relevant": true, "reasons": ["Профессиональное обоснование"], "proof_quote": "Цитата из текста для ст.{article}", "outcome": "satisfied"}},\n'
+            f'  {{"relevant": false, "reasons": ["Почему не подходит"], "proof_quote": "", "outcome": "unknown"}}\n'
+            f"]\n\n"
+            f"НИКАКИХ пояснений, комментариев или markdown. Твой ответ должен быть только валидным JSON-массивом."
+        )
+
+        response = await self._http_client.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {self._api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com/kad-bot",
+                "X-Title": "KAD Bot",
+            },
+            json={
+                "model": self._model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0,
+                "max_tokens": 2500,  # Ensure full JSON response is received
+            },
+            timeout=self._timeout * 2,
+        )
+        response.raise_for_status()
+        raw_content = response.json()["choices"][0]["message"]["content"]
+        content = self._clean_llm_json(raw_content)
+
+        try:
+            raw = json.loads(content)
+        except json.JSONDecodeError as e:
+            self._logger.error(
+                "llm.json_parse_failed",
+                extra={"data": {"content": raw_content[:500], "error": str(e)}},
+            )
+            raise
+
+        # Handle edge case: LLM returned a raw JSON string (double-encoded)
+        if isinstance(raw, str):
+            self._logger.warning(
+                "llm.json_is_string", extra={"data": {"content": raw_content[:300]}}
+            )
+            try:
+                raw = json.loads(raw)
+            except Exception:
+                raise ValueError(f"Expected list from LLM but got string: {raw[:100]}")
+
+        # If LLM wrapped list in a dict (common quirk), try to extract it
+        if isinstance(raw, dict):
+            # Look for common keys: 'results', 'acts', 'data', or any list value
+            for key in ["results", "acts", "decisions", "data", "items"]:
+                if isinstance(raw.get(key), list):
+                    raw = raw[key]
+                    break
+            else:
+                # If no known key, use the first list value found
+                for val in raw.values():
+                    if isinstance(val, list):
+                        raw = val
+                        break
+
+        if not isinstance(raw, list):
+            self._logger.error(
+                "llm.expected_list_failed", extra={"data": {"content": raw_content}}
+            )
+            raise ValueError("Expected list from LLM")
+
+        results = []
+        for item in raw:
+            try:
+                # Defensive: if item is a string, it might be double-encoded JSON or a comment
+                if isinstance(item, str):
+                    item = item.strip()
+                    if (item.startswith("{") and item.endswith("}")) or (
+                        item.startswith("[") and item.endswith("]")
+                    ):
+                        try:
+                            item = json.loads(item)
+                        except Exception:
+                            pass
+
+                if not isinstance(item, dict):
+                    self._logger.warning(
+                        "llm.unexpected_item_type", extra={"data": {"item": str(item)}}
+                    )
+                    results.append((False, self._FALLBACK, "", None))
+                    continue
+
+                is_relevant = bool(item.get("relevant", True))
+                reasons = item.get("reasons", [])
+                proof_quote = item.get("proof_quote", "").strip()
+
+                # Extract LLM-determined outcome
+                raw_outcome = str(item.get("outcome", "") or "").strip().lower()
+                llm_outcome: str | None = None
+                if raw_outcome in ("satisfied", "удовлетворено"):
+                    llm_outcome = "satisfied"
+                elif raw_outcome in ("denied", "отказано"):
+                    llm_outcome = "denied"
+
+                # Perfection requirement: No quote = No relevance
+                if is_relevant and not proof_quote:
+                    is_relevant = False
+                    reasons = ["не подтверждено цитатой (нерелевантно)"]
+
+                if not isinstance(reasons, list) or not reasons:
+                    reasons = [self._FALLBACK[0]]
+                valid_reasons = tuple(
+                    r for r in reasons if isinstance(r, str) and r.strip()
+                )
+
+                # Strict safety: if relevant but no quote provided, mark as irrelevant
+                if is_relevant and not proof_quote:
+                    is_relevant = False
+                    valid_reasons = ("НЕ_ПОДТВЕРЖДЕНО_ЦИТАТОЙ",)
+
+                results.append((
+                    is_relevant,
+                    valid_reasons if valid_reasons else self._FALLBACK,
+                    proof_quote,
+                    llm_outcome,
+                ))
+            except Exception as e:
+                self._logger.error(
+                    "llm.item_process_failed",
+                    extra={"data": {"item": str(item), "error": str(e)}},
+                )
+                results.append((False, self._FALLBACK, "", None))
+
+        # Ensure we have the same number of results
+        return results[: len(decisions)]
+
+    def _build_case_context(self, decision: CaseDecision) -> str | None:
+        MAX_TEXT_CHARS = 5000  # Phase 2.5: Reduce context to save costs
         parts: list[str] = []
         if decision.case_number:
             parts.append(f"Дело: {decision.case_number}")
@@ -279,22 +686,35 @@ class LLMReasonExtractor:
             parts.append(f"Суд: {decision.court_name}")
         if decision.case_category:
             cat_map = {"Б": "Банкротство", "Г": "Гражданское", "А": "Административное"}
-            parts.append(f"Категория: {cat_map.get(decision.case_category, decision.case_category)}")
+            parts.append(
+                f"Категория: {cat_map.get(decision.case_category, decision.case_category)}"
+            )
         if decision.analysis_text:
-            parts.append(f"Текст события: {decision.analysis_text}")
+            text = decision.analysis_text
+            if len(text) > MAX_TEXT_CHARS:
+                # Tail-priority: keep the LAST characters (where decisions usually are)
+                text = "..." + text[-MAX_TEXT_CHARS:]
+            parts.append(f"Текст события (последние важные данные): {text}")
         if decision.reasons and decision.reasons != ("оценка обстоятельств дела",):
             parts.append(f"Извлеченные основания: {', '.join(decision.reasons)}")
         return "\n".join(parts)
 
     async def _call_classify_with_retry(
-        self, text: str, outcome: CaseOutcome, article: str, query_text: str = "",
-    ) -> tuple[bool, tuple[str, ...]]:
+        self,
+        text: str,
+        outcome: CaseOutcome,
+        article: str,
+        query_text: str = "",
+    ) -> tuple[bool, tuple[str, ...], str]:
         last_exc: Exception = RuntimeError("no attempts")
         for attempt in range(self._MAX_RETRIES + 1):
             try:
                 return await self._call_classify_api(text, outcome, article, query_text)
             except httpx.HTTPStatusError as exc:
-                if exc.response.status_code in {429, 503} and attempt < self._MAX_RETRIES:
+                if (
+                    exc.response.status_code in {429, 503}
+                    and attempt < self._MAX_RETRIES
+                ):
                     await asyncio.sleep(1.0 * (attempt + 1))
                     last_exc = exc
                     continue
@@ -302,28 +722,29 @@ class LLMReasonExtractor:
         raise last_exc
 
     async def _call_classify_api(
-        self, context: str, outcome: CaseOutcome, article: str, query_text: str = "",
-    ) -> tuple[bool, tuple[str, ...]]:
+        self,
+        context: str,
+        outcome: CaseOutcome,
+        article: str,
+        query_text: str = "",
+    ) -> tuple[bool, tuple[str, ...], str]:
         outcome_ru = {"satisfied": "Удовлетворено", "denied": "Отказано"}.get(
             outcome.value, "Не определено"
         )
-        query_hint = f"Запрос пользователя: {query_text}\n" if query_text else ""
         prompt = (
-            f"Ты — высококвалифицированный юрист Арбитражных судов РФ.\n\n"
-            f"{query_hint}"
-            f"Контекст из системы КАД Арбитр:\n{context}\n"
-            f"Исход дела: {outcome_ru}\n\n"
-            f"ТВОЯ ЗАДАЧА:\n"
-            f"1. Проверь, относится ли этот судебный акт к спору по статье {article}.\n"
-            f"2. Если акт релевантен, извлеки 1-3 ключевых правовых тезиса.\n\n"
-            f"КРИТЕРИИ РЕЛЕВАНТНОСТИ:\n"
-            f"- ТАК КАК ПОИСК УЖЕ БЫЛ ВЫПОЛНЕН ПО СТАТЬЕ {article}, СЧИТАЙ АКТ РЕЛЕВАНТНЫМ, если краткий контекст не содержит явных противоречий (например, упоминания совсем другой статьи или категории спора).\n"
-            f"- Если это процедурное определение (назначение дела, перенос) БЕЗ упоминания сути — ВСЕ РАВНО ОТМЕЧАЙ КАК РЕЛЕВАНТНОЕ (это часть спора по нужной статье).\n"
-            f"- Только если из текста очевидно, что спор касается ДРУГИХ правоотношений — ставь НЕ_РЕЛЕВАНТНО.\n\n"
-            f"ФОРМАТ ОТВЕТА:\n"
-            f"- Если релевантно: JSON массив строк. Если в тексте нет оснований для анализа, пиши [\"оценка обстоятельств дела\"].\n"
-            f"- Если НЕ релевантно (явное несовпадение): JSON массив [\"НЕ_РЕЛЕВАНТНО\"].\n\n"
-            f"Ответь ТОЛЬКО JSON-массивом."
+            f"Ты — элитный юрист-аналитик Арбитражных судов РФ. Твоя задача — ПРОВЕРИТЬ, относится ли этот акт прямо к запросу пользователя.\n\n"
+            f"ЗАПРОС ПОЛЬЗОВАТЕЛЯ: {query_text}\n"
+            f"ЦЕЛЕВАЯ СТАТЬЯ: {article}\n"
+            f"КОНТЕКСТ ИЗ КАД:\n{context}\n"
+            f"ИСХОД ДЕЛА: {outcome_ru}\n\n"
+            f"СТРОГИЕ КРИТЕРИИ (ДЛЯ 100% ТОЧНОСТИ):\n"
+            f"1. СТАТЬЯ: Акт ДОЛЖЕН быть по ст. {article} в контексте запроса пользователя. Если статья иная — НЕ_РЕЛЕВАНТНО.\n"
+            f"2. ЗАКОН: Акт должен относиться к той же области права, что и запрос. Если запрос и акт про разные области — НЕ_РЕЛЕВАНТНО.\n"
+            f"3. СОДЕРЖАНИЕ: Процедурные определения (о назначении и т.д.) БЕЗ сути — НЕ_РЕЛЕВАНТНО.\n"
+            f"4. СУТЬ: Если ст. {article} лишь упомянута, а спор о другом — НЕ_РЕЛЕВАНТНО.\n"
+            f"5. ЦИТАТА: ОБЯЗАТЕЛЬНО приведи короткую цитату (1-2 предложения), подтверждающую суть спора по ст. {article}.\n\n"
+            f"ВЕРНИ JSON:\n"
+            f'{{ "relevant": true/false, "reasons": ["краткий тезис"], "proof_quote": "цитата" }}'
         )
         response = await self._http_client.post(
             "https://openrouter.ai/api/v1/chat/completions",
@@ -342,28 +763,52 @@ class LLMReasonExtractor:
             timeout=self._timeout,
         )
         response.raise_for_status()
-        content = response.json()["choices"][0]["message"]["content"].strip()
-        if content.startswith("```"):
-            content = content.split("```", 2)[1]
-            if content.startswith("json"):
-                content = content[4:]
-            content = content.strip()
-        raw = json.loads(content)
-        if not isinstance(raw, list):
-            return True, self._FALLBACK
-        # Check if LLM says not relevant
-        if any(r == "НЕ_РЕЛЕВАНТНО" for r in raw):
-            return False, self._NOT_RELEVANT
-        valid = tuple(r for r in raw if isinstance(r, str) and r.strip())
-        return True, (valid if valid else self._FALLBACK)
+        raw_content = response.json()["choices"][0]["message"]["content"]
+        content = self._clean_llm_json(raw_content)
 
-    async def _call_with_retry(self, text: str, outcome: CaseOutcome) -> tuple[str, ...]:
+        try:
+            item = json.loads(content)
+        except json.JSONDecodeError as e:
+            self._logger.error(
+                "llm.json_parse_failed",
+                extra={"data": {"content": raw_content, "error": str(e)}},
+            )
+            raise
+
+        if isinstance(item, list) and item:
+            item = item[0]
+
+        is_relevant = bool(item.get("relevant", True))
+        reasons = item.get("reasons", [])
+        proof_quote = item.get("proof_quote", "")
+
+        if not isinstance(reasons, list) or not reasons:
+            reasons = [self._FALLBACK[0]]
+        valid_reasons = tuple(r for r in reasons if isinstance(r, str) and r.strip())
+
+        # Strict safety: if relevant but no quote provided, mark as irrelevant
+        if is_relevant and not proof_quote:
+            is_relevant = False
+            valid_reasons = ("НЕ_ПОДТВЕРЖДЕНО_ЦИТАТОЙ",)
+
+        return (
+            is_relevant,
+            valid_reasons if valid_reasons else self._FALLBACK,
+            proof_quote,
+        )
+
+    async def _call_with_retry(
+        self, text: str, outcome: CaseOutcome
+    ) -> tuple[str, ...]:
         last_exc: Exception = RuntimeError("no attempts")
         for attempt in range(self._MAX_RETRIES + 1):
             try:
                 return await self._call_api(text, outcome)
             except httpx.HTTPStatusError as exc:
-                if exc.response.status_code in {429, 503} and attempt < self._MAX_RETRIES:
+                if (
+                    exc.response.status_code in {429, 503}
+                    and attempt < self._MAX_RETRIES
+                ):
                     await asyncio.sleep(1.0 * (attempt + 1))
                     last_exc = exc
                     continue
@@ -376,13 +821,14 @@ class LLMReasonExtractor:
         )
         labels_str = "\n".join(f"- {label}" for label in self._CANONICAL_LABELS)
         prompt = (
-            f"Ты анализируешь определение арбитражного суда по делу о банкротстве.\n"
+            f"Ты анализируешь судебный акт арбитражного суда.\n"
             f"Текст события: {text}\n"
             f"Результат: {outcome_ru}\n\n"
-            f"Выбери 1–3 правовых основания из списка ниже, которые наиболее точно "
-            f"соответствуют данному делу. Если информации недостаточно, верни "
-            f'["оценка обстоятельств дела"].\n\n'
-            f"Допустимые значения:\n{labels_str}\n\n"
+            f"Выбери 1–3 правовых основания, которые наиболее точно "
+            f"соответствуют данному делу. Можешь использовать основания из списка ниже "
+            f"или сформулировать свои, если дело не относится к перечисленным категориям. "
+            f'Если информации недостаточно, верни ["оценка обстоятельств дела"].\n\n'
+            f"Типовые основания:\n{labels_str}\n\n"
             f"Ответь ТОЛЬКО JSON-массивом строк, без пояснений."
         )
         response = await self._http_client.post(
@@ -412,8 +858,7 @@ class LLMReasonExtractor:
         raw = json.loads(content)
         if not isinstance(raw, list):
             return self._FALLBACK
-        valid = tuple(
-            r for r in raw
-            if r in self._CANONICAL_SET or r == self._FALLBACK[0]
-        )
+        # Accept any well-formed reason string — not just canonical labels.
+        # This allows the LLM to return relevant reasons for any area of law.
+        valid = tuple(r for r in raw if isinstance(r, str) and r.strip())
         return valid if valid else self._FALLBACK

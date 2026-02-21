@@ -2,7 +2,12 @@ import io
 import json
 import logging
 
-from src.app.logging import ContextFilter, JsonFormatter, clear_request_context, set_request_context
+from src.app.bot_logging import (
+    ContextFilter,
+    JsonFormatter,
+    clear_request_context,
+    set_request_context,
+)
 
 
 def test_context_filter_injects_context_fields():

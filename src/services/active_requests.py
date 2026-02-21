@@ -1,6 +1,7 @@
+import logging
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime
-import threading
 
 from src.domain.value_objects import UserId
 
@@ -25,8 +26,15 @@ class ActiveRequestRegistry:
         self._lock = threading.Lock()
         self._active: dict[UserId, ActiveRequest] = {}
         self._db_repo = db_repo
+        self._logger = logging.getLogger("active_requests")
 
-    def start(self, user_id: UserId, query_text: str, total_cases: int, phase: str = "counting") -> bool:
+    def start(
+        self,
+        user_id: UserId,
+        query_text: str,
+        total_cases: int,
+        phase: str = "counting",
+    ) -> bool:
         with self._lock:
             if user_id in self._active:
                 return False
@@ -126,13 +134,17 @@ class ActiveRequestRegistry:
     def cancel(self, user_id: UserId) -> None:
         with self._lock:
             active = self._active.get(user_id)
-            if active is None:
-                return
-            active.cancelled = True
+            if active is not None:
+                active.cancelled = True
+        if self._db_repo is not None:
+            self._db_repo.set_cancelled(str(user_id.value), True)
 
     def is_cancelled(self, user_id: UserId) -> bool:
         with self._lock:
             active = self._active.get(user_id)
-            if active is None:
-                return False
-            return active.cancelled
+            if active is not None and active.cancelled:
+                return True
+
+        if self._db_repo is not None:
+            return self._db_repo.is_cancelled(str(user_id.value))
+        return False

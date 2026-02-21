@@ -24,9 +24,9 @@ class Settings:
 
 def default_settings(now: datetime) -> Settings:
     return Settings(
-        max_cases=500,
+        max_cases=2000,
         max_documents_per_case=5,
-        max_pages=20,
+        max_pages=80,
         fetch_concurrency_min=6,
         fetch_concurrency_max=10,
         slow_alert_minutes=5,

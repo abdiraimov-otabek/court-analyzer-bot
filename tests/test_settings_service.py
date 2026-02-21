@@ -44,7 +44,7 @@ def test_settings_service_updates_valid_values(tmp_path):
     "payload",
     [
         {"max_cases": 4, "max_documents_per_case": 5, "max_pages": 20, "analysis_prompt": "x"},
-        {"max_cases": 501, "max_documents_per_case": 5, "max_pages": 20, "analysis_prompt": "x"},
+        {"max_cases": 5001, "max_documents_per_case": 5, "max_pages": 20, "analysis_prompt": "x"},
         {"max_cases": 100, "max_documents_per_case": 0, "max_pages": 20, "analysis_prompt": "x"},
         {"max_cases": 100, "max_documents_per_case": 5, "max_pages": 0, "analysis_prompt": "x"},
         {

@@ -1,3 +1,4 @@
+import asyncio
 from datetime import date
 
 from src.domain.analysis import AnalysisService
@@ -36,10 +37,12 @@ def test_analysis_service_builds_summary_and_list():
         ),
     ]
 
-    result = service.build_result(
-        court="9 ААС",
-        period="2023 год",
-        decisions=decisions,
+    result = asyncio.run(
+        service.build_result(
+            court="9 ААС",
+            period="2023 год",
+            decisions=decisions,
+        )
     )
 
     assert "Всего дел: 3" in result.summary
@@ -90,7 +93,9 @@ def test_analysis_service_top_reasons_are_distinct_between_outcomes():
         ),
     ]
 
-    result = service.build_result("АС города Москвы", "2024 год", decisions)
+    result = asyncio.run(
+        service.build_result("АС города Москвы", "2024 год", decisions)
+    )
 
     assert "Топ-2 основания для удовлетворения: причинение вреда кредиторам" in result.summary
     assert "Топ-2 основания для отказа: пропуск срока" in result.summary
@@ -119,7 +124,9 @@ def test_analysis_service_keeps_unknown_outcomes_and_percentages_sum():
         ),
     ]
 
-    result = service.build_result("АС города Москвы", "2024 год", decisions)
+    result = asyncio.run(
+        service.build_result("АС города Москвы", "2024 год", decisions)
+    )
 
     assert "Удовлетворено - 1 (33%)" in result.summary
     assert "Отказано - 1 (33%)" in result.summary
@@ -144,7 +151,9 @@ def test_analysis_service_provides_top_reasons_even_when_reason_lists_are_empty(
         ),
     ]
 
-    result = service.build_result("АС города Москвы", "2024 год", decisions)
+    result = asyncio.run(
+        service.build_result("АС города Москвы", "2024 год", decisions)
+    )
 
     assert "Топ-2 основания для удовлетворения: оценка обстоятельств дела" in result.summary
     assert "Топ-2 основания для отказа: оценка обстоятельств дела" in result.summary

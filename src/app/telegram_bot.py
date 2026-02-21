@@ -4,17 +4,37 @@ import asyncio
 import logging
 
 from aiogram import Bot, Dispatcher
-from aiogram.types import BufferedInputFile, Message
+from aiogram.types import (
+    BufferedInputFile,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+)
 
 from src.app.analysis_notifications import send_slow_alert_if_needed
+from src.app.bot_logging import (
+    clear_request_context,
+    configure_logging,
+    log_event,
+    new_request_id,
+    set_request_context,
+)
 from src.app.config import load_config
 from src.app.container import Container
-from src.app.bot_logging import clear_request_context, configure_logging, log_event, new_request_id, set_request_context
 from src.domain.value_objects import UserId
-from src.services.hashing import HashingService
-from src.services.kad_client import KadAccessError, KadInvalidResponseError, KadRateLimitError, KadUnavailableError
 from src.services.case_exporter import build_cases_excel
-from src.services.request_processor import CourtNotFoundError, InsufficientQualityError, NotEnoughData
+from src.services.hashing import HashingService
+from src.services.kad_client import (
+    KadAccessError,
+    KadInvalidResponseError,
+    KadRateLimitError,
+    KadUnavailableError,
+)
+from src.services.request_processor import (
+    CourtNotFoundError,
+    InsufficientQualityError,
+    NotEnoughData,
+)
 
 config = load_config()
 container = Container(config)
@@ -26,9 +46,50 @@ hashing_service = HashingService(config.hash_salt) if config.hash_salt else None
 dp = Dispatcher()
 
 
+def _status_cancel_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="Статус", callback_data="cmd:status"),
+                InlineKeyboardButton(text="Отменить", callback_data="cmd:cancel"),
+            ]
+        ]
+    )
+
+
+def _help_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="Помощь", callback_data="cmd:help"),
+            ]
+        ]
+    )
+
+
+@dp.callback_query(lambda cb: cb.data and cb.data.startswith("cmd:"))
+async def handle_command_button(callback) -> None:
+    cmd = "/" + callback.data.split(":", 1)[1]
+    if not callback.from_user:
+        return
+    user_id = UserId(str(callback.from_user.id))
+    user_hash = hashing_service.hash_value(user_id.value) if hashing_service else "-"
+    request_id = new_request_id()
+    set_request_context(request_id, user_hash, "telegram_bot")
+    bot_logic = container.build_bot_logic()
+    now = callback.message.date.replace(tzinfo=None)
+    responses = bot_logic.handle_message(user_id, cmd, now)
+    await callback.answer()
+    for response in responses:
+        await callback.message.answer(response)
+    clear_request_context()
+
+
 @dp.message()
 async def handle_message(message: Message) -> None:
     if message.text is None:
+        return
+    if not message.from_user:
         return
     user_id = UserId(str(message.from_user.id))
     user_hash = hashing_service.hash_value(user_id.value) if hashing_service else "-"
@@ -60,8 +121,14 @@ async def handle_message(message: Message) -> None:
         return
 
     # Ack the user immediately — before any network call.
-    await message.answer("Принял. Оцениваю объем данных...")
-    asyncio.create_task(_count_and_analyze(message, user_id, pre_result.query_text, pre_result.is_quarter_selection))
+    await message.answer(
+        "Принял. Оцениваю объем данных...", reply_markup=_status_cancel_kb()
+    )
+    asyncio.create_task(
+        _count_and_analyze(
+            message, user_id, pre_result.query_text, pre_result.is_quarter_selection
+        )
+    )
     clear_request_context()
 
 
@@ -82,39 +149,52 @@ async def _count_and_analyze(
         log_event(logger, "count_cases.completed", count=count)
     except KadRateLimitError:
         log_event(logger, "count_cases.failed", error_type="KadRateLimitError")
-        await message.answer("КАД временно ограничил доступ. Попробуйте позже.")
+        await message.answer(
+            "КАД временно ограничил доступ. Попробуйте позже.", reply_markup=_help_kb()
+        )
         container.active_requests.finish(user_id)
         clear_request_context()
         return
     except KadUnavailableError:
         log_event(logger, "count_cases.failed", error_type="KadUnavailableError")
-        await message.answer("КАД временно недоступен. Попробуйте позже.")
+        await message.answer(
+            "КАД временно недоступен. Попробуйте позже.", reply_markup=_help_kb()
+        )
         container.active_requests.finish(user_id)
         clear_request_context()
         return
     except KadInvalidResponseError:
         log_event(logger, "count_cases.failed", error_type="KadInvalidResponseError")
-        await message.answer("КАД вернул некорректный ответ. Запрос прерван.")
+        await message.answer(
+            "КАД вернул некорректный ответ. Запрос прерван.", reply_markup=_help_kb()
+        )
         container.active_requests.finish(user_id)
         clear_request_context()
         return
     except KadAccessError:
         log_event(logger, "count_cases.failed", error_type="KadAccessError")
-        await message.answer("Доступ к КАД ограничен. Проверьте ключ и лимиты.")
+        await message.answer(
+            "Доступ к КАД ограничен. Проверьте ключ и лимиты.", reply_markup=_help_kb()
+        )
         container.active_requests.finish(user_id)
         clear_request_context()
         return
     except Exception:
         logger.exception("count_cases.failed_unexpected")
-        await message.answer("Не удалось обработать запрос. Попробуйте позже.")
+        await message.answer(
+            "Не удалось обработать запрос. Попробуйте позже.", reply_markup=_help_kb()
+        )
         container.active_requests.finish(user_id)
         clear_request_context()
         return
 
     bot_logic = container.build_bot_logic()
-    messages, should_analyze = bot_logic.apply_count_result(user_id, query_text, count, is_quarter_selection)
+    messages, should_analyze = bot_logic.apply_count_result(
+        user_id, query_text, count, is_quarter_selection
+    )
     for msg in messages:
-        await message.answer(msg)
+        kb = _status_cancel_kb() if should_analyze else None
+        await message.answer(msg, reply_markup=kb)
 
     clear_request_context()
     if should_analyze:
@@ -136,20 +216,28 @@ async def _run_analysis(message: Message, user_id: UserId, query_text: str) -> N
     try:
         result = await processor.process(user_id, query_text, settings)
         slow_alert_task.cancel()
-        await message.answer(result.summary)
+        await message.answer(result.summary, reply_markup=_help_kb())
         excel_bytes = build_cases_excel(result.case_list)
         file = BufferedInputFile(excel_bytes, filename="cases.xlsx")
         await message.answer_document(file)
-        log_event(logger, "analysis.completed", total_cases=len(result.case_list.splitlines()))
+        log_event(
+            logger, "analysis.completed", total_cases=len(result.case_list.splitlines())
+        )
     except KadRateLimitError:
         log_event(logger, "analysis.failed", error_type="KadRateLimitError")
-        await message.answer("КАД временно ограничил доступ. Попробуйте позже.")
+        await message.answer(
+            "КАД временно ограничил доступ. Попробуйте позже.", reply_markup=_help_kb()
+        )
     except KadUnavailableError:
         log_event(logger, "analysis.failed", error_type="KadUnavailableError")
-        await message.answer("КАД временно недоступен. Попробуйте позже.")
+        await message.answer(
+            "КАД временно недоступен. Попробуйте позже.", reply_markup=_help_kb()
+        )
     except KadInvalidResponseError:
         log_event(logger, "analysis.failed", error_type="KadInvalidResponseError")
-        await message.answer("КАД вернул некорректный ответ. Запрос прерван.")
+        await message.answer(
+            "КАД вернул некорректный ответ. Запрос прерван.", reply_markup=_help_kb()
+        )
     except InsufficientQualityError as exc:
         log_event(
             logger,
@@ -161,7 +249,7 @@ async def _run_analysis(message: Message, user_id: UserId, query_text: str) -> N
             unknown_share=round(exc.unknown_share, 4),
             court_mismatch_share=round(exc.court_mismatch_share, 4),
         )
-        await message.answer(exc.summary)
+        await message.answer(exc.summary, reply_markup=_help_kb())
         if settings.send_partial_file_on_quality_fail and exc.case_list.strip():
             excel_bytes = build_cases_excel(exc.case_list)
             file = BufferedInputFile(excel_bytes, filename="cases.xlsx")
@@ -171,17 +259,21 @@ async def _run_analysis(message: Message, user_id: UserId, query_text: str) -> N
         await message.answer(
             "По вашему запросу не найдено дел в указанном суде. "
             "Возможно, название суда указано неточно или суд не поддерживается системой КАД. "
-            "Уточните суд и попробуйте снова."
+            "Уточните суд и попробуйте снова.",
+            reply_markup=_help_kb(),
         )
     except NotEnoughData:
         log_event(logger, "analysis.failed", error_type="NotEnoughData")
         await message.answer(
             "Найдено менее 5 дел. Недостаточно данных для статистического анализа. "
-            "Уточните запрос или период."
+            "Уточните запрос или период.",
+            reply_markup=_help_kb(),
         )
     except Exception:
         logger.exception("analysis.failed_unexpected")
-        await message.answer("Не удалось завершить анализ. Попробуйте позже.")
+        await message.answer(
+            "Не удалось завершить анализ. Попробуйте позже.", reply_markup=_help_kb()
+        )
     finally:
         slow_alert_task.cancel()
         container.active_requests.finish(user_id)

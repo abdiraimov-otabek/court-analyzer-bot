@@ -1,21 +1,24 @@
 from __future__ import annotations
 
+import hashlib
+import logging
+import sqlite3
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
-import logging
-from collections import Counter
-import sqlite3
 
+from src.app.bot_logging import log_event
 from src.domain.analysis import AnalysisService
 from src.domain.entities import AnalysisResult, CaseDecision, CaseOutcome
+from src.domain.kad_models import KadUnavailableError
 from src.domain.settings import Settings
 from src.domain.value_objects import UserId
-from src.app.bot_logging import log_event
-from src.services.active_requests import ActiveRequestRegistry
-from src.services.hashing import HashingService
-from src.services.kad_client import KadClient, KadUnavailableError, QueryParser
 from src.infrastructure.cache_repository import AnalysisCacheRepository
 from src.infrastructure.log_repository import LogRepository
+from src.services.active_requests import ActiveRequestRegistry
+from src.services.hashing import HashingService
+from src.services.kad_client import KadClient
+from src.services.query_parser import QueryParser
 
 
 @dataclass(frozen=True)
@@ -41,7 +44,9 @@ class QueryMetadataExtractor:
             period = f"{year} год"
         else:
             period = "период не указан"
-        return QueryMetadata(court=court or "суд не указан", period=period, article=article)
+        return QueryMetadata(
+            court=court or "суд не указан", period=period, article=article
+        )
 
     def _find_year(self, text: str) -> str | None:
         for token in text.split():
@@ -63,7 +68,7 @@ class QueryMetadataExtractor:
 
 
 class RequestProcessor:
-    _CACHE_SCHEMA_VERSION = "v20"
+    _CACHE_SCHEMA_VERSION = "v21"
 
     def __init__(
         self,
@@ -84,7 +89,9 @@ class RequestProcessor:
         self._metadata_extractor = metadata_extractor or QueryMetadataExtractor()
         self._logger = logging.getLogger("request_processor")
 
-    async def process(self, user_id: UserId, query_text: str, settings: Settings) -> AnalysisResult:
+    async def process(
+        self, user_id: UserId, query_text: str, settings: Settings
+    ) -> AnalysisResult:
         if self._active_requests.is_cancelled(user_id):
             raise RequestCancelled()
         total_start = datetime.now()
@@ -127,18 +134,30 @@ class RequestProcessor:
         fetch_result = await self._kad_client.fetch_decisions(
             query_text,
             settings,
-            on_progress=lambda count: self._active_requests.update_attempted(user_id, count),
-            on_successful=lambda count: self._active_requests.update_successful(user_id, count),
-            on_retry=lambda count: self._active_requests.update_retry_count(user_id, count),
+            on_progress=lambda count: self._active_requests.update_attempted(
+                user_id, count
+            ),
+            on_successful=lambda count: self._active_requests.update_successful(
+                user_id, count
+            ),
+            on_retry=lambda count: self._active_requests.update_retry_count(
+                user_id, count
+            ),
             on_collection_progress=on_collection_progress,
             on_stage_change=on_stage_change,
             should_cancel=lambda: self._active_requests.is_cancelled(user_id),
         )
         fetch_duration_ms = int((datetime.now() - fetch_start).total_seconds() * 1000)
         decisions = fetch_result.decisions
-        self._active_requests.update_attempted(user_id, fetch_result.stats.attempted_cases)
-        self._active_requests.update_successful(user_id, fetch_result.stats.successful_cases)
-        self._active_requests.update_retry_count(user_id, fetch_result.stats.retry_count)
+        self._active_requests.update_attempted(
+            user_id, fetch_result.stats.attempted_cases
+        )
+        self._active_requests.update_successful(
+            user_id, fetch_result.stats.successful_cases
+        )
+        self._active_requests.update_retry_count(
+            user_id, fetch_result.stats.retry_count
+        )
         if self._active_requests.is_cancelled(user_id):
             raise RequestCancelled()
         if fetch_result.stats.court_filter_removed:
@@ -152,10 +171,15 @@ class RequestProcessor:
                 raise NotEnoughData()
             if fetch_result.stats.attempted_cases >= 20:
                 # Most cases fetched but filtered by court → court unrecognised by API.
-                if fetch_result.stats.filtered_by_court >= fetch_result.stats.attempted_cases // 2:
+                if (
+                    fetch_result.stats.filtered_by_court
+                    >= fetch_result.stats.attempted_cases // 2
+                ):
                     raise CourtNotFoundError()
                 # Many attempted but almost none returned data → transient API outage.
-                raise KadUnavailableError("KAD returned no case data despite large result set")
+                raise KadUnavailableError(
+                    "KAD returned no case data despite large result set"
+                )
             raise NotEnoughData()
         satisfied_cases = self._count_outcomes(decisions, CaseOutcome.SATISFIED)
         denied_cases = self._count_outcomes(decisions, CaseOutcome.DENIED)
@@ -163,7 +187,8 @@ class RequestProcessor:
         unknown_cases = max(0, len(decisions) - known_cases)
         unknown_share = (unknown_cases / len(decisions)) if decisions else 1.0
         court_mismatch_share = (
-            fetch_result.stats.filtered_by_court / fetch_result.stats.court_compared_cases
+            fetch_result.stats.filtered_by_court
+            / fetch_result.stats.court_compared_cases
             if fetch_result.stats.court_compared_cases > 0
             else 0.0
         )
@@ -184,23 +209,35 @@ class RequestProcessor:
             metadata = QueryMetadata(
                 court=p.court or metadata.court,
                 period=metadata.period,  # We'll update period below if dates match
-                article=p.article or metadata.article
+                article=p.article or metadata.article,
             )
-            
+
             if p.date_from and p.date_to:
                 m_from, m_to = int(p.date_from[5:7]), int(p.date_to[5:7])
                 year = p.date_from[:4]
-                if m_from == 1 and m_to == 3: dp = f"1 квартал {year} года"
-                elif m_from == 4 and m_to == 6: dp = f"2 квартал {year} года"
-                elif m_from == 7 and m_to == 9: dp = f"3 квартал {year} года"
-                elif m_from == 10 and m_to == 12: dp = f"4 квартал {year} года"
-                elif m_from == 1 and m_to == 12: dp = f"{year} год"
-                else: dp = f"{p.date_from} - {p.date_to}"
-                metadata = QueryMetadata(court=metadata.court, period=dp, article=metadata.article)
+                if m_from == 1 and m_to == 3:
+                    dp = f"1 квартал {year} года"
+                elif m_from == 4 and m_to == 6:
+                    dp = f"2 квартал {year} года"
+                elif m_from == 7 and m_to == 9:
+                    dp = f"3 квартал {year} года"
+                elif m_from == 10 and m_to == 12:
+                    dp = f"4 квартал {year} года"
+                elif m_from == 1 and m_to == 12:
+                    dp = f"{year} год"
+                else:
+                    dp = f"{p.date_from} - {p.date_to}"
+                metadata = QueryMetadata(
+                    court=metadata.court, period=dp, article=metadata.article
+                )
 
         court_for_summary = metadata.court
         if court_for_summary == "суд не указан" or not court_for_summary:
-            known_courts = [d.court_name for d in decisions if d.court_name and d.court_name != "Суд не указан"]
+            known_courts = [
+                d.court_name
+                for d in decisions
+                if d.court_name and d.court_name != "Суд не указан"
+            ]
             if known_courts:
                 court_for_summary = Counter(known_courts).most_common(1)[0][0]
 
@@ -215,11 +252,15 @@ class RequestProcessor:
         # Skip quality gate when article classification already filtered the set —
         # the remaining cases are intentionally few and quality thresholds designed
         # for 100+ case datasets would reject valid filtered results.
-        quality_reason = None if article_filtered else self._get_quality_reason(
-            known_cases=known_cases,
-            unknown_share=unknown_share,
-            court_mismatch_share=court_mismatch_share,
-            settings=settings,
+        quality_reason = (
+            None
+            if article_filtered
+            else self._get_quality_reason(
+                known_cases=known_cases,
+                unknown_share=unknown_share,
+                court_mismatch_share=court_mismatch_share,
+                settings=settings,
+            )
         )
         if quality_reason is not None:
             log_event(
@@ -282,14 +323,19 @@ class RequestProcessor:
         return result
 
     def _build_cache_key(self, query_text: str, settings: Settings) -> str:
-        return (
+        raw_key = (
             f"{self._CACHE_SCHEMA_VERSION}|{query_text}|{settings.max_cases}|{settings.max_documents_per_case}|"
             f"{settings.max_pages}|{settings.fetch_concurrency_min}|{settings.fetch_concurrency_max}|"
             f"{settings.analysis_prompt}"
         )
+        return hashlib.sha256(raw_key.encode()).hexdigest()
 
-    def _count_outcomes(self, decisions: list[CaseDecision], target: CaseOutcome) -> int:
-        return sum(1 for decision in decisions if self._normalize_outcome(decision) == target)
+    def _count_outcomes(
+        self, decisions: list[CaseDecision], target: CaseOutcome
+    ) -> int:
+        return sum(
+            1 for decision in decisions if self._normalize_outcome(decision) == target
+        )
 
     def _normalize_outcome(self, decision: CaseDecision) -> CaseOutcome:
         return self._analysis_service.normalize_outcome(decision)

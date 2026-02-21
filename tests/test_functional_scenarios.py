@@ -22,11 +22,11 @@ class MappedCountProvider:
 
 
 class StaticSettingsProvider:
-    def __init__(self, max_cases: int = 500) -> None:
+    def __init__(self, max_cases: int = 2000) -> None:
         self._settings = Settings(
             max_cases=max_cases,
             max_documents_per_case=5,
-            max_pages=20,
+            max_pages=80,
             fetch_concurrency_min=6,
             fetch_concurrency_max=10,
             slow_alert_minutes=5,
@@ -104,25 +104,29 @@ def test_edge_scenarios_handle_no_results(query):
     user_id = UserId("123")
     messages = logic.handle_message(user_id, query, datetime(2026, 2, 11, 12, 0, 0))
 
-    if "ААС" in query:
-        assert len(messages) == 2
-        assert "Оцениваю" in messages[0]
-        assert "не найдено" in messages[1]
-    else:
+    messages = logic.handle_message(user_id, query, datetime(2026, 2, 11, 12, 0, 0))
+
+    if query == "!@#$%^&*()":
+        # Pure junk still fails validation -> 1 message
         assert len(messages) == 1
         assert (
             "укажите суд" in messages[0].lower()
             or "уточните суд" in messages[0].lower()
-            or "уточните период" in messages[0].lower()
         )
+    else:
+        # Potential NL (like "банкротство") or case numbers now pass to evaluation -> 2 messages
+        assert len(messages) == 2
+        assert "Оцениваю" in messages[0]
 
 
 def test_edge_scenario_handles_too_many_results():
-    mapping = {edge_overflow_query: 501}
+    mapping = {edge_overflow_query: 2001}
     logic = build_logic(mapping)
     user_id = UserId("123")
-    messages = logic.handle_message(user_id, edge_overflow_query, datetime(2026, 2, 11, 12, 0, 0))
+    messages = logic.handle_message(
+        user_id, edge_overflow_query, datetime(2026, 2, 11, 12, 0, 0)
+    )
 
     assert len(messages) == 2
     assert "Оцениваю" in messages[0]
-    assert "более 500" in messages[1]
+    assert "более 2000" in messages[1]

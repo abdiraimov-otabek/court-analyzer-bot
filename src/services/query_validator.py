@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.services.kad_client import QueryParser
+from src.services.query_parser import QueryParser
 
 
 @dataclass(frozen=True)
@@ -20,10 +20,17 @@ class QueryValidator:
         self._parser = parser or QueryParser()
 
     def validate(self, query_text: str) -> QueryValidationResult:
-        if len(query_text.strip()) > 30:
-            # Assume it's a natural language query that LLM will handle
+        clean_text = query_text.strip()
+
+        # Obvious junk (no letters/digits) should always fail
+        if not any(c.isalnum() for c in clean_text):
+            return QueryValidationResult(missing_court=True, missing_period=True)
+
+        if len(clean_text) >= 5:
+            # Let it pass to async flow where LLM will refine/validate parameters.
+            # This follows the "Prioritize LLM" audit recommendation for better NL support.
             return QueryValidationResult(missing_court=False, missing_period=False)
-            
+
         params = self._parser.parse(query_text)
         return QueryValidationResult(
             missing_court=not bool(params.court),

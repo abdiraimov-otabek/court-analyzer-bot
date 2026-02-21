@@ -2,41 +2,48 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import date
+from typing import TYPE_CHECKING
 
 from src.domain.entities import AnalysisResult, CaseDecision, CaseOutcome
+
+if TYPE_CHECKING:
+    from src.services.llm_reason_extractor import LLMReasonExtractor
 
 
 class AnalysisService:
     def __init__(self, llm_reason_extractor: LLMReasonExtractor | None = None) -> None:
         self._llm_reason_extractor = llm_reason_extractor
 
-    async def build_result(self, court: str, period: str, decisions: list[CaseDecision], article: str | None = None) -> AnalysisResult:
-        total = len(decisions)
-        satisfied = sum(1 for decision in decisions if self.normalize_outcome(decision) == CaseOutcome.SATISFIED)
-        denied = sum(1 for decision in decisions if self.normalize_outcome(decision) == CaseOutcome.DENIED)
-        unknown = sum(1 for decision in decisions if self.normalize_outcome(decision) == CaseOutcome.UNKNOWN)
+    async def build_result(
+        self,
+        court: str,
+        period: str,
+        decisions: list[CaseDecision],
+        article: str | None = None,
+    ) -> AnalysisResult:
+        satisfied = 0
+        denied = 0
+        unknown = 0
+        satisfied_reasons: Counter[str] = Counter()
+        denied_reasons: Counter[str] = Counter()
+        all_reasons: Counter[str] = Counter()
 
+        for decision in decisions:
+            outcome = self.normalize_outcome(decision)
+            if outcome == CaseOutcome.SATISFIED:
+                satisfied += 1
+                satisfied_reasons.update(decision.reasons)
+            elif outcome == CaseOutcome.DENIED:
+                denied += 1
+                denied_reasons.update(decision.reasons)
+            else:
+                unknown += 1
+            all_reasons.update(decision.reasons)
+
+        total = len(decisions)
         satisfied_pct = self._percentage(satisfied, total)
         denied_pct = self._percentage(denied, total)
         unknown_pct = self._percentage(unknown, total)
-
-        satisfied_reasons = Counter(
-            reason
-            for decision in decisions
-            if self.normalize_outcome(decision) == CaseOutcome.SATISFIED
-            for reason in decision.reasons
-        )
-        denied_reasons = Counter(
-            reason
-            for decision in decisions
-            if self.normalize_outcome(decision) == CaseOutcome.DENIED
-            for reason in decision.reasons
-        )
-        all_reasons = Counter(
-            reason
-            for decision in decisions
-            for reason in decision.reasons
-        )
 
         stats = (
             f"Удовлетворено - {satisfied} ({satisfied_pct}%), "
@@ -65,7 +72,7 @@ class AnalysisService:
                 denied=denied,
                 unknown=unknown,
                 top_satisfied_reasons=[r for r, _ in satisfied_reasons.most_common(5)],
-                top_denied_reasons=[r for r, _ in denied_reasons.most_common(5)]
+                top_denied_reasons=[r for r, _ in denied_reasons.most_common(5)],
             )
         else:
             article_line = f"Статья: {article} | " if article else ""
@@ -88,7 +95,9 @@ class AnalysisService:
             return 0
         return round(part / total * 100)
 
-    def _format_top_distinct(self, primary: Counter[str], secondary: Counter[str], fallback: Counter[str]) -> str:
+    def _format_top_distinct(
+        self, primary: Counter[str], secondary: Counter[str], fallback: Counter[str]
+    ) -> str:
         if not primary:
             return self._format_fallback_top(fallback)
         exclusive = [
@@ -117,17 +126,24 @@ class AnalysisService:
         return "; ".join(reason for reason, _ in reasons.most_common(2))
 
     def _format_case(self, decision: CaseDecision) -> str:
-        case_label = decision.case_number or (f"ID:{decision.case_id}" if decision.case_id else "Номер дела не указан")
+        case_label = decision.case_number or (
+            f"ID:{decision.case_id}" if decision.case_id else "Номер дела не указан"
+        )
         court = decision.court_name or "Суд не указан"
         reason = self._format_reason(decision)
         link = decision.case_link or "https://kad.arbitr.ru/"
+
+        quote_text = ""
+        if decision.proof_quote:
+            quote_text = f" | Цитата: {decision.proof_quote}"
+
         docs_text = ""
         if decision.document_links:
             doc_links = [f"[{d['name']}]({d['url']})" for d in decision.document_links]
             docs_text = " | Документы: " + ", ".join(doc_links)
         return (
             f"{case_label} | {self._format_date(decision.decision_date)} | "
-            f"{self._format_outcome(decision)} | Суд: {court} | Основание: {reason} | Ссылка: {link}{docs_text}"
+            f"{self._format_outcome(decision)} | Суд: {court} | Основание: {reason} | Ссылка: {link}{quote_text}{docs_text}"
         )
 
     def _format_date(self, value: date) -> str:
@@ -146,24 +162,48 @@ class AnalysisService:
         if isinstance(outcome, CaseOutcome):
             return outcome
         normalized = str(outcome).strip().lower()
-        satisfied_variants = {
-            CaseOutcome.SATISFIED.value, "удовлетворено", "удовлетворить", 
-            "удовлетворить частично", "признать незаконным", "признать недействительным",
-            "обоснованно"
-        }
-        if any(v in normalized for v in satisfied_variants):
-            return CaseOutcome.SATISFIED
-        
         denied_variants = {
-            CaseOutcome.DENIED.value, "отказано", "отказать", 
-            "прекратить производство", "необоснованно", "без удовлетворения"
+            CaseOutcome.DENIED.value,
+            "отказано",
+            "отказать",
+            "прекратить производство",
+            "необоснованно",
+            "без удовлетворения",
+            "оставить без изменения",
+            "оставлено без изменения",
+            "без изменения",
+            "оставить без удовлетворения",
+            "оставлено без удовлетворения",
+            "не обоснована",
+            "жалоба не обоснована",
         }
         if any(v in normalized for v in denied_variants):
             return CaseOutcome.DENIED
-            
+
+        satisfied_variants = {
+            CaseOutcome.SATISFIED.value,
+            "удовлетворено",
+            "удовлетворить",
+            "удовлетворить частично",
+            "частично удовлетворено",
+            "удовлетворено частично",
+            "признать незаконным",
+            "признать недействительным",
+            "обоснованно",
+            "жалоба удовлетворена",
+            "заявление удовлетворено",
+            "жалоба обоснована",
+            "отменить",
+            "изменить",
+            "включить в реестр",
+            "взыскать",
+        }
+        if any(v in normalized for v in satisfied_variants):
+            return CaseOutcome.SATISFIED
+
         return CaseOutcome.UNKNOWN
 
     def _format_reason(self, decision: CaseDecision) -> str:
         if not decision.reasons:
             return "не указано"
-        return "; ".join(decision.reasons[:2])
+        return "; ".join(decision.reasons[:5])

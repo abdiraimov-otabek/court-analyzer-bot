@@ -5,7 +5,7 @@ import logging
 import re
 import sqlite3
 import time
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from datetime import date, datetime
 from typing import Callable, Protocol
 from urllib.parse import quote_plus
@@ -14,18 +14,28 @@ import httpx
 
 from src.app.bot_logging import log_debug, log_event
 from src.domain.entities import CaseDecision, CaseOutcome
+from src.domain.kad_models import (
+    DecisionFetchOutcome,
+    FetchDecisionsResult,
+    FetchStats,
+    KadAccessError,
+    KadInvalidResponseError,
+    KadRateLimitError,
+    KadUnavailableError,
+    RequestResult,
+    SearchParams,
+)
 from src.domain.reason_extractor import ReasonExtractor
 from src.domain.settings import Settings
 from src.infrastructure.case_details_cache_repository import CaseDetailsCacheRepository
 from src.services.llm_reason_extractor import LLMReasonExtractor
+from src.services.query_parser import QueryParser
 
 
 class KadClient(Protocol):
-    def count_cases(self, query_text: str, settings: Settings) -> int:
-        ...
+    def count_cases(self, query_text: str, settings: Settings) -> int: ...
 
-    async def count_cases_async(self, query_text: str, settings: Settings) -> int:
-        ...
+    async def count_cases_async(self, query_text: str, settings: Settings) -> int: ...
 
     async def fetch_decisions(
         self,
@@ -37,252 +47,7 @@ class KadClient(Protocol):
         on_collection_progress: Callable[[int], None] | None = None,
         on_stage_change: Callable[[str], None] | None = None,
         should_cancel: Callable[[], bool] | None = None,
-    ) -> "FetchDecisionsResult":
-        ...
-
-
-class KadRateLimitError(RuntimeError):
-    pass
-
-
-class KadUnavailableError(RuntimeError):
-    pass
-
-
-class KadInvalidResponseError(RuntimeError):
-    pass
-
-
-class KadAccessError(RuntimeError):
-    pass
-
-
-@dataclass
-class SearchParams:
-    inn_or_name: str | None
-    inn_type: str | None
-    date_from: str | None
-    date_to: str | None
-    court: str | None
-    case_type: str | None
-    case_number: str | None
-    article: str | None = None
-    full_article: str | None = None
-    paragraph: str | None = None
-    use_court_filter: bool = True
-
-
-@dataclass(frozen=True)
-class FetchStats:
-    attempted_cases: int
-    successful_cases: int
-    retry_count: int
-    effective_concurrency: int
-    case_id_collection_ms: int
-    details_fetch_ms: int
-    filtered_by_court: int
-    court_compared_cases: int
-    court_filter_removed: bool = False
-    filtered_by_article: int = 0
-
-
-@dataclass(frozen=True)
-class FetchDecisionsResult:
-    decisions: list[CaseDecision]
-    stats: FetchStats
-    params: SearchParams | None = None
-
-
-@dataclass(frozen=True)
-class RequestResult:
-    data: dict
-    retry_count: int
-    had_transient_error: bool
-
-
-@dataclass(frozen=True)
-class DecisionFetchOutcome:
-    decision: CaseDecision | None
-    retry_count: int
-    had_transient_error: bool
-
-
-# Abbreviations that must stay ALL-CAPS inside court name fragments.
-_COURT_CAPS = frozenset({"АО", "НАО", "ХМАО", "ЯНАО", "ЧАО", "ЕАО", "ЛО", "МО"})
-
-# Generic geographic nouns that are lowercase in Russian court names.
-# Proper geographic adjectives/names (Новгородской, Татарстан, etc.) are NOT in this set.
-_COURT_LOWERCASE_WORDS = frozenset({
-    "и",
-    "области", "область",
-    "края", "край",
-    "округа", "округ", "автономного", "автономной",
-    "города", "город",
-})
-
-
-def _court_fragment_to_title(fragment: str) -> str:
-    """Convert ALL-CAPS court name fragment to proper Russian casing.
-
-    Rules:
-    - Known abbreviations (АО, ХМАО, …)  → stay ALL-CAPS
-    - Generic geographic nouns (область, край, округ, город, …) → lowercase
-    - Everything else (proper names/adjectives) → Title Case
-    """
-    return " ".join(
-        word if word in _COURT_CAPS
-        else word.lower() if word.lower() in _COURT_LOWERCASE_WORDS
-        else word.title()
-        for word in fragment.split(" ")
-    )
-
-
-class QueryParser:
-    _year_pattern = re.compile(r"\b(19\d{2}|20\d{2})\b")
-    _inn_pattern = re.compile(r"\b\d{10,12}\b")
-    _case_number_pattern = re.compile(r"[АA]\d{2}-\d+/\d{4}")
-    _quoted_pattern = re.compile(r"[«\"]([^»\"]{3,100})[»\"]")
-    _article_pattern = re.compile(r"(?:ст\.?|стать[а-яё]*)\s*(\d{1,3}(?:\.\d+)*)", re.IGNORECASE)
-    _plain_article_pattern = re.compile(r"\b(\d{1,3}\.\d+)\b")
-    _paragraph_pattern = re.compile(r"(?:п\.?|пункт)\s*(\d+)", re.IGNORECASE)
-
-    def parse(self, text: str) -> SearchParams:
-        year = self._extract_year(text)
-        quarter = self._extract_quarter(text)
-        date_from, date_to = self._build_period(year, quarter)
-        case_number = self._extract_case_number(text)
-        inn_or_name = self._extract_inn(text) or self._extract_quoted_name(text)
-        court = self._extract_court(text)
-        article = self._extract_article(text)
-        paragraph = self._extract_paragraph(text)
-        case_type = self._extract_case_type(text, article=article)
-        return SearchParams(
-            inn_or_name=inn_or_name,
-            inn_type="Any" if inn_or_name else None,
-            date_from=date_from,
-            date_to=date_to,
-            court=court,
-            case_type=case_type,
-            case_number=case_number,
-            article=article,
-            paragraph=paragraph,
-            use_court_filter=True,
-        )
-
-    def _extract_year(self, text: str) -> str | None:
-        match = self._year_pattern.search(text)
-        return match.group(1) if match else None
-
-    def _extract_quarter(self, text: str) -> int | None:
-        lowered = text.lower()
-        if "1 кварт" in lowered or "i кварт" in lowered:
-            return 1
-        if "2 кварт" in lowered or "ii кварт" in lowered:
-            return 2
-        if "3 кварт" in lowered or "iii кварт" in lowered:
-            return 3
-        if "4 кварт" in lowered or "iv кварт" in lowered:
-            return 4
-        return None
-
-    def _build_period(self, year: str | None, quarter: int | None) -> tuple[str | None, str | None]:
-        if not year:
-            return None, None
-        if not quarter:
-            return f"{year}-01-01", f"{year}-12-31"
-        if quarter == 1:
-            return f"{year}-01-01", f"{year}-03-31"
-        if quarter == 2:
-            return f"{year}-04-01", f"{year}-06-30"
-        if quarter == 3:
-            return f"{year}-07-01", f"{year}-09-30"
-        return f"{year}-10-01", f"{year}-12-31"
-
-    def _extract_inn(self, text: str) -> str | None:
-        match = self._inn_pattern.search(text)
-        return match.group(0) if match else None
-
-    def _extract_case_number(self, text: str) -> str | None:
-        match = self._case_number_pattern.search(text.upper())
-        return match.group(0) if match else None
-
-    def _extract_quoted_name(self, text: str) -> str | None:
-        match = self._quoted_pattern.search(text)
-        if not match:
-            return None
-        return match.group(1).strip() or None
-
-    def _extract_court(self, text: str) -> str | None:
-        normalized = " ".join(text.upper().split())
-        match = re.search(r"\b(\d{1,2})\s*-?\s*ААС\b", normalized)
-        if match:
-            court_number = int(match.group(1))
-            return f"{court_number} арбитражный апелляционный суд"
-        if "ДЕВЯТЫЙ ААС" in normalized or "ДЕВЯТЫЙ АРБИТРАЖНЫЙ АПЕЛЛЯЦИОННЫЙ СУД" in normalized:
-            return "9 арбитражный апелляционный суд"
-        if (
-            "АС ГОРОДА МОСКВЫ" in normalized
-            or "АС Г. МОСКВЫ" in normalized
-            or "АС МОСКВЫ" in normalized
-            or "АРБИТРАЖНЫЙ СУД ГОРОДА МОСКВЫ" in normalized
-        ):
-            return "АС города Москвы"
-        if (
-            "АС СПБ" in normalized
-            or "АС СПБ И ЛО" in normalized
-            or "АС САНКТ-ПЕТЕРБУРГА" in normalized
-            or "АС САНКТ-ПЕТЕРБУРГА И ЛЕНИНГРАДСКОЙ ОБЛАСТИ" in normalized
-            or "АРБИТРАЖНЫЙ СУД САНКТ-ПЕТЕРБУРГА И ЛЕНИНГРАДСКОЙ ОБЛАСТИ" in normalized
-        ):
-            # parser-api expects this exact court value for Saint Petersburg court
-            return "АС города Санкт-Петербурга и Ленинградской области"
-
-        arb_match = re.search(
-            r"\bАРБИТРАЖНЫЙ\s+СУД\b\s+([А-ЯЁA-Z0-9\-. ]{2,90}?)(?:\s+ЗА\b|\s+ПО\b|$)",
-            normalized,
-        )
-        if arb_match:
-            fragment = arb_match.group(1).strip(" .,")
-            if fragment:
-                return f"АС {_court_fragment_to_title(fragment)}"
-
-        generic_match = re.search(
-            r"\bАС\b\s+([А-ЯЁA-Z0-9\-. ]{2,90}?)(?:\s+ЗА\b|\s+ПО\b|$)",
-            normalized,
-        )
-        if generic_match:
-            fragment = generic_match.group(1).strip(" .,")
-            if fragment:
-                return f"АС {_court_fragment_to_title(fragment)}"
-        return None
-
-    def _extract_case_type(self, text: str, article: str | None = None) -> str | None:
-        lowered = text.lower()
-        if article and article.startswith("61."):
-            return "B"
-        if "банкрот" in lowered or "несостоятельн" in lowered:
-            return "B"
-        if "администр" in lowered:
-            return "A"
-        if "граждан" in lowered or re.search(r'\bгк\b', lowered):
-            return "G"
-        return None
-
-    def _extract_article(self, text: str) -> str | None:
-        match = self._article_pattern.search(text)
-        if match:
-            return match.group(1)
-        # fallback: users often type only "61.3" without "ст."
-        plain = self._plain_article_pattern.search(text)
-        if plain:
-            return plain.group(1)
-        return None
-
-    def _extract_paragraph(self, text: str) -> str | None:
-        match = self._paragraph_pattern.search(text)
-        if not match:
-            return None
-        return match.group(1)
+    ) -> FetchDecisionsResult: ...
 
 
 class ParserApiKadClient:
@@ -319,12 +84,16 @@ class ParserApiKadClient:
         self._search_case_types: dict[str, str] = {}
         self._search_case_numbers: dict[str, str] = {}
         self._details_cache_repository = details_cache_repository
-        self._current_article: str | None = None  # set during fetch_decisions
         limits = httpx.Limits(max_connections=100, max_keepalive_connections=50)
-        self._sync_http_client = sync_http_client or httpx.Client(timeout=self._timeout, limits=limits)
-        self._async_http_client = async_http_client or httpx.AsyncClient(timeout=self._timeout, limits=limits)
+        self._sync_http_client = sync_http_client or httpx.Client(
+            timeout=self._timeout, limits=limits
+        )
+        self._async_http_client = async_http_client or httpx.AsyncClient(
+            timeout=self._timeout, limits=limits
+        )
         self._owns_sync_client = sync_http_client is None
         self._owns_async_client = async_http_client is None
+        self._current_article: str | None = None
 
     async def aclose(self) -> None:
         if self._owns_async_client:
@@ -335,7 +104,9 @@ class ParserApiKadClient:
     def count_cases(self, query_text: str, settings: Settings) -> int:
         params = self._parser.parse(query_text)
         if params.case_number:
-            case = self._fetch_case_by_number(params.case_number, settings.max_documents_per_case)
+            case = self._fetch_case_by_number(
+                params.case_number, settings.max_documents_per_case
+            )
             return 1 if case else 0
         params = self._sanitize_params(params)
         first_page = self._search(params, page=1)
@@ -367,9 +138,11 @@ class ParserApiKadClient:
         """Async version of count_cases — fetches remaining pages in parallel."""
         params = self._parser.parse(query_text)
         params = await self._refine_params_with_llm(query_text, params)
-        
+
         if params.case_number:
-            case = await self._fetch_case_by_number_async(params.case_number, settings.max_documents_per_case)
+            case = await self._fetch_case_by_number_async(
+                params.case_number, settings.max_documents_per_case
+            )
             return 1 if case else 0
         params = await self._sanitize_params_async(params)
 
@@ -399,7 +172,9 @@ class ParserApiKadClient:
 
         page_tasks = [
             asyncio.create_task(
-                self._request_json_async("GET", self._search_path, params=self._build_query(params, page=p))
+                self._request_json_async(
+                    "GET", self._search_path, params=self._build_query(params, page=p)
+                )
             )
             for p in range(2, max_page + 1)
         ]
@@ -432,17 +207,17 @@ class ParserApiKadClient:
     ) -> FetchDecisionsResult:
         params = self._parser.parse(query_text)
         params = await self._refine_params_with_llm(query_text, params)
-        self._current_article = params.article
         if self._llm_reason_extractor is not None:
             # When article is specified, every case needs classification — raise budget
-            budget = 600 if params.article else 50
-            self._llm_reason_extractor.set_fetch_budget(max_calls=budget)
+            self._llm_reason_extractor.set_fetch_budget(max_calls=600)
         if should_cancel and should_cancel():
             return self._empty_fetch_result()
         if params.case_number:
             if on_stage_change:
                 on_stage_change("analyzing")
-            outcome = await self._fetch_case_by_number_async(params.case_number, settings.max_documents_per_case)
+            outcome = await self._fetch_case_by_number_async(
+                params.case_number, settings.max_documents_per_case
+            )
             decisions = [outcome] if outcome else []
             return FetchDecisionsResult(
                 decisions=decisions,
@@ -470,8 +245,14 @@ class ParserApiKadClient:
         # court name is syntactically valid but the combination has no results;
         # in that case we proceed without the API court filter and rely on local
         # court_name matching inside fetch to narrow results down.
-        if params.court and not params.use_court_filter and self._court_validity_cache.get(params.court) is False:
-            log_event(self._logger, "fetch_decisions.court_filter_removed", court=params.court)
+        if (
+            params.court
+            and not params.use_court_filter
+            and self._court_validity_cache.get(params.court) is False
+        ):
+            log_event(
+                self._logger, "fetch_decisions.court_filter_removed", court=params.court
+            )
             return FetchDecisionsResult(
                 decisions=[],
                 stats=FetchStats(
@@ -519,123 +300,142 @@ class ParserApiKadClient:
         if on_stage_change:
             on_stage_change("analyzing")
 
-        async def _fill_in_flight() -> None:
-            nonlocal next_index
-            while (
-                next_index < case_limit
-                and len(in_flight) < target_concurrency
-                and not (should_cancel and should_cancel())
-            ):
-                in_flight.add(
-                    asyncio.create_task(
-                        self._fetch_case_decision_with_metrics(case_ids[next_index], settings)
-                    )
-                )
-                next_index += 1
+        self._current_article = params.article
+        try:
 
-        await _fill_in_flight()
-        while in_flight:
-            if should_cancel and should_cancel():
-                for task in in_flight:
-                    task.cancel()
-                await asyncio.gather(*in_flight, return_exceptions=True)
-                break
-
-            done, _ = await asyncio.wait(in_flight, return_when=asyncio.FIRST_COMPLETED)
-            for task in done:
-                in_flight.discard(task)
-                attempted_cases += 1
-                if on_progress:
-                    on_progress(attempted_cases)
-                try:
-                    outcome = await task
-                except KadUnavailableError:
-                    unavailable_failures += 1
-                    target_concurrency = max(min_concurrency, target_concurrency - 2)
-                    stable_success_window = 0
-                    log_event(
-                        self._logger,
-                        "fetch_decisions.case_failed",
-                        error_type="KadUnavailableError",
-                        unavailable_failures=unavailable_failures,
-                        attempted_cases=attempted_cases,
+            async def _fill_in_flight() -> None:
+                nonlocal next_index
+                while (
+                    next_index < case_limit
+                    and len(in_flight) < target_concurrency
+                    and not (should_cancel and should_cancel())
+                ):
+                    in_flight.add(
+                        asyncio.create_task(
+                            self._fetch_case_decision_with_metrics(
+                                case_ids[next_index], settings
+                            )
+                        )
                     )
-                    continue
-                except KadRateLimitError:
-                    rate_limit_failures += 1
-                    target_concurrency = max(min_concurrency, target_concurrency - 2)
-                    stable_success_window = 0
-                    log_event(
-                        self._logger,
-                        "fetch_decisions.case_failed",
-                        error_type="KadRateLimitError",
-                        rate_limit_failures=rate_limit_failures,
-                        attempted_cases=attempted_cases,
-                    )
-                    continue
-                except KadInvalidResponseError:
-                    invalid_failures += 1
-                    log_event(
-                        self._logger,
-                        "fetch_decisions.case_failed",
-                        error_type="KadInvalidResponseError",
-                        invalid_failures=invalid_failures,
-                        attempted_cases=attempted_cases,
-                    )
-                    continue
-                if outcome.decision is not None:
-                    decision = outcome.decision
-                    if not self._matches_query_scope(decision, params):
-                        filtered_by_article += 1
-                        continue
-                    if expected_court_tokens:
-                        actual_court_tokens = self._court_tokens(decision.court_name)
-                        if actual_court_tokens:
-                            court_compared_cases += 1
-                        if (
-                            actual_court_tokens
-                            and not self._courts_match(expected_court_tokens, actual_court_tokens)
-                        ):
-                            filtered_by_court += 1
-                            continue
-                        if not actual_court_tokens and params.court:
-                            decision = replace(decision, court_name=params.court)
-                    decisions.append(decision)
-                    successful_cases += 1
-                    if on_successful:
-                        on_successful(successful_cases)
-                if outcome.retry_count:
-                    retry_count += outcome.retry_count
-                    if on_retry:
-                        on_retry(retry_count)
+                    next_index += 1
 
-                if outcome.had_transient_error:
-                    target_concurrency = max(min_concurrency, target_concurrency - 2)
-                    stable_success_window = 0
-                else:
-                    stable_success_window += 1
-                    if stable_success_window >= target_concurrency and target_concurrency < max_concurrency:
-                        target_concurrency += 1
-                        stable_success_window = 0
-
-                if attempted_cases % 25 == 0:
-                    log_event(
-                        self._logger,
-                        "fetch_decisions.progress",
-                        attempted_cases=attempted_cases,
-                        successful_cases=successful_cases,
-                        retry_count=retry_count,
-                        target_concurrency=target_concurrency,
-                        in_flight=len(in_flight),
-                    )
-
-                if attempted_cases >= case_limit:
-                    for pending in in_flight:
-                        pending.cancel()
-                    await asyncio.gather(*in_flight, return_exceptions=True)
-                    in_flight.clear()
-                    break
             await _fill_in_flight()
+            while in_flight:
+                if should_cancel and should_cancel():
+                    for task in in_flight:
+                        task.cancel()
+                    await asyncio.gather(*in_flight, return_exceptions=True)
+                    break
+
+                done, _ = await asyncio.wait(
+                    in_flight, return_when=asyncio.FIRST_COMPLETED
+                )
+                for task in done:
+                    in_flight.discard(task)
+                    attempted_cases += 1
+                    if on_progress:
+                        on_progress(attempted_cases)
+                    try:
+                        outcome = await task
+                    except KadUnavailableError:
+                        unavailable_failures += 1
+                        target_concurrency = max(
+                            min_concurrency, target_concurrency - 2
+                        )
+                        stable_success_window = 0
+                        log_event(
+                            self._logger,
+                            "fetch_decisions.case_failed",
+                            error_type="KadUnavailableError",
+                            unavailable_failures=unavailable_failures,
+                            attempted_cases=attempted_cases,
+                        )
+                        continue
+                    except KadRateLimitError:
+                        rate_limit_failures += 1
+                        target_concurrency = max(
+                            min_concurrency, target_concurrency - 2
+                        )
+                        stable_success_window = 0
+                        log_event(
+                            self._logger,
+                            "fetch_decisions.case_failed",
+                            error_type="KadRateLimitError",
+                            rate_limit_failures=rate_limit_failures,
+                            attempted_cases=attempted_cases,
+                        )
+                        continue
+                    except KadInvalidResponseError:
+                        invalid_failures += 1
+                        log_event(
+                            self._logger,
+                            "fetch_decisions.case_failed",
+                            error_type="KadInvalidResponseError",
+                            invalid_failures=invalid_failures,
+                            attempted_cases=attempted_cases,
+                        )
+                        continue
+                    if outcome.decision is not None:
+                        decision = outcome.decision
+                        if not self._matches_query_scope(decision, params):
+                            filtered_by_article += 1
+                            continue
+                        if expected_court_tokens:
+                            actual_court_tokens = self._court_tokens(
+                                decision.court_name
+                            )
+                            if actual_court_tokens:
+                                court_compared_cases += 1
+                            if actual_court_tokens and not self._courts_match(
+                                expected_court_tokens, actual_court_tokens
+                            ):
+                                filtered_by_court += 1
+                                continue
+                            if not actual_court_tokens and params.court:
+                                decision = replace(decision, court_name=params.court)
+                        decisions.append(decision)
+                        successful_cases += 1
+                        if on_successful:
+                            on_successful(successful_cases)
+                    if outcome.retry_count:
+                        retry_count += outcome.retry_count
+                        if on_retry:
+                            on_retry(retry_count)
+
+                    if outcome.had_transient_error:
+                        target_concurrency = max(
+                            min_concurrency, target_concurrency - 2
+                        )
+                        stable_success_window = 0
+                    else:
+                        stable_success_window += 1
+                        if (
+                            stable_success_window >= target_concurrency
+                            and target_concurrency < max_concurrency
+                        ):
+                            target_concurrency += 1
+                            stable_success_window = 0
+
+                    if attempted_cases % 25 == 0:
+                        log_event(
+                            self._logger,
+                            "fetch_decisions.progress",
+                            attempted_cases=attempted_cases,
+                            successful_cases=successful_cases,
+                            retry_count=retry_count,
+                            target_concurrency=target_concurrency,
+                            in_flight=len(in_flight),
+                        )
+
+                    if attempted_cases >= case_limit:
+                        for pending in in_flight:
+                            pending.cancel()
+                        await asyncio.gather(*in_flight, return_exceptions=True)
+                        in_flight.clear()
+                        break
+                await _fill_in_flight()
+        finally:
+            self._current_article = None
 
         details_fetch_ms = int((time.perf_counter() - details_start) * 1000)
         log_event(
@@ -663,13 +463,15 @@ class ParserApiKadClient:
 
         # When article is specified, first hard-filter by case category, then classify via LLM
         if params.article and decisions:
-            # Hard pre-filter: ст.61.2/61.3 are bankruptcy provisions —
-            # reject civil ("Г") and administrative ("А") cases before LLM classification.
-            # This prevents wasting LLM tokens on obviously irrelevant cases.
             pre_filter_count = len(decisions)
+            category_filtered = 0
             if params.case_type == "B":
+                # Hard pre-filter: ст.61.2/61.3 are bankruptcy provisions —
+                # reject civil ("Г") and administrative ("А") cases before LLM classification.
+                # This prevents wasting LLM tokens on obviously irrelevant cases.
                 decisions = [
-                    d for d in decisions
+                    d
+                    for d in decisions
                     if not d.case_category or d.case_category == "Б"
                 ]
                 category_filtered = pre_filter_count - len(decisions)
@@ -681,6 +483,7 @@ class ParserApiKadClient:
                         remaining=len(decisions),
                     )
                     filtered_by_article += category_filtered
+            pre_llm_count = len(decisions)
 
         if params.article and self._llm_reason_extractor is not None and decisions:
             if on_stage_change:
@@ -691,25 +494,46 @@ class ParserApiKadClient:
                 article=params.article,
                 total_decisions=len(decisions),
             )
-            classify_tasks = [
-                self._llm_reason_extractor.classify_and_extract(d, params.article, query_text)
-                for d in decisions
-            ]
-            classify_results = await asyncio.gather(*classify_tasks)
+
+            # Batch classification for 100% data quality and cost reduction
+            classify_results = await self._llm_reason_extractor.classify_batch(
+                decisions, params.article, query_text
+            )
+
             relevant_decisions: list[CaseDecision] = []
-            for decision, (is_relevant, reasons) in zip(decisions, classify_results):
+            filtered_by_relevance = 0
+            for decision, (is_relevant, reasons, proof_quote, llm_outcome) in zip(
+                decisions, classify_results
+            ):
                 if is_relevant:
-                    relevant_decisions.append(replace(decision, reasons=reasons))
+                    updated = replace(
+                        decision, reasons=reasons, proof_quote=proof_quote
+                    )
+                    # Apply LLM-determined outcome when rule-based detection failed
+                    if updated.outcome == CaseOutcome.UNKNOWN and llm_outcome:
+                        if llm_outcome == "satisfied":
+                            updated = replace(updated, outcome=CaseOutcome.SATISFIED)
+                        elif llm_outcome == "denied":
+                            updated = replace(updated, outcome=CaseOutcome.DENIED)
+                    relevant_decisions.append(updated)
                 else:
-                    filtered_by_article += 1
+                    filtered_by_relevance += 1
+
             decisions = relevant_decisions
             successful_cases = len(decisions)
+
+            # Update the global counter for the final stats object
+            filtered_by_article += filtered_by_relevance
+
             log_event(
                 self._logger,
                 "fetch_decisions.article_classification_done",
                 article=params.article,
+                total_input=pre_filter_count,
+                pre_llm_count=pre_llm_count,
                 relevant=len(decisions),
-                filtered=filtered_by_article,
+                filtered_category=category_filtered,
+                filtered_relevance=filtered_by_relevance,
             )
 
         if self._llm_reason_extractor is not None:
@@ -754,58 +578,71 @@ class ParserApiKadClient:
         should_cancel: Callable[[], bool] | None = None,
         on_collection_progress: Callable[[int], None] | None = None,
     ) -> list[str]:
-        self._search_case_types.clear()  # reset for each new collection session
+        self._search_case_types.clear()
         self._search_case_numbers.clear()
         case_ids: list[str] = []
         seen: set[str] = set()
-        pages_count: int = 0  # set from first successful page response
-        for page in range(1, settings.max_pages + 1):
-            if should_cancel and should_cancel():
-                return case_ids
-            data_result = await self._request_json_async(
-                "GET",
-                self._search_path,
-                params=self._build_query(params, page),
-            )
-            data = self._validate_success(data_result.data)
-            if data.get("Success") == 0:
-                if not case_ids:
-                    # No results collected yet — genuinely empty query.
-                    break
-                # A mid-pagination Success=0 is a transient API quirk.
-                # Skip this page without resetting pages_count and continue.
-                log_event(self._logger, "collect_case_ids.page_skipped", page=page)
-                continue
-            for case in data.get("Cases", []):
-                case_id = case.get("CaseId")
-                if not case_id or case_id in seen:
+
+        # Phase 2.2: Parallelize collection. First page for count.
+        data_result = await self._request_json_async(
+            "GET", self._search_path, params=self._build_query(params, 1)
+        )
+        data = self._validate_success(data_result.data)
+        pages_count = int(data.get("PagesCount", 0) or 0)
+
+        def _process_page(p_data: dict):
+            for case in p_data.get("Cases", []):
+                cid = case.get("CaseId")
+                if not cid or cid in seen:
                     continue
-                seen.add(case_id)
-                # Cache CaseType and CaseNumber — search results include them; details_by_id does not.
-                case_type = str(case.get("CaseType", "") or "").strip()
-                if case_type:
-                    self._search_case_types[case_id] = case_type
-                case_number = str(case.get("CaseNumber", "") or "").strip()
-                if case_number:
-                    self._search_case_numbers[case_id] = case_number
-                case_ids.append(case_id)
+                seen.add(cid)
+                case_ids.append(cid)
+                c_type = str(case.get("CaseType", "") or "").strip()
+                if c_type:
+                    self._search_case_types[cid] = c_type
+                c_num = str(case.get("CaseNumber", "") or "").strip()
+                if c_num:
+                    self._search_case_numbers[cid] = c_num
                 if on_collection_progress:
                     on_collection_progress(len(case_ids))
-                if len(case_ids) >= settings.max_cases:
-                    return case_ids
-            pages_count = int(data.get("PagesCount", 0) or 0)
-            log_event(
-                self._logger,
-                "collect_case_ids.page",
-                page=page,
-                pages_count=pages_count,
-                collected=len(case_ids),
+
+        _process_page(data)
+        if len(case_ids) >= settings.max_cases or pages_count <= 1:
+            return case_ids
+
+        max_page = min(settings.max_pages, pages_count)
+        page_tasks = [
+            self._request_json_async(
+                "GET", self._search_path, params=self._build_query(params, p)
             )
-            if page >= pages_count:
-                break
+            for p in range(2, max_page + 1)
+        ]
+
+        results = await asyncio.gather(*page_tasks, return_exceptions=True)
+        fail_count = 0
+        for res in results:
+            if isinstance(res, (BaseException, type(None))):
+                fail_count += 1
+                continue
+            try:
+                p_data = self._validate_success(res.data)
+                _process_page(p_data)
+                if len(case_ids) >= settings.max_cases:
+                    break
+            except Exception:
+                fail_count += 1
+                continue
+
+        if pages_count > 1 and fail_count / (max_page - 1) > 0.3:
+            raise KadUnavailableError(
+                f"Too many pages failed to load ({fail_count}/{max_page - 1}). Data may be incomplete."
+            )
+
         return case_ids
 
-    async def _fetch_case_decision_with_metrics(self, case_id: str, settings: Settings) -> DecisionFetchOutcome:
+    async def _fetch_case_decision_with_metrics(
+        self, case_id: str, settings: Settings
+    ) -> DecisionFetchOutcome:
         now = datetime.now()
         if self._details_cache_repository is not None:
             try:
@@ -819,7 +656,9 @@ class ParserApiKadClient:
                     error=str(exc),
                 )
             if cached is not None:
-                return DecisionFetchOutcome(decision=cached, retry_count=0, had_transient_error=False)
+                return DecisionFetchOutcome(
+                    decision=cached, retry_count=0, had_transient_error=False
+                )
 
         data_result = await self._request_json_async(
             "GET",
@@ -851,12 +690,25 @@ class ParserApiKadClient:
             decision is not None
             and self._llm_reason_extractor is not None
             and not self._current_article
-            and (not decision.reasons or decision.reasons == ("оценка обстоятельств дела",))
+            and (
+                not decision.reasons
+                or decision.reasons == ("оценка обстоятельств дела",)
+                or decision.outcome == CaseOutcome.UNKNOWN
+            )
         ):
-            llm_reasons = await self._llm_reason_extractor.extract(
+            (
+                llm_reasons,
+                llm_outcome,
+            ) = await self._llm_reason_extractor.extract_with_outcome(
                 decision.analysis_text, decision.outcome
             )
             decision = replace(decision, reasons=llm_reasons)
+            # Apply LLM-determined outcome when rule-based detection failed
+            if decision.outcome == CaseOutcome.UNKNOWN and llm_outcome:
+                if llm_outcome == "satisfied":
+                    decision = replace(decision, outcome=CaseOutcome.SATISFIED)
+                elif llm_outcome == "denied":
+                    decision = replace(decision, outcome=CaseOutcome.DENIED)
         if decision is not None and self._details_cache_repository is not None:
             try:
                 self._details_cache_repository.set(
@@ -889,11 +741,15 @@ class ParserApiKadClient:
         removed: list[str] = []
         while True:
             try:
-                data = self._request_json("GET", self._search_path, params=self._build_query(params, page=1))
+                data = self._request_json(
+                    "GET", self._search_path, params=self._build_query(params, page=1)
+                )
                 if data.get("Success") == 0:
                     return params
                 if removed:
-                    log_event(self._logger, "search.filters_removed", removed_filters=removed)
+                    log_event(
+                        self._logger, "search.filters_removed", removed_filters=removed
+                    )
                 # Only cache court as definitively valid on a confirmed Success=1 response.
                 if params.court is not None and params.use_court_filter:
                     self._court_validity_cache[params.court] = True
@@ -917,13 +773,18 @@ class ParserApiKadClient:
             try:
                 # Use asdict for logging
                 from dataclasses import asdict
+
                 log_debug(self._logger, "search.sanitizing", params=asdict(params))
-                
-                result = await self._request_json_async("GET", self._search_path, params=self._build_query(params, page=1))
+
+                result = await self._request_json_async(
+                    "GET", self._search_path, params=self._build_query(params, page=1)
+                )
                 if result.data.get("Success") == 0:
                     return params
                 if removed:
-                    log_event(self._logger, "search.filters_removed", removed_filters=removed)
+                    log_event(
+                        self._logger, "search.filters_removed", removed_filters=removed
+                    )
                 if params.court is not None and params.use_court_filter:
                     self._court_validity_cache[params.court] = True
                 return params
@@ -934,11 +795,17 @@ class ParserApiKadClient:
                 if "Court" in removed and params.court and not params.use_court_filter:
                     self._court_validity_cache[params.court] = False
 
-    def _drop_invalid_filter(self, params: SearchParams, error_text: str, removed: list[str]) -> bool:
+    def _drop_invalid_filter(
+        self, params: SearchParams, error_text: str, removed: list[str]
+    ) -> bool:
         normalized = error_text.lower()
         log_event(self._logger, "search.api_error", error=error_text)
         removed_any = False
-        if ("court" in normalized or "суд" in normalized) and params.court and params.use_court_filter:
+        if (
+            ("court" in normalized or "суд" in normalized)
+            and params.court
+            and params.use_court_filter
+        ):
             params.use_court_filter = False
             removed.append("Court")
             removed_any = True
@@ -970,13 +837,13 @@ class ParserApiKadClient:
         }
         if params.inn_or_name:
             query["Inn"] = params.inn_or_name
-        
+
         # Priority 1: full_article (e.g. "ст. 723 ГК РФ") — best for full-text precision
         # Priority 2: article (e.g. "723") — fallback
         search_text = params.full_article or params.article
         if search_text:
             query["Text"] = search_text
-            
+
         if params.inn_type:
             query["InnType"] = params.inn_type
         if params.date_from:
@@ -989,7 +856,9 @@ class ParserApiKadClient:
             query["CaseType"] = params.case_type
         return query
 
-    def _fetch_case_by_number(self, case_number: str, max_documents_per_case: int) -> CaseDecision | None:
+    def _fetch_case_by_number(
+        self, case_number: str, max_documents_per_case: int
+    ) -> CaseDecision | None:
         data = self._request_json(
             "GET",
             self._details_by_number_path,
@@ -1000,9 +869,13 @@ class ParserApiKadClient:
         if not cases:
             return None
         case = cases[0]
-        return self._build_decision_from_case(case, max_documents_per_case=max_documents_per_case)
+        return self._build_decision_from_case(
+            case, max_documents_per_case=max_documents_per_case
+        )
 
-    async def _fetch_case_by_number_async(self, case_number: str, max_documents_per_case: int) -> CaseDecision | None:
+    async def _fetch_case_by_number_async(
+        self, case_number: str, max_documents_per_case: int
+    ) -> CaseDecision | None:
         data_result = await self._request_json_async(
             "GET",
             self._details_by_number_path,
@@ -1013,9 +886,16 @@ class ParserApiKadClient:
         if not cases:
             return None
         case = cases[0]
-        decision = self._build_decision_from_case(case, max_documents_per_case=max_documents_per_case)
-        if decision is not None and self._llm_reason_extractor is not None and (
-            not decision.reasons or decision.reasons == ("оценка обстоятельств дела",)
+        decision = self._build_decision_from_case(
+            case, max_documents_per_case=max_documents_per_case
+        )
+        if (
+            decision is not None
+            and self._llm_reason_extractor is not None
+            and (
+                not decision.reasons
+                or decision.reasons == ("оценка обстоятельств дела",)
+            )
         ):
             llm_reasons = await self._llm_reason_extractor.extract(
                 decision.analysis_text, decision.outcome
@@ -1044,7 +924,9 @@ class ParserApiKadClient:
         if max_documents_per_case:
             events = events[-max_documents_per_case:]
 
-        outcome, reasons, decision_date, analysis_text, document_links = self._extract_outcome_and_reasons(events)
+        outcome, reasons, decision_date, analysis_text, document_links = (
+            self._extract_outcome_and_reasons(events)
+        )
         case_category = self._extract_case_category(case)
         return CaseDecision(
             case_number=case_number,
@@ -1074,7 +956,14 @@ class ParserApiKadClient:
         return ""
 
     def _extract_court_name(self, case: dict) -> str:
-        for key in ("CourtName", "Court", "court_name", "court", "CourtFullName", "CaseCourtName"):
+        for key in (
+            "CourtName",
+            "Court",
+            "court_name",
+            "court",
+            "CourtFullName",
+            "CaseCourtName",
+        ):
             value = case.get(key)
             if value:
                 return self._normalize_court_value(value)
@@ -1136,7 +1025,9 @@ class ParserApiKadClient:
         if not court_name:
             return set()
         normalized = " ".join(court_name.upper().replace("Ё", "Е").split())
-        aas_match = re.search(r"\b(\d{1,2})\s*(?:ААС|АРБИТРАЖНЫЙ АПЕЛЛЯЦИОННЫЙ СУД)\b", normalized)
+        aas_match = re.search(
+            r"\b(\d{1,2})\s*(?:ААС|АРБИТРАЖНЫЙ АПЕЛЛЯЦИОННЫЙ СУД)\b", normalized
+        )
         if aas_match:
             return {f"AAS_{aas_match.group(1)}"}
         if "САНКТ" in normalized or "ПЕТЕРБУРГ" in normalized or "СПБ" in normalized:
@@ -1205,9 +1096,17 @@ class ParserApiKadClient:
         min_size = min(len(expected_tokens), len(actual_tokens))
         return (len(overlap) / min_size) >= 0.6
 
-    def _extract_outcome_and_reasons(self, events: list[dict]) -> tuple[CaseOutcome, tuple[str, ...], date, str, tuple[dict[str, str], ...]]:
+    def _extract_outcome_and_reasons(
+        self, events: list[dict]
+    ) -> tuple[CaseOutcome, tuple[str, ...], date, str, tuple[dict[str, str], ...]]:
         if not events:
-            return CaseOutcome.UNKNOWN, ("оценка обстоятельств дела",), date.today(), "", ()
+            return (
+                CaseOutcome.UNKNOWN,
+                ("оценка обстоятельств дела",),
+                date.today(),
+                "",
+                (),
+            )
 
         # Each entry: (full_text, priority_text, date, docs)
         # priority_text = only the most structured/reliable fields from the API
@@ -1218,11 +1117,16 @@ class ParserApiKadClient:
             full_text = self._build_event_text(event)
             # DecisionTypeName is the most reliable structured field (e.g. "Отказать в удовлетворении")
             # ActTypeName and Resolution are also structured decision fields
-            priority_text = " ".join(filter(None, [
-                str(event.get("DecisionTypeName", "") or ""),
-                str(event.get("ActTypeName", "") or ""),
-                str(event.get("Resolution", "") or ""),
-            ])).strip()
+            priority_text = " ".join(
+                filter(
+                    None,
+                    [
+                        str(event.get("DecisionTypeName", "") or ""),
+                        str(event.get("ActTypeName", "") or ""),
+                        str(event.get("Resolution", "") or ""),
+                    ],
+                )
+            ).strip()
 
             docs: list[dict[str, str]] = []
             if event.get("FileName") and event.get("Url"):
@@ -1230,7 +1134,10 @@ class ParserApiKadClient:
             elif event.get("Details") and isinstance(event["Details"], list):
                 for detail in event["Details"]:
                     if detail.get("FileName") and detail.get("Url"):
-                        docs.append({"name": str(detail["FileName"]), "url": str(detail["Url"])})
+                        docs.append({
+                            "name": str(detail["FileName"]),
+                            "url": str(detail["Url"]),
+                        })
 
             prepared.append((full_text, priority_text, decision_date, docs))
 
@@ -1257,7 +1164,13 @@ class ParserApiKadClient:
                     break
 
         decision_date = prepared[decisive_idx][2]
-        analysis_text = prepared[decisive_idx][0]
+
+        # Concatenate ALL event texts for better recall (Phase 3)
+        # We add markers so the LLM understands it's looking at a history of events.
+        concatenated_parts = []
+        for i, (full_text, _, _, _) in enumerate(prepared):
+            concatenated_parts.append(f"--- СОБЫТИЕ №{i + 1} ---\n{full_text}")
+        analysis_text = "\n\n".join(concatenated_parts)
 
         all_docs: list[dict[str, str]] = []
         seen_urls: set[str] = set()
@@ -1267,40 +1180,42 @@ class ParserApiKadClient:
                     all_docs.append(d)
                     seen_urls.add(d["url"])
 
-        reasons = self._reason_extractor.extract(analysis_text)
-        if not reasons and decisive_idx > 0:
-            fallback_text = prepared[decisive_idx - 1][0]
-            reasons = self._reason_extractor.extract(fallback_text)
-            if fallback_text:
-                analysis_text = f"{analysis_text} {fallback_text}".strip()
+        # Reasons extraction still focuses on the decisive text, but fallback uses the combined text
+        reasons = self._reason_extractor.extract(prepared[decisive_idx][0])
+        if not reasons:
+            reasons = self._reason_extractor.extract(analysis_text)
+
         if not reasons:
             reasons = ("оценка обстоятельств дела",)
 
         return outcome, reasons, decision_date, analysis_text, tuple(all_docs)
 
     def _build_event_text(self, event: dict) -> str:
-        return " ".join(
-            [
-                str(event.get("EventTypeName", "")),
-                str(event.get("DecisionTypeName", "")),
-                str(event.get("EventContentTypeName", "")),
-                str(event.get("AdditionalInfo", "")),
-                str(event.get("Comment", "")),
-                str(event.get("DocumentTypeName", "")),
-                str(event.get("ActTypeName", "")),
-                str(event.get("Text", "")),
-                str(event.get("Description", "")),
-                str(event.get("Resolution", "")),
-            ]
-        )
+        return " ".join([
+            str(event.get("EventTypeName", "")),
+            str(event.get("DecisionTypeName", "")),
+            str(event.get("EventContentTypeName", "")),
+            str(event.get("AdditionalInfo", "")),
+            str(event.get("Comment", "")),
+            str(event.get("DocumentTypeName", "")),
+            str(event.get("ActTypeName", "")),
+            str(event.get("Text", "")),
+            str(event.get("Description", "")),
+            str(event.get("Resolution", "")),
+        ])
 
-    def _matches_query_scope(self, decision: CaseDecision, params: SearchParams) -> bool:
+    def _matches_query_scope(
+        self, decision: CaseDecision, params: SearchParams
+    ) -> bool:
         text = (decision.analysis_text or "").lower()
 
         # Unconditional exclusions — applied regardless of query params
         if self._is_returned_application(text):
             return False
-        if self._is_operative_part_only(text) and decision.outcome == CaseOutcome.UNKNOWN:
+        if (
+            self._is_operative_part_only(text)
+            and decision.outcome == CaseOutcome.UNKNOWN
+        ):
             return False
 
         # No filtering criteria at all → accept
@@ -1316,15 +1231,22 @@ class ParserApiKadClient:
         # Paragraph-level queries (e.g. п.2 ст.61.3) differ meaningfully between paragraphs,
         # and KAD search may return mixed paragraph results.
         if params.paragraph:
-            full_text = " ".join(filter(None, [
-                decision.analysis_text or "",
-                " ".join(decision.reasons or []),
-            ])).lower()
+            full_text = " ".join(
+                filter(
+                    None,
+                    [
+                        decision.analysis_text or "",
+                        " ".join(decision.reasons or []),
+                    ],
+                )
+            ).lower()
             if not full_text:
                 return False
             if params.article and not self._text_has_article(full_text, params.article):
                 return False
-            if not self._text_has_paragraph(full_text, params.paragraph, params.article):
+            if not self._text_has_paragraph(
+                full_text, params.paragraph, params.article
+            ):
                 return False
 
         # Case type filtering — skipped when an article is specified.
@@ -1335,7 +1257,9 @@ class ParserApiKadClient:
         if params.case_type and not params.article:
             if decision.case_category:
                 # Direct API category — 100% accurate, works for cached cases too
-                if decision.case_category != self._CASE_TYPE_TO_CATEGORY.get(params.case_type, ""):
+                if decision.case_category != self._CASE_TYPE_TO_CATEGORY.get(
+                    params.case_type, ""
+                ):
                     return False
             elif text:
                 # Text-based fallback — no 100-char minimum (was causing bypasses)
@@ -1354,7 +1278,9 @@ class ParserApiKadClient:
         ]
         return any(re.search(pattern, text) for pattern in patterns)
 
-    def _text_has_paragraph(self, text: str, paragraph: str, article: str | None) -> bool:
+    def _text_has_paragraph(
+        self, text: str, paragraph: str, article: str | None
+    ) -> bool:
         paragraph_patterns = [
             rf"п\.?\s*{re.escape(paragraph)}\b",
             rf"пункт\s*{re.escape(paragraph)}\b",
@@ -1380,16 +1306,20 @@ class ParserApiKadClient:
         """True when decisive document is only the operative part (no reasoning published)."""
         if len(text) < 50 or "резолютивная" not in text:
             return False
-        reasoning_markers = ("установил", "рассмотрев", "материалы дела", "обстоятельства")
+        reasoning_markers = (
+            "установил",
+            "рассмотрев",
+            "материалы дела",
+            "обстоятельства",
+        )
         return not any(m in text for m in reasoning_markers)
 
     def _text_matches_case_type(self, text: str, case_type: str) -> bool:
         if case_type == "B":
             return any(m in text for m in self._BANKRUPTCY_MARKERS)
         if case_type == "G":
-            return (
-                not any(m in text for m in self._BANKRUPTCY_MARKERS)
-                and not any(m in text for m in self._ADMIN_MARKERS)
+            return not any(m in text for m in self._BANKRUPTCY_MARKERS) and not any(
+                m in text for m in self._ADMIN_MARKERS
             )
         if case_type == "A":
             return any(m in text for m in self._ADMIN_MARKERS)
@@ -1398,18 +1328,28 @@ class ParserApiKadClient:
     _CASE_TYPE_TO_CATEGORY: dict[str, str] = {"B": "Б", "G": "Г", "A": "А"}
 
     _BANKRUPTCY_MARKERS: frozenset[str] = frozenset({
-        "банкрот", "несостоятельн", "конкурсн", "наблюден",
-        "финансовое оздоровлен", "арбитражный управляющ",
-        "конкурсный управляющ", "временный управляющ",
+        "банкрот",
+        "несостоятельн",
+        "конкурсн",
+        "наблюден",
+        "финансовое оздоровлен",
+        "арбитражный управляющ",
+        "конкурсный управляющ",
+        "временный управляющ",
     })
     _ADMIN_MARKERS: frozenset[str] = frozenset({
-        "коап", "административное правонарушен",
+        "коап",
+        "административное правонарушен",
         "административн ответственност",
     })
 
     _DENIED_COMBINED = [
-        re.compile(r"отказ\w*(?:\s+\w+){0,3}\s+в\s+(?:удовлетвор|признани|иске|заявлении|жалобе|требован|привлечении)\w*"),
-        re.compile(r"(?:удовлетвор|признани|иске|заявлении|жалобе|требован|привлечении)\w*(?:\s+\w+){0,10}\s+отказ\w*"),
+        re.compile(
+            r"отказ\w*(?:\s+\w+){0,3}\s+в\s+(?:удовлетвор|признани|иске|заявлении|жалобе|требован|привлечении)\w*"
+        ),
+        re.compile(
+            r"(?:удовлетвор|признани|иске|заявлении|жалобе|требован|привлечении)\w*(?:\s+\w+){0,10}\s+отказ\w*"
+        ),
         re.compile(r"без\s+(?:удовлетвор|рассмотрения)\w*"),
         re.compile(r"производство\w*\s+(?:.+?\s+)?прекратить"),
         re.compile(r"прекратить\s+производство"),
@@ -1421,34 +1361,69 @@ class ParserApiKadClient:
         re.compile(r"не\s+(?:было\s+)?установлено\w*"),
         re.compile(r"не\s+усматривается"),
         re.compile(r"признак\w*(?:\s+\w+){0,5}\s+(?:не\s+установлен|отсутству)"),
+        # Common appeal/complaint denial patterns
+        re.compile(r"оставить\s+(?:\w+\s+){0,3}без\s+(?:удовлетвор|изменен)\w*"),
+        re.compile(r"оставлен\w*\s+без\s+(?:удовлетвор|изменен)\w*"),
+        re.compile(r"жалоб\w+\s+(?:\w+\s+){0,5}не\s+(?:обоснован|подлежит)\w*"),
+        re.compile(r"не\s+(?:нашел|находит|усматрива\w+)\s+основани\w*"),
+        re.compile(r"не\s+(?:нашел|находит)\s+(?:\w+\s+){0,3}основани\w*"),
+        re.compile(r"заявлени\w+\s+(?:\w+\s+){0,5}не\s+подлежит\s+удовлетвор\w*"),
     ]
 
     # Keywords that — when present WITHOUT a preceding denial context — indicate SATISFIED.
     _SATISFIED_KEYWORDS = [
-        "удовлетвор",       # удовлетворить / удовлетворено / удовлетворены
+        "удовлетвор",  # удовлетворить / удовлетворено / удовлетворены
         "признать недействит",
         "признать незаконн",
         "признано незаконн",
         "незаконн",
         "неправомерн",
-        "ненадлежащ",       # ненадлежащее исполнение (признать)
+        "ненадлежащ",  # ненадлежащее исполнение (признать)
         "взыскать",
-        "отстранить",       # отстранить арбитражного управляющего
-        "привлечь к",       # привлечь к ответственности
-        "обоснованн",       # жалоба признана обоснованной
+        "отстранить",  # отстранить арбитражного управляющего
+        "привлечь к",  # привлечь к ответственности
+        "обоснованн",  # жалоба признана обоснованной
+        "отменить определени",  # отменить определение (reverse ruling)
+        "изменить определени",  # изменить определение (modify ruling)
+        "жалоба подлежит удовлетвор",  # complaint subject to satisfaction
+        "заявление подлежит удовлетвор",  # application subject to satisfaction
+        "признать действия",  # признать действия незаконными (already covered by незаконн)
+        "снизить",  # снизить размер вознаграждения
+        "уменьшить",  # уменьшить размер
+        "включить в реестр",  # включить требования в реестр кредиторов
     ]
 
-    async def _refine_params_with_llm(self, query_text: str, params: SearchParams) -> SearchParams:
+    async def _refine_params_with_llm(
+        self, query_text: str, params: SearchParams
+    ) -> SearchParams:
         if self._llm_reason_extractor is None:
             return params
-            
+
         llm_params = await self._llm_reason_extractor.parse_query(query_text)
-        
+
         # Extract period-related fields
-        year = llm_params.get("year") or (params.date_from[:4] if params.date_from else None)
-        quarter = llm_params.get("quarter")
-        date_from, date_to = self._parser._build_period(year, quarter)
-        
+        year = llm_params.get("year") or (
+            params.date_from[:4] if params.date_from else None
+        )
+
+        # Guardrail: If regex already found a quarter, and LLM output differs or is null,
+        # we trust the regex more (it's "cheap" and deterministic).
+        llm_quarter = llm_params.get("quarter")
+        if params._regex_quarter and (
+            not llm_quarter or str(llm_quarter) != str(params._regex_quarter)
+        ):
+            log_event(
+                self._logger,
+                "kad.llm_quarter_ignored",
+                regex=params._regex_quarter,
+                llm=llm_quarter,
+            )
+            final_quarter = params._regex_quarter
+        else:
+            final_quarter = llm_quarter or params._regex_quarter
+
+        date_from, date_to = self._parser._build_period(year, final_quarter)
+
         llm_court = llm_params.get("court")
         if llm_court:
             # Try to normalize LLM output using our regex-based rules
@@ -1460,7 +1435,13 @@ class ParserApiKadClient:
         # Map common types to Cyrillic just in case LLM returns Latin (G, B, A)
         type_map = {"G": "Г", "B": "Б", "A": "А", "Г": "Г", "Б": "Б", "А": "А"}
         llm_type = llm_params.get("case_type")
-        final_type = type_map.get(llm_type, llm_type) or params.case_type
+
+        # Defensive: if the parser already identified Bankruptcy (B) for Article 61.2,
+        # don't let the LLM downgrade it to General (G).
+        if params.case_type == "B":
+            final_type = "B"
+        else:
+            final_type = type_map.get(llm_type, llm_type) or params.case_type
 
         # Merge with regex results, preferring LLM for these fields
         refined = replace(
@@ -1472,9 +1453,10 @@ class ParserApiKadClient:
             date_from=date_from or params.date_from,
             date_to=date_to or params.date_to,
         )
-        
+
         # Use asdict for logging to avoid JSON serialization errors
         from dataclasses import asdict
+
         log_event(self._logger, "kad.llm_query_parsed", params=asdict(refined))
         return refined
 
@@ -1506,32 +1488,44 @@ class ParserApiKadClient:
         last_error: Exception | None = None
         for _ in range(5):
             try:
-                response = self._sync_http_client.request(method, url, params=params, timeout=self._timeout)
+                response = self._sync_http_client.request(
+                    method, url, params=params, timeout=self._timeout
+                )
                 if response.status_code == 429:
                     rate_limit_attempts += 1
                     if rate_limit_attempts >= 3:
                         raise KadRateLimitError("KAD API rate limit exceeded")
-                    log_event(self._logger, "kad.rate_limit", attempt=rate_limit_attempts)
+                    log_event(
+                        self._logger, "kad.rate_limit", attempt=rate_limit_attempts
+                    )
                     self._sleep(60)
                     continue
                 if response.status_code in {503, 504}:
                     unavailable_attempts += 1
                     if unavailable_attempts >= 2:
                         raise KadUnavailableError("KAD API unavailable")
-                    log_event(self._logger, "kad.unavailable", attempt=unavailable_attempts)
+                    log_event(
+                        self._logger, "kad.unavailable", attempt=unavailable_attempts
+                    )
                     continue
                 if response.status_code == 500:
                     unavailable_attempts += 1
                     if unavailable_attempts >= 2:
                         raise KadUnavailableError("KAD API error 500")
-                    log_event(self._logger, "kad.server_error", attempt=unavailable_attempts)
+                    log_event(
+                        self._logger, "kad.server_error", attempt=unavailable_attempts
+                    )
                     continue
                 if response.status_code == 403:
                     data = response.json()
-                    raise KadAccessError(str(data.get("error", "KAD API access denied")))
+                    raise KadAccessError(
+                        str(data.get("error", "KAD API access denied"))
+                    )
                 if response.status_code == 400:
                     data = response.json()
-                    raise KadInvalidResponseError(str(data.get("error", "Invalid request")))
+                    raise KadInvalidResponseError(
+                        str(data.get("error", "Invalid request"))
+                    )
                 response.raise_for_status()
                 data = response.json()
                 if data.get("Success") == 0 and "error" not in data:
@@ -1549,7 +1543,9 @@ class ParserApiKadClient:
                 last_error = exc
         raise KadInvalidResponseError("KAD API request failed") from last_error
 
-    async def _request_json_async(self, method: str, path: str, params: dict) -> RequestResult:
+    async def _request_json_async(
+        self, method: str, path: str, params: dict
+    ) -> RequestResult:
         url = f"{self._base_url}{path}"
         rate_limit_attempts = 0
         unavailable_attempts = 0
@@ -1558,14 +1554,18 @@ class ParserApiKadClient:
         last_error: Exception | None = None
         for _ in range(5):
             try:
-                response = await self._async_http_client.request(method, url, params=params, timeout=self._timeout)
+                response = await self._async_http_client.request(
+                    method, url, params=params, timeout=self._timeout
+                )
                 if response.status_code == 429:
                     retry_count += 1
                     had_transient_error = True
                     rate_limit_attempts += 1
                     if rate_limit_attempts >= 3:
                         raise KadRateLimitError("KAD API rate limit exceeded")
-                    log_event(self._logger, "kad.rate_limit", attempt=rate_limit_attempts)
+                    log_event(
+                        self._logger, "kad.rate_limit", attempt=rate_limit_attempts
+                    )
                     await asyncio.sleep(60)
                     continue
                 if response.status_code in {503, 504}:
@@ -1574,7 +1574,9 @@ class ParserApiKadClient:
                     unavailable_attempts += 1
                     if unavailable_attempts >= 2:
                         raise KadUnavailableError("KAD API unavailable")
-                    log_event(self._logger, "kad.unavailable", attempt=unavailable_attempts)
+                    log_event(
+                        self._logger, "kad.unavailable", attempt=unavailable_attempts
+                    )
                     continue
                 if response.status_code == 500:
                     retry_count += 1
@@ -1582,14 +1584,20 @@ class ParserApiKadClient:
                     unavailable_attempts += 1
                     if unavailable_attempts >= 2:
                         raise KadUnavailableError("KAD API error 500")
-                    log_event(self._logger, "kad.server_error", attempt=unavailable_attempts)
+                    log_event(
+                        self._logger, "kad.server_error", attempt=unavailable_attempts
+                    )
                     continue
                 if response.status_code == 403:
                     data = response.json()
-                    raise KadAccessError(str(data.get("error", "KAD API access denied")))
+                    raise KadAccessError(
+                        str(data.get("error", "KAD API access denied"))
+                    )
                 if response.status_code == 400:
                     data = response.json()
-                    raise KadInvalidResponseError(str(data.get("error", "Invalid request")))
+                    raise KadInvalidResponseError(
+                        str(data.get("error", "Invalid request"))
+                    )
                 response.raise_for_status()
                 data = response.json()
                 if data.get("Success") == 0 and "error" not in data:

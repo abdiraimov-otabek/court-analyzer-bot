@@ -21,8 +21,9 @@ class CaseDecision:
     court_name: str = ""
     case_link: str = ""
     analysis_text: str = ""
-    case_category: str = ""   # "Б", "Г", "А", or "" if unknown
+    case_category: str = ""  # "Б", "Г", "А", or "" if unknown
     document_links: tuple[dict[str, str], ...] = ()
+    proof_quote: str = ""  # Direct citation from the act for verifiable accuracy
 
 
 @dataclass(frozen=True)

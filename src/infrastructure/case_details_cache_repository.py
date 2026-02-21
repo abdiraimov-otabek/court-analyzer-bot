@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from datetime import date, datetime, timedelta
 
 from src.domain.entities import CaseDecision, CaseOutcome
@@ -8,16 +9,22 @@ from src.infrastructure.sqlite import SqliteConnection
 
 
 class CaseDetailsCacheRepository:
-    _SCHEMA_VERSION = "v8"
+    _SCHEMA_VERSION = "v9"
 
-    def __init__(self, connection: SqliteConnection, ttl_seconds: int = 24 * 60 * 60) -> None:
+    def __init__(
+        self, connection: SqliteConnection, ttl_seconds: int = 24 * 60 * 60
+    ) -> None:
         if ttl_seconds <= 0:
             raise ValueError("ttl_seconds must be positive")
         self._connection = connection
+        self._last_cleanup_at = 0.0
         self._ttl = timedelta(seconds=ttl_seconds)
 
     def get(self, case_id: str, now: datetime) -> CaseDecision | None:
-        self._cleanup(now)
+        t_now = time.time()
+        if t_now - self._last_cleanup_at > 60:
+            self._cleanup(now)
+            self._last_cleanup_at = t_now
         with self._connection.connect() as conn:
             row = conn.execute(
                 "select payload, expires_at from case_details_cache where case_id = ?",
@@ -65,7 +72,10 @@ class CaseDetailsCacheRepository:
 
     def _cleanup(self, now: datetime) -> None:
         with self._connection.connect() as conn:
-            conn.execute("delete from case_details_cache where expires_at <= ?", (now.isoformat(),))
+            conn.execute(
+                "delete from case_details_cache where expires_at <= ?",
+                (now.isoformat(),),
+            )
             conn.commit()
 
     def _serialize_decision(self, decision: CaseDecision) -> str:

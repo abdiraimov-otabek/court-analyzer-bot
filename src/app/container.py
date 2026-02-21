@@ -12,6 +12,8 @@ from src.infrastructure.active_requests_repository import ActiveRequestsReposito
 from src.infrastructure.cache_repository import AnalysisCacheRepository
 from src.infrastructure.case_details_cache_repository import CaseDetailsCacheRepository
 from src.infrastructure.log_repository import LogRepository
+from src.infrastructure.rate_limit_repository import LoginRateLimitRepository
+from src.infrastructure.session_repository import AdminSessionRepository
 from src.infrastructure.settings_repository import SettingsRepository
 from src.infrastructure.sqlite import SqliteConnection
 from src.services.access_control import AccessControlList
@@ -32,18 +34,27 @@ class Container:
         self.settings_repository = SettingsRepository(self.connection)
         self.settings_service = SettingsService(self.settings_repository)
         self.allowed_users_repository = AllowedUsersRepository(self.connection)
-        self.access_control = AccessControlList(DatabaseAccessStore(self.allowed_users_repository))
+        self.access_control = AccessControlList(
+            DatabaseAccessStore(self.allowed_users_repository)
+        )
         db_repo = ActiveRequestsRepository(self.connection)
         self.active_requests = ActiveRequestRegistry(db_repo=db_repo)
         self.quarter_selections = QuarterSelectionRegistry()
         self.rate_limiter = HourlyRateLimiter(limit=10)
-        self.cache_repository = AnalysisCacheRepository(self.connection, ttl_seconds=24 * 60 * 60)
-        self.case_details_cache_repository = CaseDetailsCacheRepository(self.connection, ttl_seconds=24 * 60 * 60)
+        self.cache_repository = AnalysisCacheRepository(
+            self.connection, ttl_seconds=24 * 60 * 60
+        )
+        self.case_details_cache_repository = CaseDetailsCacheRepository(
+            self.connection, ttl_seconds=24 * 60 * 60
+        )
         self.log_repository = LogRepository(self.connection)
+        self.session_repository = AdminSessionRepository(self.connection)
+        self.rate_limit_repository = LoginRateLimitRepository(self.connection)
         limits = httpx.Limits(max_connections=100, max_keepalive_connections=50)
         self.sync_http_client = httpx.Client(timeout=30, limits=limits)
         self.async_http_client = httpx.AsyncClient(timeout=30, limits=limits)
-        self.kad_client: ParserApiKadClient | None = None
+        self._kad_client: ParserApiKadClient | None = None
+        self._llm_extractor: LLMReasonExtractor | None = None
 
     def build_bot_logic(self) -> BotLogic:
         return BotLogic(
@@ -68,9 +79,9 @@ class Container:
         )
 
     def _get_kad_client(self) -> ParserApiKadClient:
-        if self.kad_client is None:
-            self.kad_client = self._build_kad_client()
-        return self.kad_client
+        if self._kad_client is None:
+            self._kad_client = self._build_kad_client()
+        return self._kad_client
 
     def _build_kad_client(self) -> ParserApiKadClient:
         if not self.config.kad_api_base_url or not self.config.kad_api_key:
@@ -85,11 +96,14 @@ class Container:
         )
 
     def _get_llm_reason_extractor(self) -> LLMReasonExtractor | None:
+        if self._llm_extractor is not None:
+            return self._llm_extractor
         if self.config.openrouter_api_key:
-            return LLMReasonExtractor(
+            self._llm_extractor = LLMReasonExtractor(
                 http_client=self.async_http_client,
                 api_key=self.config.openrouter_api_key,
             )
+            return self._llm_extractor
         return None
 
     def _build_hashing_service(self) -> HashingService:
@@ -98,7 +112,7 @@ class Container:
         return HashingService(self.config.hash_salt)
 
     async def aclose(self) -> None:
-        if self.kad_client is not None:
-            await self.kad_client.aclose()
+        if self._kad_client is not None:
+            await self._kad_client.aclose()
         await self.async_http_client.aclose()
         self.sync_http_client.close()

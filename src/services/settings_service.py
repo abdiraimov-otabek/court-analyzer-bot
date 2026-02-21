@@ -29,8 +29,8 @@ class SettingsService:
         min_known_outcomes: int,
         send_partial_file_on_quality_fail: bool,
     ) -> Settings:
-        if max_cases < 5 or max_cases > 500:
-            raise ValueError("max_cases must be between 5 and 500")
+        if max_cases < 5 or max_cases > 5000:
+            raise ValueError("max_cases must be between 5 and 5000")
         if max_documents_per_case <= 0:
             raise ValueError("max_documents_per_case must be positive")
         if max_pages <= 0:

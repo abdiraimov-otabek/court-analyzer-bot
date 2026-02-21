@@ -1,60 +1,72 @@
 from __future__ import annotations
 
-import html as _html
 import hmac
+import html as _html
 import logging
 import secrets
 import time
 
-from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request
-from pydantic import BaseModel
+from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
+from pydantic import BaseModel
 
+from src.app.bot_logging import (
+    clear_request_context,
+    configure_logging,
+    log_event,
+    new_request_id,
+    set_request_context,
+)
 from src.app.config import load_config
 from src.app.container import Container
-from src.app.bot_logging import clear_request_context, configure_logging, log_event, new_request_id, set_request_context
 
 configure_logging("admin-api")
-logger = logging.getLogger("admin_api")
+logger = logging.getLogger("admin_api.routes")
+db_logger = logging.getLogger("admin_api.db")
+auth_logger = logging.getLogger("admin_api.auth")
 
 app = FastAPI(title="KAD Bot Admin API")
 
 config = load_config()
 container = Container(config)
 
-_sessions: dict[str, float] = {}  # session_id -> expiry timestamp
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'"
+    )
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
+
 _SESSION_TTL = 8 * 3600  # 8 hours
-_LOGIN_ATTEMPTS: dict[str, list[float]] = {}  # ip -> list of attempt timestamps
 _LOGIN_RATE_LIMIT = 5  # max attempts
 _LOGIN_RATE_WINDOW = 60  # seconds
 
 
 def _create_session() -> str:
     sid = secrets.token_urlsafe(32)
-    _sessions[sid] = time.time() + _SESSION_TTL
+    container.session_repository.create_session(sid, _SESSION_TTL)
     return sid
 
 
 def _validate_session(sid: str | None) -> bool:
     if not sid:
         return False
-    expiry = _sessions.get(sid)
-    if expiry is None or time.time() > expiry:
-        _sessions.pop(sid, None)
-        return False
-    return True
+    return container.session_repository.validate_session(sid)
 
 
 def _check_login_rate_limit(ip: str) -> bool:
     """Returns True if allowed, False if rate limited."""
-    now = time.time()
-    attempts = _LOGIN_ATTEMPTS.get(ip, [])
-    attempts = [t for t in attempts if now - t < _LOGIN_RATE_WINDOW]
-    _LOGIN_ATTEMPTS[ip] = attempts
-    if len(attempts) >= _LOGIN_RATE_LIMIT:
+    attempts = container.rate_limit_repository.count_attempts(ip, _LOGIN_RATE_WINDOW)
+    if attempts >= _LOGIN_RATE_LIMIT:
         return False
-    attempts.append(now)
-    _LOGIN_ATTEMPTS[ip] = attempts
+    container.rate_limit_repository.add_attempt(ip)
     return True
 
 
@@ -95,7 +107,9 @@ def require_auth(
 ) -> None:
     token = config.admin_auth_token
     if not token:
-        raise HTTPException(status_code=500, detail="ADMIN_AUTH_TOKEN is not configured")
+        raise HTTPException(
+            status_code=500, detail="ADMIN_AUTH_TOKEN is not configured"
+        )
     if x_admin_token:
         provided = x_admin_token
     elif authorization:
@@ -103,10 +117,31 @@ def require_auth(
             provided = authorization.replace("Bearer ", "", 1)
         else:
             provided = authorization
-    else:
-        raise HTTPException(status_code=401, detail="Unauthorized")
     if not hmac.compare_digest(provided, token):
         raise HTTPException(status_code=403, detail="Forbidden")
+
+
+async def require_admin_session(request: Request) -> None:
+    session_id = request.cookies.get("admin_session")
+    if not _validate_session(session_id):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if request.method in {"POST", "PUT", "DELETE", "PATCH"}:
+        csrf_cookie = request.cookies.get("csrf_token")
+        csrf_header = request.headers.get("X-CSRF-Token")
+
+        # Check header first (AJAX), then try form data (standard submission)
+        csrf_token = csrf_header
+        if (
+            not csrf_token
+            and "application/x-www-form-urlencoded"
+            in request.headers.get("Content-Type", "")
+        ):
+            form_data = await request.form()
+            csrf_token = form_data.get("csrf_token")
+
+        if not csrf_cookie or csrf_cookie != csrf_token:
+            raise HTTPException(status_code=403, detail="CSRF token mismatch")
 
 
 @app.middleware("http")
@@ -133,7 +168,44 @@ async def log_requests(request: Request, call_next):
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok"}
+    # 1. Check Database (read check)
+    db_status = "error"
+    try:
+        with container.connection.get_connection() as conn:
+            conn.execute("SELECT 1")
+            db_status = "ok"
+    except Exception as e:
+        log_event("health.db_error", error=str(e))
+
+    # 2. Check Critical Config
+    config_status = "ok"
+    missing_keys = []
+    if (
+        not container.config.kad_api_key
+        or "your_key_here" in container.config.kad_api_key
+    ):
+        missing_keys.append("KAD_API_KEY")
+    if not container.config.bot_token:
+        missing_keys.append("TELEGRAM_BOT_TOKEN")
+
+    if missing_keys:
+        config_status = "missing_keys"
+
+    # 3. Simple Metrics
+    active_count = len(container.active_requests.list_all())
+
+    overall_status = "ok" if db_status == "ok" and config_status == "ok" else "degraded"
+
+    return {
+        "status": overall_status,
+        "database": db_status,
+        "config": {
+            "status": config_status,
+            "missing_keys": missing_keys,
+            "llm_enabled": bool(container.config.llm_api_key),
+        },
+        "metrics": {"active_requests": active_count},
+    }
 
 
 @app.get("/admin/login", response_class=HTMLResponse)
@@ -153,35 +225,66 @@ async def login_page():
 async def login(request: Request, token: str = Form(...)):
     client_ip = request.client.host if request.client else "unknown"
     if not _check_login_rate_limit(client_ip):
-        return HTMLResponse("Too many login attempts. Try again later.", status_code=429)
-    expected = config.admin_auth_token
-    if not expected:
+        return HTMLResponse(
+            "Too many login attempts. Try again later.", status_code=429
+        )
+    if not config.admin_auth_token:
         return HTMLResponse("Admin token is not configured.", status_code=500)
-    if not hmac.compare_digest(token, expected):
+    if not hmac.compare_digest(token, config.admin_auth_token):
+        auth_logger.warning("admin.login_failed", extra={"data": {"ip": client_ip}})
         return HTMLResponse("Invalid token", status_code=401)
     sid = _create_session()
     response = RedirectResponse(url="/admin/", status_code=303)
-    response.set_cookie("admin_session", sid, httponly=True, samesite="strict", max_age=_SESSION_TTL)
+    response.set_cookie(
+        "admin_session",
+        sid,
+        httponly=True,
+        samesite="strict",
+        secure=True,
+        max_age=_SESSION_TTL,
+    )
+    # Set CSRF token on login
+    csrf_token = secrets.token_urlsafe(32)
+    response.set_cookie(
+        key="csrf_token",
+        value=csrf_token,
+        httponly=True,
+        secure=True,
+        samesite="strict",
+    )
     return response
 
 
 @app.get("/admin/logout")
 async def logout(request: Request):
     sid = request.cookies.get("admin_session")
-    _sessions.pop(sid, None)
+    if sid:
+        container.session_repository.delete_session(sid)
     response = RedirectResponse(url="/admin/login", status_code=303)
     response.delete_cookie("admin_session")
+    response.delete_cookie("csrf_token")  # Delete CSRF token on logout
     return response
 
 
-@app.get("/admin/", response_class=HTMLResponse)
-@app.get("/admin", response_class=HTMLResponse)
+@app.get(
+    "/admin/",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_admin_session)],
+)
+@app.get(
+    "/admin", response_class=HTMLResponse, dependencies=[Depends(require_admin_session)]
+)
 def admin_ui(request: Request) -> HTMLResponse:
     if not _validate_session(request.cookies.get("admin_session")):
         return RedirectResponse(url="/admin/login", status_code=303)
     settings = container.settings_service.get_settings()
     users = container.allowed_users_repository.list_all()
-    users_html = "".join(f"<li>{user}</li>" for user in users) or "<li>Нет пользователей</li>"
+    users_html = (
+        "".join(f"<li>{_html.escape(user)}</li>" for user in users)
+        or "<li>Нет пользователей</li>"
+    )
+    csrf_token = request.cookies.get("csrf_token", "")
+    csrf_input = f'<input type="hidden" name="csrf_token" value="{csrf_token}" />'
     html = f"""
     <html>
       <head>
@@ -318,6 +421,7 @@ def admin_ui(request: Request) -> HTMLResponse:
             <section class="card">
               <h2>Основные настройки</h2>
               <form method="post" action="/admin/settings" class="stack">
+                {csrf_input}
                 <div class="row">
                   <div><label>Максимум дел в одном анализе</label><input name="max_cases" value="{_html.escape(str(settings.max_cases))}" /></div>
                   <div><label>Сколько документов учитывать по каждому делу</label><input name="max_documents_per_case" value="{_html.escape(str(settings.max_documents_per_case))}" /></div>
@@ -358,12 +462,14 @@ def admin_ui(request: Request) -> HTMLResponse:
               <h2>Доступ к боту</h2>
               <ul>{users_html}</ul>
               <form method="post" action="/admin/users/grant" class="stack">
+                {csrf_input}
                 <div class="inline-form">
                   <div><label>ID пользователя в Telegram</label><input name="telegram_id" /></div>
                   <button class="btn" type="submit">Выдать доступ</button>
                 </div>
               </form>
               <form method="post" action="/admin/users/revoke" class="stack" style="margin-top: 10px;">
+                {csrf_input}
                 <div class="inline-form">
                   <div><label>ID пользователя в Telegram</label><input name="telegram_id" /></div>
                   <button class="btn btn-danger" type="submit">Забрать доступ</button>
@@ -378,7 +484,7 @@ def admin_ui(request: Request) -> HTMLResponse:
     return HTMLResponse(html)
 
 
-@app.post("/admin/settings")
+@app.post("/admin/settings", dependencies=[Depends(require_admin_session)])
 def admin_update_settings(
     request: Request,
     max_cases: int = Form(...),
@@ -395,8 +501,6 @@ def admin_update_settings(
     send_partial_file_on_quality_fail: bool = Form(False),
     analysis_prompt: str = Form(...),
 ) -> RedirectResponse:
-    if not _validate_session(request.cookies.get("admin_session")):
-        return RedirectResponse(url="/admin/login", status_code=303)
     try:
         container.settings_service.update_settings(
             max_cases=max_cases,
@@ -418,18 +522,18 @@ def admin_update_settings(
     return RedirectResponse(url="/admin/", status_code=303)
 
 
-@app.post("/admin/users/grant")
-def admin_grant_user(request: Request, telegram_id: str = Form(...)) -> RedirectResponse:
-    if not _validate_session(request.cookies.get("admin_session")):
-        return RedirectResponse(url="/admin/login", status_code=303)
+@app.post("/admin/users/grant", dependencies=[Depends(require_admin_session)])
+def admin_grant_user(
+    request: Request, telegram_id: str = Form(...)
+) -> RedirectResponse:
     container.allowed_users_repository.grant(telegram_id)
     return RedirectResponse(url="/admin/", status_code=303)
 
 
-@app.post("/admin/users/revoke")
-def admin_revoke_user(request: Request, telegram_id: str = Form(...)) -> RedirectResponse:
-    if not _validate_session(request.cookies.get("admin_session")):
-        return RedirectResponse(url="/admin/login", status_code=303)
+@app.post("/admin/users/revoke", dependencies=[Depends(require_admin_session)])
+def admin_revoke_user(
+    request: Request, telegram_id: str = Form(...)
+) -> RedirectResponse:
     container.allowed_users_repository.revoke(telegram_id)
     return RedirectResponse(url="/admin/", status_code=303)
 
@@ -503,7 +607,13 @@ def grant_access(payload: AllowedUserModel) -> AllowedUserModel:
     return payload
 
 
-@app.delete("/access/users", dependencies=[Depends(require_auth)], status_code=204)
+@app.delete(
+    "/access/users",
+    dependencies=[Depends(require_auth)],
+    status_code=204,
+    response_class=Response,
+    response_model=None,
+)
 async def revoke_access(payload: AllowedUserModel) -> None:
     container.allowed_users_repository.revoke(payload.telegram_id)
 

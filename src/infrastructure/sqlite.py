@@ -1,6 +1,5 @@
-from __future__ import annotations
-
 import sqlite3
+import threading
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator
@@ -13,22 +12,29 @@ class SqliteConnection:
             path = (Path.cwd() / path).resolve()
         self._db_path = str(path)
         path.parent.mkdir(parents=True, exist_ok=True)
+        self._conn: sqlite3.Connection | None = None
+        self._lock = threading.Lock()
         self._ensure_schema()
 
     @contextmanager
     def connect(self) -> Generator[sqlite3.Connection, None, None]:
-        conn = sqlite3.connect(self._db_path, timeout=30)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")
+        if self._conn is None:
+            with self._lock:  # Ensure only one thread initializes
+                if self._conn is None:
+                    self._conn = sqlite3.connect(
+                        self._db_path, timeout=30, check_same_thread=False
+                    )
+                    self._conn.row_factory = sqlite3.Row
+                    self._conn.execute("PRAGMA journal_mode=WAL")
+                    self._conn.execute("PRAGMA synchronous=NORMAL")
+
         try:
-            yield conn
-            conn.commit()
+            yield self._conn
+            self._conn.commit()
         except Exception:
-            conn.rollback()
+            if self._conn:
+                self._conn.rollback()
             raise
-        finally:
-            conn.close()
 
     def _ensure_schema(self) -> None:
         with self.connect() as conn:
@@ -75,16 +81,32 @@ class SqliteConnection:
                     created_at text not null,
                     expires_at text not null
                 );
+                create table if not exists admin_sessions (
+                    session_id text primary key,
+                    expires_at real not null
+                );
+                create table if not exists login_attempts (
+                    ip_address text not null,
+                    attempt_at real not null
+                );
+                create index if not exists idx_login_attempts_ip on login_attempts(ip_address);
                 create table if not exists active_requests (
                     user_id text primary key,
                     query_text text not null,
                     phase text not null default 'counting',
                     total_cases integer not null default 0,
+                    cancelled integer not null default 0,
                     started_at text not null,
                     updated_at text not null
                 );
-                create index if not exists idx_case_details_cache_expires_at on case_details_cache(expires_at);
                 create index if not exists idx_case_details_cache_case_id on case_details_cache(case_id);
+
+                -- Cleanup stale active requests (older than 1 hour) on startup
+                delete from active_requests where updated_at < strftime('%s', 'now', '-1 hour');
+                -- Cleanup stale sessions
+                delete from admin_sessions where expires_at < strftime('%s', 'now');
+                -- Cleanup stale login attempts (older than 15 mins)
+                delete from login_attempts where attempt_at < strftime('%s', 'now', '-15 minutes');
                 """
             )
             self._ensure_settings_columns(conn)
@@ -95,20 +117,38 @@ class SqliteConnection:
             for row in conn.execute("pragma table_info(settings)").fetchall()
         }
         if "fetch_concurrency_min" not in columns:
-            conn.execute("alter table settings add column fetch_concurrency_min integer not null default 6")
+            conn.execute(
+                "alter table settings add column fetch_concurrency_min integer not null default 6"
+            )
         if "fetch_concurrency_max" not in columns:
-            conn.execute("alter table settings add column fetch_concurrency_max integer not null default 10")
+            conn.execute(
+                "alter table settings add column fetch_concurrency_max integer not null default 10"
+            )
         if "slow_alert_minutes" not in columns:
-            conn.execute("alter table settings add column slow_alert_minutes integer not null default 5")
+            conn.execute(
+                "alter table settings add column slow_alert_minutes integer not null default 5"
+            )
         if "details_cache_ttl_seconds" not in columns:
-            conn.execute("alter table settings add column details_cache_ttl_seconds integer not null default 86400")
+            conn.execute(
+                "alter table settings add column details_cache_ttl_seconds integer not null default 86400"
+            )
         if "allow_all_users" not in columns:
-            conn.execute("alter table settings add column allow_all_users integer not null default 0")
+            conn.execute(
+                "alter table settings add column allow_all_users integer not null default 0"
+            )
         if "unknown_outcome_threshold_percent" not in columns:
-            conn.execute("alter table settings add column unknown_outcome_threshold_percent integer not null default 15")
+            conn.execute(
+                "alter table settings add column unknown_outcome_threshold_percent integer not null default 15"
+            )
         if "court_mismatch_threshold_percent" not in columns:
-            conn.execute("alter table settings add column court_mismatch_threshold_percent integer not null default 20")
+            conn.execute(
+                "alter table settings add column court_mismatch_threshold_percent integer not null default 20"
+            )
         if "min_known_outcomes" not in columns:
-            conn.execute("alter table settings add column min_known_outcomes integer not null default 50")
+            conn.execute(
+                "alter table settings add column min_known_outcomes integer not null default 50"
+            )
         if "send_partial_file_on_quality_fail" not in columns:
-            conn.execute("alter table settings add column send_partial_file_on_quality_fail integer not null default 1")
+            conn.execute(
+                "alter table settings add column send_partial_file_on_quality_fail integer not null default 1"
+            )
