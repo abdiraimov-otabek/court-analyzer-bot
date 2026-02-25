@@ -171,7 +171,7 @@ def health() -> dict:
     # 1. Check Database (read check)
     db_status = "error"
     try:
-        with container.connection.get_connection() as conn:
+        with container.connection.connect() as conn:
             conn.execute("SELECT 1")
             db_status = "ok"
     except Exception as e:
