@@ -95,3 +95,31 @@ async def test_golden_dataset_verifiability():
         d3, "61.2", "ст. 61.2 банкротство"
     )
     assert is_rel is False
+
+    # 4. GOLDEN RELEVANT + NO QUOTE: Substantive act where LLM cannot find verbatim quote
+    no_quote_act = "Суд рассмотрел заявление об оспаривании сделки по ст. 61.2 Закона о банкротстве и удовлетворил его."
+    api_response_no_quote = [
+        {
+            "relevant": True,
+            "reasons": ["оспаривание сделки по ст.61.2"],
+            "proof_quote": "",
+            "outcome": "satisfied",
+        }
+    ]
+    http.post.return_value = _mock_response(api_response_no_quote)
+
+    d4 = CaseDecision(
+        case_number="A40-4/2024",
+        decision_date="2024-01-01",
+        outcome=CaseOutcome.SATISFIED,
+        reasons=(),
+        analysis_text=no_quote_act,
+        case_category="Б",
+    )
+    is_rel, reasons, quote, llm_outcome = await extractor.classify_and_extract(
+        d4, "61.2", "ст. 61.2 банкротство"
+    )
+    assert is_rel is True, "Relevant case without quote should stay relevant"
+    assert "оспаривание" in reasons[0]
+    assert quote.startswith("НЕТ_ЦИТАТЫ")
+    assert llm_outcome == "satisfied"

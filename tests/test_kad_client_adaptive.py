@@ -388,7 +388,7 @@ def test_extract_outcome_and_reasons_uses_final_decisive_event():
         },
     ]
 
-    outcome, reasons, decision_date, analysis_text, document_links = client._extract_outcome_and_reasons(events)  # noqa: SLF001
+    outcome, reasons, decision_date, analysis_text, document_links, reason_conf = client._extract_outcome_and_reasons(events)  # noqa: SLF001
 
     assert outcome == CaseOutcome.DENIED
     assert any("пропуск срока" in r for r in reasons)
@@ -412,7 +412,7 @@ def test_extract_outcome_and_reasons_uses_latest_decisive_event_when_last_event_
         },
     ]
 
-    outcome, reasons, decision_date, analysis_text, document_links = client._extract_outcome_and_reasons(events)  # noqa: SLF001
+    outcome, reasons, decision_date, analysis_text, document_links, reason_conf = client._extract_outcome_and_reasons(events)  # noqa: SLF001
 
     assert outcome == CaseOutcome.SATISFIED
     assert decision_date == date(2024, 1, 10)
@@ -431,7 +431,7 @@ def test_extract_outcome_and_reasons_returns_unknown_when_no_decisive_events():
         },
     ]
 
-    outcome, reasons, decision_date, analysis_text, document_links = client._extract_outcome_and_reasons(events)  # noqa: SLF001
+    outcome, reasons, decision_date, analysis_text, document_links, reason_conf = client._extract_outcome_and_reasons(events)  # noqa: SLF001
 
     assert outcome == CaseOutcome.UNKNOWN
     assert reasons == ("оценка обстоятельств дела",)

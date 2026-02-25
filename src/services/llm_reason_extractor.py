@@ -85,6 +85,7 @@ class LLMReasonExtractor:
 
     _FALLBACK: tuple[str, ...] = ("оценка обстоятельств дела",)
     _NOT_RELEVANT: tuple[str, ...] = ("НЕ_РЕЛЕВАНТНО",)
+    _NO_QUOTE_PREFIX = "НЕТ_ЦИТАТЫ"
     _CANONICAL_SET: frozenset[str] = frozenset(_CANONICAL_LABELS)
     _MAX_RETRIES = 1
 
@@ -93,7 +94,7 @@ class LLMReasonExtractor:
         http_client: httpx.AsyncClient,
         api_key: str,
         model: str = "anthropic/claude-3.5-sonnet",
-        fast_model: str = "google/gemini-flash-1.5",
+        fast_model: str = "google/gemini-2.5-flash",
         timeout: int = 15,
         max_concurrent: int = 8,
     ) -> None:
@@ -256,6 +257,7 @@ class LLMReasonExtractor:
         top_denied_reasons: list[str],
         total_pages: int = 0,
         total_cases_found: int = 0,
+        reason_confidence: float = 1.0,
     ) -> str:
         """Generate a professional legal summary of the analysis results."""
         prompt = (
@@ -279,7 +281,12 @@ class LLMReasonExtractor:
             "Твоя задача — написать 3-4 предложения, которые резюмируют практику. "
             "Избегай шаблонных фраз вроде 'Решение суда удовлетворяет иск'. "
             "Пиши как опытный юрист для другого юриста. Акцентируй внимание на шансах успеха.\n"
-            "Начни сразу с текста сводки."
+            + (
+                "ВАЖНО: Уверенность в извлечённых основаниях ниже средней — часть дел классифицирована без прямых цитат. Упомяни это в сводке.\n"
+                if reason_confidence < 0.6
+                else ""
+            )
+            + "Начни сразу с текста сводки."
         )
         try:
             response = await self._http_client.post(
@@ -305,12 +312,16 @@ class LLMReasonExtractor:
             satisfied_pct = round(satisfied / total * 100) if total > 0 else 0
             denied_pct = round(denied / total * 100) if total > 0 else 0
             unknown_pct = round(unknown / total * 100) if total > 0 else 0
+            quality_note = ""
+            if reason_confidence < 0.6:
+                quality_note = "⚠️ Низкая уверенность в основаниях: часть дел классифицирована без прямых цитат из судебных актов.\n\n"
             header = (
                 f"СВОДКА ПО ЗАПРОСУ:\n"
                 f"Суд: {court} | Период: {period} | {article_line}Всего дел: {total}\n"
                 f"Статистика: Удовлетворено - {satisfied} ({satisfied_pct}%), "
                 f"Отказано - {denied} ({denied_pct}%), "
-                f"Не определено - {unknown} ({unknown_pct}%)\n\n"
+                f"Не определено - {unknown} ({unknown_pct}%)\n"
+                f"{quality_note}\n"
             )
             return header + summary_text
         except Exception as exc:
@@ -572,7 +583,7 @@ class LLMReasonExtractor:
             f"3. **Контекст**: Если целевая статья упоминается лишь в списке других статей без обсуждения её сути, но из контекста понятно, что это тема спора — relevant: true.\n\n"
             f"ТРЕБОВАНИЯ К ПОЛЯМ ОТВЕТА:\n"
             f"- **reasons**: Пиши профессиональным юридическим языком суть спора.\n"
-            f"- **proof_quote**: Если relevant: true, приведи краткую цитату или просто подтверждение из текста. Если цитату найти сложно, укажи контекст упоминания.\n"
+            f'- **proof_quote**: Если relevant: true, приведи краткую цитату из текста. Если прямую цитату найти невозможно, напиши "НЕТ_ЦИТАТЫ: <краткое обоснование релевантности>".\n'
             f'- **outcome**: "satisfied" (удовлетворено/обоснованно), "denied" (отказано/необоснованно) или "NOT FOUND IN DOCUMENT".\n\n'
             f"ФОРМАТ ОТВЕТА — СТРОГИЙ JSON-МАССИВ (ровно {len(decisions)} элементов):\n"
             f"[\n"
@@ -662,10 +673,10 @@ class LLMReasonExtractor:
                     llm_outcome = "denied"
                 # Else: NOT FOUND IN DOCUMENT implies None
 
-                # Zero-Hallucination Perfection requirement: No quote = No relevance
+                # When relevant but no quote, keep relevant but note the absence.
+                # Downstream code will assign lower reason_confidence.
                 if is_relevant and not proof_quote:
-                    is_relevant = False
-                    reasons = ["НЕ_ПОДТВЕРЖДЕНО_ЦИТАТОЙ (нерелевантно)"]
+                    proof_quote = f"{self._NO_QUOTE_PREFIX}: релевантность определена по контексту"
 
                 if not reasons:
                     reasons = [self._FALLBACK[0]]
@@ -804,10 +815,9 @@ class LLMReasonExtractor:
             reasons = [self._FALLBACK[0]]
         valid_reasons = tuple(r for r in reasons if isinstance(r, str) and r.strip())
 
-        # Strict safety: if relevant but no quote provided, mark as irrelevant
+        # When relevant but no quote, keep relevant but note the absence
         if is_relevant and not proof_quote:
-            is_relevant = False
-            valid_reasons = ("НЕ_ПОДТВЕРЖДЕНО_ЦИТАТОЙ",)
+            proof_quote = f"{self._NO_QUOTE_PREFIX}: релевантность определена по контексту"
 
         return (
             is_relevant,

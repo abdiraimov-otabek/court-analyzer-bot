@@ -87,3 +87,60 @@ def test_fakt_ne_dokazan_masculine():
     extractor = ReasonExtractor()
     reasons = extractor.extract("Факт злоупотребления правом не доказан конкурсным управляющим.")
     assert "недоказанность обстоятельств" in reasons
+
+
+# ── Reason cap tests ──────────────────────────────────────────────────────────
+
+def test_primary_patterns_capped_at_3():
+    """Primary pattern matches should be capped at 3."""
+    extractor = ReasonExtractor()
+    text = (
+        "Неравноценное встречное исполнение. Причинение вреда кредиторам. "
+        "Аффилированность сторон. Злоупотребление правом. Мнимость сделки. "
+        "Ничтожность сделки."
+    )
+    reasons = extractor.extract(text)
+    assert len(reasons) <= 3
+
+
+def test_cap_preserves_order():
+    """First 3 matched patterns should be returned in order."""
+    extractor = ReasonExtractor()
+    text = "Неравноценное встречное исполнение и причинение вреда кредиторам при подозрительной сделке и злоупотреблении."
+    reasons = extractor.extract(text)
+    assert len(reasons) == 3
+    assert any("неравноценн" in r for r in reasons)
+
+
+# ── extract_with_confidence tests ─────────────────────────────────────────────
+
+def test_extract_with_confidence_primary():
+    """Primary patterns yield confidence 0.5."""
+    extractor = ReasonExtractor()
+    reasons, conf = extractor.extract_with_confidence("Злоупотребление правом (ст.10 ГК)")
+    assert any("злоупотреб" in r for r in reasons)
+    assert conf == 0.5
+
+
+def test_extract_with_confidence_fallback():
+    """Fallback keywords yield confidence 0.3."""
+    extractor = ReasonExtractor()
+    reasons, conf = extractor.extract_with_confidence("Обстоятельства банкротства")
+    assert len(reasons) > 0
+    assert conf == 0.3
+
+
+def test_extract_with_confidence_generic():
+    """Generic fallback yields confidence 0.1."""
+    extractor = ReasonExtractor()
+    reasons, conf = extractor.extract_with_confidence("Служебная заметка.")
+    assert reasons == ("оценка обстоятельств дела",)
+    assert conf == 0.1
+
+
+def test_extract_with_confidence_empty():
+    """Empty text yields generic fallback with confidence 0.1."""
+    extractor = ReasonExtractor()
+    reasons, conf = extractor.extract_with_confidence("")
+    assert reasons == ("оценка обстоятельств дела",)
+    assert conf == 0.1

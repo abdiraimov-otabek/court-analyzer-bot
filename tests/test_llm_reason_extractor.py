@@ -294,7 +294,7 @@ async def test_classify_empty_text_returns_not_relevant():
 
 @pytest.mark.asyncio
 async def test_classify_http_error_returns_true_fallback():
-    """On error, keep the case (safe default) with generic reason."""
+    """On error, keep the case (safe default) with generic reason to avoid data loss."""
     import httpx as _httpx
 
     http = AsyncMock()
@@ -308,13 +308,14 @@ async def test_classify_http_error_returns_true_fallback():
     decision = _make_decision("some text")
     is_relevant, reasons, quote, llm_outcome = await extractor.classify_and_extract(decision, "61.2")
 
-    assert is_relevant is False  # For perfection: errors default to False
-    assert reasons == ("оценка обстоятельств дела",)
+    assert is_relevant is True  # Fail-safe: keep case to avoid 100% rejection
+    assert "оценка обстоятельств дела" in reasons
     assert llm_outcome is None
 
 
 @pytest.mark.asyncio
 async def test_classify_malformed_json_returns_true_fallback():
+    """On malformed JSON, keep the case (safe default) to avoid data loss."""
     http = AsyncMock()
     http.post = AsyncMock(return_value=_mock_response(_api_body("not json")))
     extractor = _make_extractor(http_client=http)
@@ -322,8 +323,8 @@ async def test_classify_malformed_json_returns_true_fallback():
     decision = _make_decision("some text")
     is_relevant, reasons, quote, llm_outcome = await extractor.classify_and_extract(decision, "61.3")
 
-    assert is_relevant is False  # For perfection: malformed JSON defaults to False
-    assert reasons == ("оценка обстоятельств дела",)
+    assert is_relevant is True  # Fail-safe: keep case to avoid 100% rejection
+    assert "оценка обстоятельств дела" in reasons
     assert llm_outcome is None
 
 
@@ -350,6 +351,7 @@ async def test_classify_uses_separate_cache():
 
 @pytest.mark.asyncio
 async def test_classify_budget_exhausted_keeps_case():
+    """When budget is exhausted, keep cases as relevant to avoid data loss."""
     http = AsyncMock()
     extractor = _make_extractor(http_client=http)
     extractor.set_fetch_budget(0)
@@ -357,12 +359,40 @@ async def test_classify_budget_exhausted_keeps_case():
     decision = _make_decision("some text")
     is_relevant, reasons, quote, llm_outcome = await extractor.classify_and_extract(decision, "61.2")
 
-    assert (
-        is_relevant is False
-    )  # Now it's False for perfection (no verify = no relevant)
-    assert reasons == ("оценка обстоятельств дела",)
+    assert is_relevant is True  # Fail-safe: keep case to avoid data loss
+    assert "оценка обстоятельств дела" in reasons
     assert llm_outcome is None
     http.post.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_classify_relevant_without_quote_stays_relevant():
+    """A case marked relevant by LLM but without a proof_quote should remain relevant.
+
+    Previously, this was hard-rejected. Now it should stay relevant with a
+    НЕТ_ЦИТАТЫ prefix in proof_quote.
+    """
+    http = AsyncMock()
+    labels = ["неравноценное встречное исполнение (п.1 ст.61.2)"]
+    api_response = [
+        {"relevant": True, "reasons": labels, "proof_quote": "", "outcome": "satisfied"}
+    ]
+    http.post = AsyncMock(
+        return_value=_mock_response(
+            _api_body(json.dumps(api_response, ensure_ascii=False))
+        )
+    )
+    extractor = _make_extractor(http_client=http)
+
+    decision = _make_decision("Признать сделку недействительной / Определение")
+    is_relevant, reasons, quote, llm_outcome = await extractor.classify_and_extract(
+        decision, "61.2"
+    )
+
+    assert is_relevant is True
+    assert reasons == tuple(labels)
+    assert quote.startswith("НЕТ_ЦИТАТЫ")
+    assert llm_outcome == "satisfied"
 
 
 @pytest.mark.asyncio

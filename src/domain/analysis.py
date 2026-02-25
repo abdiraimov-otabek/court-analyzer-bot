@@ -72,6 +72,12 @@ class AnalysisService:
             fallback=all_reasons,
         )
 
+        # Compute average reason confidence across verifiable decisions
+        avg_reason_conf = 1.0
+        if verifiable_decisions:
+            conf_sum = sum(d.reason_confidence for d in verifiable_decisions)
+            avg_reason_conf = conf_sum / len(verifiable_decisions)
+
         if self._llm_reason_extractor:
             summary = await self._llm_reason_extractor.generate_summary(
                 court=court,
@@ -85,6 +91,7 @@ class AnalysisService:
                 top_denied_reasons=[r for r, _ in denied_reasons.most_common(5)],
                 total_pages=total_pages,
                 total_cases_found=total_cases_found,
+                reason_confidence=avg_reason_conf,
             )
         else:
             article_line = f"Статья: {article} | " if article else ""
@@ -92,12 +99,16 @@ class AnalysisService:
             if total_pages > 1:
                 pagination_line = f"Найдено {total_cases_found} дел ({total_pages} стр.). Обработано {total_all} дел. "
 
+            quality_note = ""
+            if avg_reason_conf < 0.6:
+                quality_note = "\n⚠️ Низкая уверенность в основаниях: часть дел классифицирована без прямых цитат из судебных актов."
+
             summary = (
                 "СВОДКА ПО ЗАПРОСУ:\n"
                 f"Суд: {court} | Период: {period} | {article_line}{pagination_line}Всего верифицировано: {total_verifiable} (из {total_all})\n"
                 f"Статистика: {stats}\n"
                 f"Топ-2 основания для удовлетворения: {top_satisfied}\n"
-                f"Топ-2 основания для отказа: {top_denied}"
+                f"Топ-2 основания для отказа: {top_denied}{quality_note}"
             )
 
         case_list = self.build_case_list(verifiable_decisions)
@@ -241,4 +252,7 @@ class AnalysisService:
     def _format_reason(self, decision: CaseDecision) -> str:
         if not decision.reasons:
             return "не указано"
-        return "; ".join(decision.reasons[:5])
+        reasons_text = "; ".join(decision.reasons[:5])
+        if decision.reason_confidence < 0.5:
+            reasons_text += " [~]"
+        return reasons_text

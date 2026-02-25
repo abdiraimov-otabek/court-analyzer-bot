@@ -238,6 +238,9 @@ async def _run_analysis(message: Message, user_id: UserId, query_text: str) -> N
         await message.answer(
             "Доступ к КАД ограничен. Проверьте ключ и лимиты.", reply_markup=_help_kb()
         )
+    except asyncio.CancelledError:
+        log_event(logger, "analysis.cancelled")
+        raise
     except KadInvalidResponseError:
         log_event(logger, "analysis.failed", error_type="KadInvalidResponseError")
         await message.answer(
@@ -274,11 +277,18 @@ async def _run_analysis(message: Message, user_id: UserId, query_text: str) -> N
             "Уточните запрос или период.",
             reply_markup=_help_kb(),
         )
-    except Exception:
+    except Exception as exc:
+        if isinstance(exc, RuntimeError) and "closed" in str(exc):
+            log_event(logger, "analysis.cancelled", reason="shutting down")
+            return
         logger.exception("analysis.failed_unexpected")
-        await message.answer(
-            "Не удалось завершить анализ. Попробуйте позже.", reply_markup=_help_kb()
-        )
+        try:
+            await message.answer(
+                "Не удалось завершить анализ. Попробуйте позже.",
+                reply_markup=_help_kb(),
+            )
+        except Exception:
+            pass
     finally:
         slow_alert_task.cancel()
         container.active_requests.finish(user_id)

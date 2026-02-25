@@ -68,7 +68,7 @@ class QueryMetadataExtractor:
 
 
 class RequestProcessor:
-    _CACHE_SCHEMA_VERSION = "v21"
+    _CACHE_SCHEMA_VERSION = "v22"
 
     def __init__(
         self,

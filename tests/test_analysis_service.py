@@ -147,6 +147,106 @@ def test_analysis_service_keeps_unknown_outcomes_and_percentages_sum():
     assert "Не определено" in result.case_list
 
 
+def test_analysis_service_low_confidence_marker():
+    """Decisions with reason_confidence < 0.5 should show [~] marker."""
+    service = AnalysisService()
+    decisions = [
+        CaseDecision(
+            case_number="A40-50/2024",
+            decision_date=date(2024, 1, 1),
+            outcome=CaseOutcome.SATISFIED,
+            reasons=("оспаривание сделки",),
+            case_id="id-50",
+            court_name="АС города Москвы",
+            case_link="https://kad.arbitr.ru/Card/id-50",
+            reason_confidence=0.3,
+        ),
+    ]
+
+    result = asyncio.run(
+        service.build_result("АС города Москвы", "2024 год", decisions)
+    )
+
+    assert "[~]" in result.case_list
+
+
+def test_analysis_service_high_confidence_no_marker():
+    """Decisions with reason_confidence >= 0.5 should NOT show [~] marker."""
+    service = AnalysisService()
+    decisions = [
+        CaseDecision(
+            case_number="A40-51/2024",
+            decision_date=date(2024, 1, 1),
+            outcome=CaseOutcome.SATISFIED,
+            reasons=("оспаривание сделки",),
+            case_id="id-51",
+            court_name="АС города Москвы",
+            case_link="https://kad.arbitr.ru/Card/id-51",
+            reason_confidence=0.7,
+        ),
+    ]
+
+    result = asyncio.run(
+        service.build_result("АС города Москвы", "2024 год", decisions)
+    )
+
+    assert "[~]" not in result.case_list
+
+
+def test_analysis_service_quality_warning_low_avg_confidence():
+    """Summary should include quality warning when avg reason confidence < 0.6."""
+    service = AnalysisService()
+    decisions = [
+        CaseDecision(
+            case_number="A40-60/2024",
+            decision_date=date(2024, 1, 1),
+            outcome=CaseOutcome.SATISFIED,
+            reasons=("оспаривание сделки",),
+            reason_confidence=0.3,
+        ),
+        CaseDecision(
+            case_number="A40-61/2024",
+            decision_date=date(2024, 1, 2),
+            outcome=CaseOutcome.DENIED,
+            reasons=("пропуск срока",),
+            reason_confidence=0.4,
+        ),
+    ]
+
+    result = asyncio.run(
+        service.build_result("АС города Москвы", "2024 год", decisions)
+    )
+
+    assert "Низкая уверенность в основаниях" in result.summary
+
+
+def test_analysis_service_no_warning_high_avg_confidence():
+    """Summary should NOT include quality warning when avg reason confidence >= 0.6."""
+    service = AnalysisService()
+    decisions = [
+        CaseDecision(
+            case_number="A40-70/2024",
+            decision_date=date(2024, 1, 1),
+            outcome=CaseOutcome.SATISFIED,
+            reasons=("оспаривание сделки",),
+            reason_confidence=0.9,
+        ),
+        CaseDecision(
+            case_number="A40-71/2024",
+            decision_date=date(2024, 1, 2),
+            outcome=CaseOutcome.DENIED,
+            reasons=("пропуск срока",),
+            reason_confidence=0.8,
+        ),
+    ]
+
+    result = asyncio.run(
+        service.build_result("АС города Москвы", "2024 год", decisions)
+    )
+
+    assert "Низкая уверенность в основаниях" not in result.summary
+
+
 def test_analysis_service_provides_top_reasons_even_when_reason_lists_are_empty():
     service = AnalysisService()
     decisions = [

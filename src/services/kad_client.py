@@ -440,6 +440,11 @@ class ParserApiKadClient:
                 await _fill_in_flight()
         finally:
             self._current_article = None
+            if in_flight:
+                for task in in_flight:
+                    task.cancel()
+                await asyncio.gather(*in_flight, return_exceptions=True)
+                in_flight.clear()
 
         details_fetch_ms = int((time.perf_counter() - details_start) * 1000)
         log_event(
@@ -492,12 +497,20 @@ class ParserApiKadClient:
 
             relevant_decisions: list[CaseDecision] = []
             filtered_by_relevance = 0
+            no_quote_prefix = self._llm_reason_extractor._NO_QUOTE_PREFIX
             for decision, (is_relevant, reasons, proof_quote, llm_outcome) in zip(
                 decisions, classify_results
             ):
                 if is_relevant:
+                    # Determine reason_confidence based on proof_quote quality
+                    if proof_quote and not proof_quote.startswith(no_quote_prefix):
+                        reason_conf = 1.0
+                    else:
+                        reason_conf = 0.7
+
                     updated = replace(
-                        decision, reasons=reasons, proof_quote=proof_quote
+                        decision, reasons=reasons, proof_quote=proof_quote,
+                        reason_confidence=reason_conf,
                     )
 
                     confidence = 1.0
@@ -735,6 +748,7 @@ class ParserApiKadClient:
             decision = replace(
                 decision,
                 reasons=llm_reasons,
+                reason_confidence=0.7,
                 confidence_score=max(0.0, confidence),
                 validation_conflicts=tuple(conflicts),
             )
@@ -953,7 +967,7 @@ class ParserApiKadClient:
         if max_documents_per_case:
             events = events[-max_documents_per_case:]
 
-        outcome, reasons, decision_date, analysis_text, document_links = (
+        outcome, reasons, decision_date, analysis_text, document_links, reason_conf = (
             self._extract_outcome_and_reasons(events)
         )
         case_category = self._extract_case_category(case)
@@ -968,6 +982,7 @@ class ParserApiKadClient:
             analysis_text=analysis_text,
             case_category=case_category,
             document_links=document_links,
+            reason_confidence=reason_conf,
         )
 
     def _extract_case_number(self, case: dict) -> str:
@@ -1127,7 +1142,7 @@ class ParserApiKadClient:
 
     def _extract_outcome_and_reasons(
         self, events: list[dict]
-    ) -> tuple[CaseOutcome, tuple[str, ...], date, str, tuple[dict[str, str], ...]]:
+    ) -> tuple[CaseOutcome, tuple[str, ...], date, str, tuple[dict[str, str], ...], float]:
         if not events:
             return (
                 CaseOutcome.UNKNOWN,
@@ -1135,6 +1150,7 @@ class ParserApiKadClient:
                 date.today(),
                 "",
                 (),
+                0.1,
             )
 
         # Each entry: (full_text, priority_text, date, docs)
@@ -1210,14 +1226,15 @@ class ParserApiKadClient:
                     seen_urls.add(d["url"])
 
         # Reasons extraction still focuses on the decisive text, but fallback uses the combined text
-        reasons = self._reason_extractor.extract(prepared[decisive_idx][0])
-        if not reasons:
-            reasons = self._reason_extractor.extract(analysis_text)
+        reasons, reason_conf = self._reason_extractor.extract_with_confidence(prepared[decisive_idx][0])
+        if not reasons or reasons == ("оценка обстоятельств дела",):
+            reasons, reason_conf = self._reason_extractor.extract_with_confidence(analysis_text)
 
         if not reasons:
             reasons = ("оценка обстоятельств дела",)
+            reason_conf = 0.1
 
-        return outcome, reasons, decision_date, analysis_text, tuple(all_docs)
+        return outcome, reasons, decision_date, analysis_text, tuple(all_docs), reason_conf
 
     def _build_event_text(self, event: dict) -> str:
         return " ".join([

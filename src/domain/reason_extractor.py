@@ -140,6 +140,42 @@ class ReasonExtractor:
             ("несостоятельност", "обстоятельства банкротства"),
         ]
 
+    def extract_with_confidence(self, text: str) -> tuple[tuple[str, ...], float]:
+        """Extract reasons and return a confidence score for how they were matched.
+
+        Returns (reasons, confidence) where confidence is:
+        - 0.5 for primary pattern matches
+        - 0.3 for fallback keyword matches
+        - 0.1 for generic fallback ("оценка обстоятельств дела")
+        """
+        if not text:
+            return (("оценка обстоятельств дела",), 0.1)
+        lower = text.lower()
+
+        # Primary patterns
+        reasons: list[str] = []
+        seen: set[str] = set()
+        for pattern, label in self._patterns:
+            if pattern in lower and label not in seen:
+                seen.add(label)
+                reasons.append(label)
+                if len(reasons) >= 3:
+                    break
+        if reasons:
+            return (tuple(reasons), 0.5)
+
+        # Fallback keywords
+        for keyword, label in self._fallback_keywords:
+            if keyword in lower and label not in seen:
+                seen.add(label)
+                reasons.append(label)
+            if len(reasons) >= 3:
+                break
+        if reasons:
+            return (tuple(reasons), 0.3)
+
+        return (("оценка обстоятельств дела",), 0.1)
+
     def extract(self, text: str) -> tuple[str, ...]:
         if not text:
             return ()
@@ -152,6 +188,8 @@ class ReasonExtractor:
             if pattern in lower and label not in seen:
                 seen.add(label)
                 reasons.append(label)
+                if len(reasons) >= 3:
+                    break
 
         if reasons:
             return tuple(reasons)

@@ -9,7 +9,7 @@ from src.infrastructure.sqlite import SqliteConnection
 
 
 class CaseDetailsCacheRepository:
-    _SCHEMA_VERSION = "v9"
+    _SCHEMA_VERSION = "v10"
 
     def __init__(
         self, connection: SqliteConnection, ttl_seconds: int = 24 * 60 * 60
@@ -91,6 +91,7 @@ class CaseDetailsCacheRepository:
                 "case_link": decision.case_link,
                 "analysis_text": decision.analysis_text,
                 "case_category": decision.case_category,
+                "reason_confidence": decision.reason_confidence,
             },
             ensure_ascii=False,
         )
@@ -109,4 +110,5 @@ class CaseDetailsCacheRepository:
             case_link=str(data.get("case_link", "") or ""),
             analysis_text=str(data.get("analysis_text", "") or ""),
             case_category=str(data.get("case_category", "") or ""),
+            reason_confidence=float(data.get("reason_confidence", 1.0)),
         )
