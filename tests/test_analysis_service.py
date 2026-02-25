@@ -12,7 +12,10 @@ def test_analysis_service_builds_summary_and_list():
             case_number="A40-1/2023",
             decision_date=date(2023, 3, 15),
             outcome=CaseOutcome.SATISFIED,
-            reasons=("доказан вред", "нарушение процедуры",),
+            reasons=(
+                "доказан вред",
+                "нарушение процедуры",
+            ),
             case_id="id-1",
             court_name="9 ААС",
             case_link="https://kad.arbitr.ru/Card/id-1",
@@ -45,7 +48,8 @@ def test_analysis_service_builds_summary_and_list():
         )
     )
 
-    assert "Всего дел: 3" in result.summary
+    assert "Суд: 9 ААС" in result.summary
+    assert "Всего верифицировано: 3" in result.summary
     assert "Удовлетворено - 1 (33%)" in result.summary
     assert "Отказано - 2 (67%)" in result.summary
     assert "Не определено - 0 (0%)" in result.summary
@@ -68,7 +72,10 @@ def test_analysis_service_top_reasons_are_distinct_between_outcomes():
             case_number="A40-1/2024",
             decision_date=date(2024, 1, 10),
             outcome=CaseOutcome.SATISFIED,
-            reasons=("сделка с предпочтением", "причинение вреда кредиторам",),
+            reasons=(
+                "сделка с предпочтением",
+                "причинение вреда кредиторам",
+            ),
             case_id="x1",
             court_name="АС города Москвы",
             case_link="https://kad.arbitr.ru/Card/x1",
@@ -86,7 +93,10 @@ def test_analysis_service_top_reasons_are_distinct_between_outcomes():
             case_number="A40-3/2024",
             decision_date=date(2024, 3, 10),
             outcome=CaseOutcome.DENIED,
-            reasons=("сделка с предпочтением", "пропуск срока",),
+            reasons=(
+                "сделка с предпочтением",
+                "пропуск срока",
+            ),
             case_id="x3",
             court_name="АС города Москвы",
             case_link="https://kad.arbitr.ru/Card/x3",
@@ -97,7 +107,10 @@ def test_analysis_service_top_reasons_are_distinct_between_outcomes():
         service.build_result("АС города Москвы", "2024 год", decisions)
     )
 
-    assert "Топ-2 основания для удовлетворения: причинение вреда кредиторам" in result.summary
+    assert (
+        "Топ-2 основания для удовлетворения: причинение вреда кредиторам"
+        in result.summary
+    )
     assert "Топ-2 основания для отказа: пропуск срока" in result.summary
 
 
@@ -155,5 +168,8 @@ def test_analysis_service_provides_top_reasons_even_when_reason_lists_are_empty(
         service.build_result("АС города Москвы", "2024 год", decisions)
     )
 
-    assert "Топ-2 основания для удовлетворения: оценка обстоятельств дела" in result.summary
+    assert (
+        "Топ-2 основания для удовлетворения: оценка обстоятельств дела"
+        in result.summary
+    )
     assert "Топ-2 основания для отказа: оценка обстоятельств дела" in result.summary

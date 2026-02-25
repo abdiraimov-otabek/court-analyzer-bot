@@ -24,9 +24,13 @@ class CaseDecision:
     case_category: str = ""  # "Б", "Г", "А", or "" if unknown
     document_links: tuple[dict[str, str], ...] = ()
     proof_quote: str = ""  # Direct citation from the act for verifiable accuracy
+    confidence_score: float = 1.0
+    validation_conflicts: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
 class AnalysisResult:
     summary: str
     case_list: str
+    total_pages: int = 0
+    total_cases_found: int = 0

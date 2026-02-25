@@ -1,6 +1,6 @@
 import asyncio
-from datetime import date, datetime
 import sqlite3
+from datetime import date, datetime
 
 import pytest
 
@@ -13,7 +13,11 @@ from src.infrastructure.sqlite import SqliteConnection
 from src.services.active_requests import ActiveRequestRegistry
 from src.services.hashing import HashingService
 from src.services.kad_client import FetchDecisionsResult, FetchStats, KadClient
-from src.services.request_processor import InsufficientQualityError, NotEnoughData, RequestProcessor
+from src.services.request_processor import (
+    InsufficientQualityError,
+    NotEnoughData,
+    RequestProcessor,
+)
 
 
 class FakeKadClient(KadClient):
@@ -131,7 +135,9 @@ def test_request_processor_caches_and_logs(tmp_path):
     user_id = UserId("123")
     registry.start(user_id, query_text="query 2023", total_cases=5)
 
-    cache_repo = AnalysisCacheRepository(SqliteConnection(str(tmp_path / "app.db")), ttl_seconds=60)
+    cache_repo = AnalysisCacheRepository(
+        SqliteConnection(str(tmp_path / "app.db")), ttl_seconds=60
+    )
 
     processor = RequestProcessor(
         kad_client=FakeKadClient(),
@@ -144,7 +150,7 @@ def test_request_processor_caches_and_logs(tmp_path):
 
     result = asyncio.run(processor.process(user_id, "query 2023", settings))
 
-    assert "Всего дел: 5" in result.summary
+    assert "Всего верифицировано: 5" in result.summary
     assert "Суд: АС города Москвы" in result.summary
     assert registry.get(user_id).processed_cases == 5
 
@@ -177,7 +183,7 @@ def test_request_processor_returns_result_even_if_cache_and_log_write_fail():
 
     result = asyncio.run(processor.process(user_id, "query 2023", settings))
 
-    assert "Всего дел: 5" in result.summary
+    assert "Всего верифицировано: 5" in result.summary
 
 
 class MostlyUnknownKadClient(KadClient):
@@ -243,7 +249,9 @@ def test_request_processor_blocks_final_summary_on_quality_gate(tmp_path):
     registry = ActiveRequestRegistry()
     user_id = UserId("123")
     registry.start(user_id, query_text="query 2024", total_cases=60)
-    cache_repo = AnalysisCacheRepository(SqliteConnection(str(tmp_path / "app.db")), ttl_seconds=60)
+    cache_repo = AnalysisCacheRepository(
+        SqliteConnection(str(tmp_path / "app.db")), ttl_seconds=60
+    )
 
     processor = RequestProcessor(
         kad_client=MostlyUnknownKadClient(),
@@ -312,7 +320,9 @@ def test_request_processor_raises_not_enough_data_when_no_decisions(tmp_path):
     registry = ActiveRequestRegistry()
     user_id = UserId("123")
     registry.start(user_id, query_text="query 2024", total_cases=500)
-    cache_repo = AnalysisCacheRepository(SqliteConnection(str(tmp_path / "app.db")), ttl_seconds=60)
+    cache_repo = AnalysisCacheRepository(
+        SqliteConnection(str(tmp_path / "app.db")), ttl_seconds=60
+    )
 
     processor = RequestProcessor(
         kad_client=EmptyResultKadClient(),

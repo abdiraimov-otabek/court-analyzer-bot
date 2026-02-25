@@ -6,8 +6,16 @@ import json
 import logging
 
 import httpx
+from pydantic import BaseModel, Field, ValidationError
 
 from src.domain.entities import CaseDecision, CaseOutcome
+
+
+class ClassifyResultItem(BaseModel):
+    relevant: bool = True
+    reasons: list[str] = Field(default_factory=list)
+    proof_quote: str = ""
+    outcome: str = "NOT FOUND IN DOCUMENT"
 
 
 class LLMReasonExtractor:
@@ -84,7 +92,7 @@ class LLMReasonExtractor:
         self,
         http_client: httpx.AsyncClient,
         api_key: str,
-        model: str = "anthropic/claude-3-5-sonnet",
+        model: str = "anthropic/claude-3.5-sonnet",
         fast_model: str = "google/gemini-flash-1.5",
         timeout: int = 15,
         max_concurrent: int = 8,
@@ -173,7 +181,9 @@ class LLMReasonExtractor:
                 f'3. "court": официальное название суда или его часть (например, "АС города Москвы", "15 ААС").\n'
                 f'4. "year": год в формате ГГГГ.\n'
                 f'5. "quarter": номер квартала (1, 2, 3 или 4).\n'
-                f'6. "case_type": тип дела - "Б" (банкротство), "Г" (гражданское), "А" (административное) или null.\n\n'
+                f'6. "case_type": тип дела - "Б" (банкротство), "Г" (гражданское), "А" (административное) или null.\n'
+                f'7. "date_from": конкретная дата начала в формате ГГГГ-ММ-ДД (если указан месяц, например "март 2024" -> "2024-03-01").\n'
+                f'8. "date_to": конкретная дата конца в формате ГГГГ-ММ-ДД (если указан месяц, например "март 2024" -> "2024-03-31").\n\n'
                 f"ПРАВИЛА:\n"
                 f'- В поле "full_article" ДОБАВЛЯЙ аббревиатуру кодекса (ГК, НК, УК) или краткое название закона, если они упомянуты или понятны из контекста.\n'
                 f'- Если статья из ГК РФ или других кодексов (кроме Закона о банкротстве), ставь case_type: "Г".\n'
@@ -215,6 +225,8 @@ class LLMReasonExtractor:
                 if parsed.get("quarter")
                 else None,
                 "case_type": parsed.get("case_type"),
+                "date_from": parsed.get("date_from"),
+                "date_to": parsed.get("date_to"),
             }
         except Exception as exc:
             self._logger.warning(
@@ -227,6 +239,8 @@ class LLMReasonExtractor:
             "year": None,
             "quarter": None,
             "case_type": None,
+            "date_from": None,
+            "date_to": None,
         }
 
     async def generate_summary(
@@ -240,6 +254,8 @@ class LLMReasonExtractor:
         unknown: int,
         top_satisfied_reasons: list[str],
         top_denied_reasons: list[str],
+        total_pages: int = 0,
+        total_cases_found: int = 0,
     ) -> str:
         """Generate a professional legal summary of the analysis results."""
         prompt = (
@@ -252,7 +268,8 @@ class LLMReasonExtractor:
             f"- Всего дел: {total}\n"
             f"- Удовлетворено: {satisfied} ({round(satisfied / total * 100 if total > 0 else 0)}%)\n"
             f"- Отказано: {denied} ({round(denied / total * 100 if total > 0 else 0)}%)\n"
-            f"- Не определено: {unknown} ({round(unknown / total * 100 if total > 0 else 0)}%)\n\n"
+            f"- Не определено: {unknown} ({round(unknown / total * 100 if total > 0 else 0)}%)\n"
+            f"- Масштаб выборки: {'обработано ВСЕ найдено' if total_pages <= 1 else f'обработано {total} из {total_cases_found} дел ({total_pages} стр.)'}\n\n"
             f"Типовые основания для удовлетворения:\n"
             + "\n".join(f"- {r}" for r in top_satisfied_reasons)
             + "\n\n"
@@ -484,7 +501,13 @@ class LLMReasonExtractor:
             if self._budget_remaining is not None:
                 if self._budget_remaining <= 0:
                     for idx in chunk_indices:
-                        results[idx] = (False, self._FALLBACK, "", None)
+                        # Fail-safe: if budget exhausted, pass through as relevant to avoid data loss
+                        results[idx] = (
+                            True,
+                            (self._FALLBACK[0], "Capped by budget"),
+                            "",
+                            None,
+                        )
                     continue
                 self._budget_remaining -= 1  # Each batch counts as 1 call for budget
 
@@ -509,7 +532,13 @@ class LLMReasonExtractor:
                     "llm.batch_classify_failed", extra={"data": {"error": str(exc)}}
                 )
                 for idx in chunk_indices:
-                    results[idx] = (False, self._FALLBACK, "", None)
+                    # Fail-safe: if LLM fails, pass through as relevant to avoid 100% rejection
+                    results[idx] = (
+                        True,
+                        (self._FALLBACK[0], f"LLM Error: {str(exc)[:50]}"),
+                        "",
+                        None,
+                    )
 
         return [res for res in results if res is not None]
 
@@ -538,19 +567,19 @@ class LLMReasonExtractor:
             f"АКТЫ ДЛЯ АНАЛИЗА:\n"
             f"{cases_text}\n\n"
             f"СТРОГИЕ КРИТЕРИИ РЕЛЕВАНТНОСТИ:\n"
-            f"1. **Суть**: Акт релевантен только если в нем рассматривается спор или ходатайство, прямо связанное со ст. {article} в контексте запроса пользователя.\n"
-            f"2. **Процессуальный мусор**: Обычное упоминание номера статьи в названии документа (например, 'ходатайство №60') БЕЗ связи со ст. {article} — это НЕ РЕЛЕВАНТНО (relevant: false).\n"
-            f"3. **Контекст**: Если целевая статья упоминается лишь в списке других статей без обсуждения её сути — relevant: false.\n\n"
+            f"1. **Суть**: Акт релевантен, если в нем упоминается ст. {article} в связи с оспариванием сделок, действиями управляющего или иными существенными вопросами дела. Если статья — ключевой элемент спора, relevant: true.\n"
+            f"2. **Процессуальный мусор**: Обычное упоминание номера статьи в списке (например, 'ходатайство №60') БЕЗ связи с существом дела — relevant: false. Но если ст. {article} является основанием для заявления/жалобы, даже если она упомянута кратко — relevant: true.\n"
+            f"3. **Контекст**: Если целевая статья упоминается лишь в списке других статей без обсуждения её сути, но из контекста понятно, что это тема спора — relevant: true.\n\n"
             f"ТРЕБОВАНИЯ К ПОЛЯМ ОТВЕТА:\n"
-            f"- **reasons**: Пиши профессиональным юридическим языком суть спора (например: 'Оспаривание бездействия управляющего в порядке ст. 60', 'Рассмотрение жалобы на действия АУ по ст. 60'). Избегай общих фраз типа 'упоминание статьи'.\n"
-            f"- **proof_quote**: ОБЯЗАТЕЛЬНОЕ ПОЛЕ. Если relevant: true, ты ДОЛЖЕН привести прямую цитату из текста, которая подтверждает релевантность. Если цитаты нет — relevant должен быть false.\n"
-            f'- **outcome**: ОБЯЗАТЕЛЬНОЕ ПОЛЕ для релевантных актов. Определи исход дела на основе текста: "satisfied" (удовлетворено/обоснованно), "denied" (отказано/необоснованно), или "unknown" (невозможно определить). Анализируй резолютивную часть, не заголовки.\n\n'
+            f"- **reasons**: Пиши профессиональным юридическим языком суть спора.\n"
+            f"- **proof_quote**: Если relevant: true, приведи краткую цитату или просто подтверждение из текста. Если цитату найти сложно, укажи контекст упоминания.\n"
+            f'- **outcome**: "satisfied" (удовлетворено/обоснованно), "denied" (отказано/необоснованно) или "NOT FOUND IN DOCUMENT".\n\n'
             f"ФОРМАТ ОТВЕТА — СТРОГИЙ JSON-МАССИВ (ровно {len(decisions)} элементов):\n"
             f"[\n"
-            f'  {{"relevant": true, "reasons": ["Профессиональное обоснование"], "proof_quote": "Цитата из текста для ст.{article}", "outcome": "satisfied"}},\n'
-            f'  {{"relevant": false, "reasons": ["Почему не подходит"], "proof_quote": "", "outcome": "unknown"}}\n'
+            f'  {{"relevant": true, "reasons": ["Обоснование"], "proof_quote": "Цитата", "outcome": "satisfied"}},\n'
+            f'  {{"relevant": false, "reasons": ["Не подходит"], "proof_quote": "", "outcome": "NOT FOUND IN DOCUMENT"}}\n'
             f"]\n\n"
-            f"НИКАКИХ пояснений, комментариев или markdown. Твой ответ должен быть только валидным JSON-массивом."
+            f"НИКАКИХ пояснений. Твой ответ должен быть только валидным JSON-массивом."
         )
 
         response = await self._http_client.post(
@@ -606,6 +635,8 @@ class LLMReasonExtractor:
                         raw = val
                         break
 
+                    break
+
         if not isinstance(raw, list):
             self._logger.error(
                 "llm.expected_list_failed", extra={"data": {"content": raw_content}}
@@ -615,51 +646,32 @@ class LLMReasonExtractor:
         results = []
         for item in raw:
             try:
-                # Defensive: if item is a string, it might be double-encoded JSON or a comment
-                if isinstance(item, str):
-                    item = item.strip()
-                    if (item.startswith("{") and item.endswith("}")) or (
-                        item.startswith("[") and item.endswith("]")
-                    ):
-                        try:
-                            item = json.loads(item)
-                        except Exception:
-                            pass
+                # Use Pydantic to enforce strict schema types and defaults
+                parsed_item = ClassifyResultItem.model_validate(item)
 
-                if not isinstance(item, dict):
-                    self._logger.warning(
-                        "llm.unexpected_item_type", extra={"data": {"item": str(item)}}
-                    )
-                    results.append((False, self._FALLBACK, "", None))
-                    continue
-
-                is_relevant = bool(item.get("relevant", True))
-                reasons = item.get("reasons", [])
-                proof_quote = item.get("proof_quote", "").strip()
+                is_relevant = parsed_item.relevant
+                reasons = parsed_item.reasons
+                proof_quote = parsed_item.proof_quote.strip()
 
                 # Extract LLM-determined outcome
-                raw_outcome = str(item.get("outcome", "") or "").strip().lower()
+                raw_outcome = parsed_item.outcome.strip().lower()
                 llm_outcome: str | None = None
                 if raw_outcome in ("satisfied", "удовлетворено"):
                     llm_outcome = "satisfied"
                 elif raw_outcome in ("denied", "отказано"):
                     llm_outcome = "denied"
+                # Else: NOT FOUND IN DOCUMENT implies None
 
-                # Perfection requirement: No quote = No relevance
+                # Zero-Hallucination Perfection requirement: No quote = No relevance
                 if is_relevant and not proof_quote:
                     is_relevant = False
-                    reasons = ["не подтверждено цитатой (нерелевантно)"]
+                    reasons = ["НЕ_ПОДТВЕРЖДЕНО_ЦИТАТОЙ (нерелевантно)"]
 
-                if not isinstance(reasons, list) or not reasons:
+                if not reasons:
                     reasons = [self._FALLBACK[0]]
                 valid_reasons = tuple(
                     r for r in reasons if isinstance(r, str) and r.strip()
                 )
-
-                # Strict safety: if relevant but no quote provided, mark as irrelevant
-                if is_relevant and not proof_quote:
-                    is_relevant = False
-                    valid_reasons = ("НЕ_ПОДТВЕРЖДЕНО_ЦИТАТОЙ",)
 
                 results.append((
                     is_relevant,
@@ -667,6 +679,12 @@ class LLMReasonExtractor:
                     proof_quote,
                     llm_outcome,
                 ))
+            except ValidationError as e:
+                self._logger.error(
+                    "llm.pydantic_validation_failed",
+                    extra={"data": {"item": str(item), "error": str(e)}},
+                )
+                results.append((False, self._FALLBACK, "", None))
             except Exception as e:
                 self._logger.error(
                     "llm.item_process_failed",

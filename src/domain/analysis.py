@@ -20,6 +20,8 @@ class AnalysisService:
         period: str,
         decisions: list[CaseDecision],
         article: str | None = None,
+        total_pages: int = 0,
+        total_cases_found: int = 0,
     ) -> AnalysisResult:
         satisfied = 0
         denied = 0
@@ -28,22 +30,30 @@ class AnalysisService:
         denied_reasons: Counter[str] = Counter()
         all_reasons: Counter[str] = Counter()
 
-        for decision in decisions:
-            outcome = self.normalize_outcome(decision)
-            if outcome == CaseOutcome.SATISFIED:
-                satisfied += 1
-                satisfied_reasons.update(decision.reasons)
-            elif outcome == CaseOutcome.DENIED:
-                denied += 1
-                denied_reasons.update(decision.reasons)
-            else:
-                unknown += 1
-            all_reasons.update(decision.reasons)
+        verifiable_decisions = []
+        review_decisions = []
 
-        total = len(decisions)
-        satisfied_pct = self._percentage(satisfied, total)
-        denied_pct = self._percentage(denied, total)
-        unknown_pct = self._percentage(unknown, total)
+        for decision in decisions:
+            if decision.confidence_score >= 0.98:
+                verifiable_decisions.append(decision)
+                outcome = self.normalize_outcome(decision)
+                if outcome == CaseOutcome.SATISFIED:
+                    satisfied += 1
+                    satisfied_reasons.update(decision.reasons)
+                elif outcome == CaseOutcome.DENIED:
+                    denied += 1
+                    denied_reasons.update(decision.reasons)
+                else:
+                    unknown += 1
+                all_reasons.update(decision.reasons)
+            else:
+                review_decisions.append(decision)
+
+        total_all = len(decisions)
+        total_verifiable = len(verifiable_decisions)
+        satisfied_pct = self._percentage(satisfied, total_verifiable)
+        denied_pct = self._percentage(denied, total_verifiable)
+        unknown_pct = self._percentage(unknown, total_verifiable)
 
         stats = (
             f"Удовлетворено - {satisfied} ({satisfied_pct}%), "
@@ -67,25 +77,42 @@ class AnalysisService:
                 court=court,
                 period=period,
                 article=article,
-                total=total,
+                total=total_verifiable,
                 satisfied=satisfied,
                 denied=denied,
                 unknown=unknown,
                 top_satisfied_reasons=[r for r, _ in satisfied_reasons.most_common(5)],
                 top_denied_reasons=[r for r, _ in denied_reasons.most_common(5)],
+                total_pages=total_pages,
+                total_cases_found=total_cases_found,
             )
         else:
             article_line = f"Статья: {article} | " if article else ""
+            pagination_line = ""
+            if total_pages > 1:
+                pagination_line = f"Найдено {total_cases_found} дел ({total_pages} стр.). Обработано {total_all} дел. "
+
             summary = (
                 "СВОДКА ПО ЗАПРОСУ:\n"
-                f"Суд: {court} | Период: {period} | {article_line}Всего дел: {total}\n"
+                f"Суд: {court} | Период: {period} | {article_line}{pagination_line}Всего верифицировано: {total_verifiable} (из {total_all})\n"
                 f"Статистика: {stats}\n"
                 f"Топ-2 основания для удовлетворения: {top_satisfied}\n"
                 f"Топ-2 основания для отказа: {top_denied}"
             )
 
-        case_list = self.build_case_list(decisions)
-        return AnalysisResult(summary=summary, case_list=case_list)
+        case_list = self.build_case_list(verifiable_decisions)
+        if review_decisions:
+            case_list += (
+                f"\n\n⚠️ ТРЕБУЮТ РУЧНОЙ ПРОВЕРКИ ({len(review_decisions)} дел):\n"
+            )
+            case_list += self.build_case_list(review_decisions)
+
+        return AnalysisResult(
+            summary=summary,
+            case_list=case_list,
+            total_pages=total_pages,
+            total_cases_found=total_cases_found,
+        )
 
     def build_case_list(self, decisions: list[CaseDecision]) -> str:
         return "\n".join(self._format_case(decision) for decision in decisions)
@@ -137,13 +164,21 @@ class AnalysisService:
         if decision.proof_quote:
             quote_text = f" | Цитата: {decision.proof_quote}"
 
+        validation_text = ""
+        if decision.validation_conflicts:
+            validation_text = (
+                f" | ⚠️Конфликт: {', '.join(decision.validation_conflicts)}"
+            )
+        elif decision.confidence_score < 0.98:
+            validation_text = f" | ⚠️Низкая уверенность: {decision.confidence_score}"
+
         docs_text = ""
         if decision.document_links:
             doc_links = [f"[{d['name']}]({d['url']})" for d in decision.document_links]
             docs_text = " | Документы: " + ", ".join(doc_links)
         return (
             f"{case_label} | {self._format_date(decision.decision_date)} | "
-            f"{self._format_outcome(decision)} | Суд: {court} | Основание: {reason} | Ссылка: {link}{quote_text}{docs_text}"
+            f"{self._format_outcome(decision)} | Суд: {court} | Основание: {reason} | Ссылка: {link}{quote_text}{validation_text}{docs_text}"
         )
 
     def _format_date(self, value: date) -> str:

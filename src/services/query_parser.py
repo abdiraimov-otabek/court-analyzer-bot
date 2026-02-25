@@ -49,7 +49,7 @@ class QueryParser:
         article = self._extract_article(text)
         return SearchParams(
             inn_or_name=self._extract_inn(text) or self._extract_quoted_name(text),
-            inn_type="1" if self._inn_pattern.search(text) else "0",
+            inn_type="Any",
             date_from=date_from,
             date_to=date_to,
             court=self._extract_court(text),
@@ -107,31 +107,44 @@ class QueryParser:
         return match.group(1) if match else None
 
     def _extract_court(self, text: str) -> str | None:
-        # Simplified for extraction, matching original logic
-        court_map = {
-            "москов": "0976594b-1e64-4af7-897d-65b89a8f6d72",  # АС Московской области
-            "г. москв": "3b070404-569b-443b-871d-ddc9945c50e4",  # АС города Москвы
-            "спб": "2450531c-3e61-4de1-90a7-bc6908920551",  # АС СПб и ЛО
-            "ленинград": "2450531c-3e61-4de1-90a7-bc6908920551",
-            "татарстан": "291932cd-3e91-4566-aeeb-0538a7c647b0",
-        }
         text_lower = text.lower()
-        for key, val in court_map.items():
-            if key in text_lower:
-                return val
+        if "московской обл" in text_lower or "мособл" in text_lower:
+            return "АС Московской области"
+        if re.search(r"ас москвы|ас г\.?\s*москвы|города москвы", text_lower):
+            return "АС города Москвы"
+        if (
+            "спб" in text_lower
+            or "ленинград" in text_lower
+            or "санкт-петербург" in text_lower
+        ):
+            return "АС города Санкт-Петербурга и Ленинградской области"
+
+        aas_match = re.search(
+            r"(\d+)\s*(аас|арбитражный апелляционный суд)", text_lower
+        )
+        if aas_match:
+            return f"{aas_match.group(1)} арбитражный апелляционный суд"
+
+        as_match = re.search(r"ас\s+([а-я-]+(?:\s+[а-я-]+){0,2})", text_lower)
+        if as_match:
+            city = _court_fragment_to_title(as_match.group(1))
+            return f"АС {city}"
+
         return None
 
     def _extract_case_type(self, text: str, article: str | None = None) -> str | None:
         text_lower = text.lower()
+        if article and str(article).startswith("61."):
+            return "B"
         if "банкрот" in text_lower:
             return "B"
         if "административ" in text_lower:
             return "A"
-        return "G"
+        return None
 
     def _extract_article(self, text: str) -> str | None:
-        match = re.search(r"\bст\.?\s?(\d+)\b", text, re.I)
-        return match.group(1) if match else None
+        matches = re.findall(r"\b(?:ст\.?|стать[яьеи])\s?(\d+(?:\.\d+)?)\b", text, re.I)
+        return " ".join(matches) if matches else None
 
     def _extract_paragraph(self, text: str) -> str | None:
         match = re.search(r"\bп\.?\s?(\d+)\b", text, re.I)

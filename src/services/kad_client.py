@@ -208,6 +208,8 @@ class ParserApiKadClient:
         params = self._parser.parse(query_text)
         params = await self._refine_params_with_llm(query_text, params)
         if self._llm_reason_extractor is not None:
+            # Issue #5: Reset before setting to ensure clean slate per request
+            self._llm_reason_extractor.reset_fetch_budget()
             # When article is specified, every case needs classification — raise budget
             self._llm_reason_extractor.set_fetch_budget(max_calls=600)
         if should_cancel and should_cancel():
@@ -230,6 +232,8 @@ class ParserApiKadClient:
                     details_fetch_ms=0,
                     filtered_by_court=0,
                     court_compared_cases=0,
+                    total_pages=1,
+                    total_cases_found=1,
                 ),
             )
 
@@ -268,7 +272,7 @@ class ParserApiKadClient:
                 ),
             )
 
-        case_ids = await self._collect_case_ids(
+        case_ids, pages_count = await self._collect_case_ids(
             params,
             settings,
             should_cancel=should_cancel,
@@ -465,24 +469,10 @@ class ParserApiKadClient:
         if params.article and decisions:
             pre_filter_count = len(decisions)
             category_filtered = 0
-            if params.case_type == "B":
-                # Hard pre-filter: ст.61.2/61.3 are bankruptcy provisions —
-                # reject civil ("Г") and administrative ("А") cases before LLM classification.
-                # This prevents wasting LLM tokens on obviously irrelevant cases.
-                decisions = [
-                    d
-                    for d in decisions
-                    if not d.case_category or d.case_category == "Б"
-                ]
-                category_filtered = pre_filter_count - len(decisions)
-                if category_filtered > 0:
-                    log_event(
-                        self._logger,
-                        "fetch_decisions.category_pre_filter",
-                        removed=category_filtered,
-                        remaining=len(decisions),
-                    )
-                    filtered_by_article += category_filtered
+            # Removed the aggressive 'Б' case category filter.
+            # Bankruptcy adversarial proceedings (complaints, invalidations under art. 60/61)
+            # are frequently classified as 'Г' (Civil) by the KAD system. Filtering them
+            # out here causes massive false negatives.
             pre_llm_count = len(decisions)
 
         if params.article and self._llm_reason_extractor is not None and decisions:
@@ -509,12 +499,33 @@ class ParserApiKadClient:
                     updated = replace(
                         decision, reasons=reasons, proof_quote=proof_quote
                     )
-                    # Apply LLM-determined outcome when rule-based detection failed
-                    if updated.outcome == CaseOutcome.UNKNOWN and llm_outcome:
-                        if llm_outcome == "satisfied":
-                            updated = replace(updated, outcome=CaseOutcome.SATISFIED)
-                        elif llm_outcome == "denied":
-                            updated = replace(updated, outcome=CaseOutcome.DENIED)
+
+                    confidence = 1.0
+                    conflicts = []
+
+                    if llm_outcome:
+                        if updated.outcome == CaseOutcome.UNKNOWN:
+                            # Pure LLM reliance (no regex backing) drops confidence safely
+                            confidence -= 0.05
+                            if llm_outcome == "satisfied":
+                                updated = replace(
+                                    updated, outcome=CaseOutcome.SATISFIED
+                                )
+                            elif llm_outcome == "denied":
+                                updated = replace(updated, outcome=CaseOutcome.DENIED)
+                        else:
+                            # Rule-based detection succeeded. Verify LLM matches.
+                            if updated.outcome.value != llm_outcome:
+                                confidence -= 1.0
+                                conflicts.append(
+                                    f"Conflict: Rules engine detected '{updated.outcome.value}' but LLM extracted '{llm_outcome}'"
+                                )
+
+                    updated = replace(
+                        updated,
+                        confidence_score=max(0.0, confidence),
+                        validation_conflicts=tuple(conflicts),
+                    )
                     relevant_decisions.append(updated)
                 else:
                     filtered_by_relevance += 1
@@ -551,6 +562,8 @@ class ParserApiKadClient:
                 filtered_by_court=filtered_by_court,
                 court_compared_cases=court_compared_cases,
                 filtered_by_article=filtered_by_article,
+                total_pages=pages_count,
+                total_cases_found=len(case_ids),
             ),
             params=params,
         )
@@ -577,7 +590,7 @@ class ParserApiKadClient:
         settings: Settings,
         should_cancel: Callable[[], bool] | None = None,
         on_collection_progress: Callable[[int], None] | None = None,
-    ) -> list[str]:
+    ) -> tuple[list[str], int]:
         self._search_case_types.clear()
         self._search_case_numbers.clear()
         case_ids: list[str] = []
@@ -608,7 +621,7 @@ class ParserApiKadClient:
 
         _process_page(data)
         if len(case_ids) >= settings.max_cases or pages_count <= 1:
-            return case_ids
+            return case_ids, pages_count
 
         max_page = min(settings.max_pages, pages_count)
         page_tasks = [
@@ -638,7 +651,7 @@ class ParserApiKadClient:
                 f"Too many pages failed to load ({fail_count}/{max_page - 1}). Data may be incomplete."
             )
 
-        return case_ids
+        return case_ids, pages_count
 
     async def _fetch_case_decision_with_metrics(
         self, case_id: str, settings: Settings
@@ -668,6 +681,7 @@ class ParserApiKadClient:
         data = self._validate_success(data_result.data)
         cases = data.get("Cases", [])
         if not cases:
+            log_event(self._logger, "kad.details_empty", case_id=case_id)
             return DecisionFetchOutcome(
                 decision=None,
                 retry_count=data_result.retry_count,
@@ -699,16 +713,31 @@ class ParserApiKadClient:
             (
                 llm_reasons,
                 llm_outcome,
-            ) = await self._llm_reason_extractor.extract_with_outcome(
-                decision.analysis_text, decision.outcome
+            ) = await self._llm_reason_extractor.extract_with_outcome(decision)
+
+            confidence = 1.0
+            conflicts = []
+
+            if llm_outcome:
+                if decision.outcome == CaseOutcome.UNKNOWN:
+                    confidence -= 0.05
+                    if llm_outcome == "satisfied":
+                        decision = replace(decision, outcome=CaseOutcome.SATISFIED)
+                    elif llm_outcome == "denied":
+                        decision = replace(decision, outcome=CaseOutcome.DENIED)
+                else:
+                    if decision.outcome.value != llm_outcome:
+                        confidence -= 1.0
+                        conflicts.append(
+                            f"Conflict: Rules engine detected '{decision.outcome.value}' but LLM extracted '{llm_outcome}'"
+                        )
+
+            decision = replace(
+                decision,
+                reasons=llm_reasons,
+                confidence_score=max(0.0, confidence),
+                validation_conflicts=tuple(conflicts),
             )
-            decision = replace(decision, reasons=llm_reasons)
-            # Apply LLM-determined outcome when rule-based detection failed
-            if decision.outcome == CaseOutcome.UNKNOWN and llm_outcome:
-                if llm_outcome == "satisfied":
-                    decision = replace(decision, outcome=CaseOutcome.SATISFIED)
-                elif llm_outcome == "denied":
-                    decision = replace(decision, outcome=CaseOutcome.DENIED)
         if decision is not None and self._details_cache_repository is not None:
             try:
                 self._details_cache_repository.set(
@@ -1422,7 +1451,14 @@ class ParserApiKadClient:
         else:
             final_quarter = llm_quarter or params._regex_quarter
 
-        date_from, date_to = self._parser._build_period(year, final_quarter)
+        llm_date_from = llm_params.get("date_from")
+        llm_date_to = llm_params.get("date_to")
+
+        if llm_date_from or llm_date_to:
+            date_from = llm_date_from or params.date_from
+            date_to = llm_date_to or params.date_to
+        else:
+            date_from, date_to = self._parser._build_period(year, final_quarter)
 
         llm_court = llm_params.get("court")
         if llm_court:
@@ -1601,8 +1637,25 @@ class ParserApiKadClient:
                 response.raise_for_status()
                 data = response.json()
                 if data.get("Success") == 0 and "error" not in data:
-                    # Fast Success=0 means "0 results" or unrecognized params —
-                    # not a transient error worth retrying.
+                    if path == self._details_by_id_path:
+                        # Success=0 for an ID we just found in /search is a silent overload/rate limit
+                        retry_count += 1
+                        had_transient_error = True
+                        unavailable_attempts += 1
+                        log_event(
+                            self._logger,
+                            "kad.silent_drop_retry",
+                            path=path,
+                            attempt=unavailable_attempts,
+                        )
+                        if unavailable_attempts < 2:
+                            await asyncio.sleep(2)
+                            continue
+                        # If we've retried and it still drops, raise unavailable instead of returning empty
+                        raise KadUnavailableError(
+                            "KAD API silently dropping case details"
+                        )
+
                     log_debug(self._logger, "kad.success_zero")
                 return RequestResult(
                     data=data,

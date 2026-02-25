@@ -233,6 +233,11 @@ async def _run_analysis(message: Message, user_id: UserId, query_text: str) -> N
         await message.answer(
             "КАД временно недоступен. Попробуйте позже.", reply_markup=_help_kb()
         )
+    except KadAccessError:
+        log_event(logger, "analysis.failed", error_type="KadAccessError")
+        await message.answer(
+            "Доступ к КАД ограничен. Проверьте ключ и лимиты.", reply_markup=_help_kb()
+        )
     except KadInvalidResponseError:
         log_event(logger, "analysis.failed", error_type="KadInvalidResponseError")
         await message.answer(

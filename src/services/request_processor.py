@@ -246,6 +246,8 @@ class RequestProcessor:
             period=metadata.period,
             decisions=decisions,
             article=metadata.article,
+            total_pages=fetch_result.stats.total_pages,
+            total_cases_found=fetch_result.stats.total_cases_found,
         )
         build_duration_ms = int((datetime.now() - build_start).total_seconds() * 1000)
 

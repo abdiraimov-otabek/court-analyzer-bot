@@ -110,6 +110,7 @@ class SqliteConnection:
                 """
             )
             self._ensure_settings_columns(conn)
+            self._ensure_active_requests_columns(conn)
 
     def _ensure_settings_columns(self, conn: sqlite3.Connection) -> None:
         columns = {
@@ -151,4 +152,14 @@ class SqliteConnection:
         if "send_partial_file_on_quality_fail" not in columns:
             conn.execute(
                 "alter table settings add column send_partial_file_on_quality_fail integer not null default 1"
+            )
+
+    def _ensure_active_requests_columns(self, conn: sqlite3.Connection) -> None:
+        columns = {
+            row["name"]
+            for row in conn.execute("pragma table_info(active_requests)").fetchall()
+        }
+        if "cancelled" not in columns:
+            conn.execute(
+                "alter table active_requests add column cancelled integer not null default 0"
             )

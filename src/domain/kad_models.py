@@ -50,6 +50,8 @@ class FetchStats:
     court_compared_cases: int
     court_filter_removed: bool = False
     filtered_by_article: int = 0
+    total_pages: int = 0
+    total_cases_found: int = 0
 
 
 @dataclass(frozen=True)

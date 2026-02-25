@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime
 import logging
 import re
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Protocol
 
 from src.app.bot_logging import log_event
@@ -11,8 +11,11 @@ from src.domain.settings import Settings
 from src.domain.value_objects import QueryText, UserId
 from src.services.access_control import AccessControlList
 from src.services.active_requests import ActiveRequestRegistry
+from src.services.quarter_selection import (
+    PendingQuarterSelection,
+    QuarterSelectionRegistry,
+)
 from src.services.query_validator import QueryValidationResult, QueryValidator
-from src.services.quarter_selection import PendingQuarterSelection, QuarterSelectionRegistry
 from src.services.rate_limit import HourlyRateLimiter
 
 
@@ -25,13 +28,11 @@ class PreValidateResult:
 
 
 class CountProvider(Protocol):
-    def count_cases(self, query_text: str, settings: Settings) -> int:
-        ...
+    def count_cases(self, query_text: str, settings: Settings) -> int: ...
 
 
 class SettingsProvider(Protocol):
-    def get_settings(self) -> Settings:
-        ...
+    def get_settings(self) -> Settings: ...
 
 
 class BotLogic:
@@ -80,8 +81,12 @@ class BotLogic:
             if active.phase == "counting":
                 return ["Оцениваю объем данных..."]
             if active.phase == "collecting":
-                return [f"подбираю дела для анализа, найдено {active.collected_cases} из {active.total_cases} дел."]
-            return [f"анализирую, обработано {active.processed_cases} из {active.total_cases} дел."]
+                return [
+                    f"подбираю дела для анализа, найдено {active.collected_cases} из {active.total_cases} дел."
+                ]
+            return [
+                f"анализирую, обработано {active.processed_cases} из {active.total_cases} дел."
+            ]
         if text == "/cancel":
             pending = self._quarter_selections.get_pending(user_id)
             self._quarter_selections.clear_pending(user_id)
@@ -94,7 +99,9 @@ class BotLogic:
             return ["Запрос отменен."]
 
         settings = self._settings_provider.get_settings()
-        if not settings.allow_all_users and not self._access_control.is_allowed(user_id):
+        if not settings.allow_all_users and not self._access_control.is_allowed(
+            user_id
+        ):
             return ["Доступ ограничен. Обратитесь к администратору."]
 
         pending_quarter = self._quarter_selections.get_pending(user_id)
@@ -107,9 +114,13 @@ class BotLogic:
         if not self._rate_limiter.allow(user_id, now):
             return ["Превышен лимит 10 запросов в час. Попробуйте позже."]
 
-        return self._start_query(user_id=user_id, raw_query=text, include_ack=True, apply_rate_limit=False)
+        return self._start_query(
+            user_id=user_id, raw_query=text, include_ack=True, apply_rate_limit=False
+        )
 
-    def pre_validate(self, user_id: UserId, text: str, now: datetime) -> PreValidateResult | list[str]:
+    def pre_validate(
+        self, user_id: UserId, text: str, now: datetime
+    ) -> PreValidateResult | list[str]:
         """Validate a non-command query with no HTTP calls.
 
         Starts the active request (phase="counting") on success so the caller
@@ -118,7 +129,9 @@ class BotLogic:
         Returns PreValidateResult on success or a list of error strings on failure.
         """
         settings = self._settings_provider.get_settings()
-        if not settings.allow_all_users and not self._access_control.is_allowed(user_id):
+        if not settings.allow_all_users and not self._access_control.is_allowed(
+            user_id
+        ):
             return ["Доступ ограничен. Обратитесь к администратору."]
 
         pending_quarter = self._quarter_selections.get_pending(user_id)
@@ -127,9 +140,13 @@ class BotLogic:
             if choice not in {"1", "2", "3", "4"}:
                 return ["Выберите квартал цифрой: 1, 2, 3 или 4."]
             self._quarter_selections.clear_pending(user_id)
-            quarter_query = self._build_quarter_query(pending_quarter.base_query, choice)
+            quarter_query = self._build_quarter_query(
+                pending_quarter.base_query, choice
+            )
             query = QueryText(quarter_query)
-            started = self._active_requests.start(user_id, query_text=query.value, total_cases=0, phase="counting")
+            started = self._active_requests.start(
+                user_id, query_text=query.value, total_cases=0, phase="counting"
+            )
             if not started:
                 return ["У вас уже есть активный запрос. Дождитесь его завершения."]
             return PreValidateResult(query_text=query.value, is_quarter_selection=True)
@@ -145,7 +162,9 @@ class BotLogic:
             return [self._build_validation_message(validation)]
 
         query = QueryText(text)
-        started = self._active_requests.start(user_id, query_text=query.value, total_cases=0, phase="counting")
+        started = self._active_requests.start(
+            user_id, query_text=query.value, total_cases=0, phase="counting"
+        )
         if not started:
             return ["У вас уже есть активный запрос. Дождитесь его завершения."]
         return PreValidateResult(query_text=query.value, is_quarter_selection=False)
@@ -232,7 +251,9 @@ class BotLogic:
             return [self._build_validation_message(validation)]
 
         query = QueryText(raw_query)
-        started = self._active_requests.start(user_id, query_text=query.value, total_cases=0, phase="counting")
+        started = self._active_requests.start(
+            user_id, query_text=query.value, total_cases=0, phase="counting"
+        )
         if not started:
             return ["У вас уже есть активный запрос. Дождитесь его завершения."]
         ack = "Принял. Оцениваю объем данных..."
@@ -240,8 +261,15 @@ class BotLogic:
             settings = self._settings_provider.get_settings()
             count_start = datetime.now()
             count = self._count_provider.count_cases(query.value, settings)
-            count_duration_ms = int((datetime.now() - count_start).total_seconds() * 1000)
-            log_event(self._logger, "count_cases.completed", count=count, duration_ms=count_duration_ms)
+            count_duration_ms = int(
+                (datetime.now() - count_start).total_seconds() * 1000
+            )
+            log_event(
+                self._logger,
+                "count_cases.completed",
+                count=count,
+                duration_ms=count_duration_ms,
+            )
         except Exception:
             self._active_requests.finish(user_id)
             raise

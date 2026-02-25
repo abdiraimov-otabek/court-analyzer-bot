@@ -175,7 +175,7 @@ def health() -> dict:
             conn.execute("SELECT 1")
             db_status = "ok"
     except Exception as e:
-        log_event("health.db_error", error=str(e))
+        log_event(db_logger, "health.db_error", error=str(e))
 
     # 2. Check Critical Config
     config_status = "ok"
