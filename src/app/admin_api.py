@@ -185,7 +185,7 @@ def health() -> dict:
         or "your_key_here" in container.config.kad_api_key
     ):
         missing_keys.append("KAD_API_KEY")
-    if not container.config.bot_token:
+    if not container.config.telegram_bot_token:
         missing_keys.append("TELEGRAM_BOT_TOKEN")
 
     if missing_keys:
@@ -202,7 +202,7 @@ def health() -> dict:
         "config": {
             "status": config_status,
             "missing_keys": missing_keys,
-            "llm_enabled": bool(container.config.llm_api_key),
+            "llm_enabled": bool(container.config.openrouter_api_key),
         },
         "metrics": {"active_requests": active_count},
     }
