@@ -703,7 +703,32 @@ class LLMReasonExtractor:
                 )
                 results.append((False, self._FALLBACK, "", None))
 
-        # Ensure we have the same number of results
+        # Ensure we always return exactly one result per decision.
+        # LLM may truncate output and return fewer JSON items than requested.
+        if len(results) < len(decisions):
+            missing = len(decisions) - len(results)
+            self._logger.warning(
+                "llm.batch_size_mismatch",
+                extra={
+                    "data": {
+                        "expected": len(decisions),
+                        "received": len(results),
+                        "missing": missing,
+                    }
+                },
+            )
+            results.extend(
+                [
+                    (
+                        True,
+                        (self._FALLBACK[0], "LLM batch truncated"),
+                        "",
+                        None,
+                    )
+                ]
+                * missing
+            )
+
         return results[: len(decisions)]
 
     def _build_case_context(self, decision: CaseDecision) -> str | None:
