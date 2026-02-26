@@ -1,6 +1,7 @@
 import asyncio
-from datetime import datetime
+from datetime import date, datetime
 
+from src.domain.entities import CaseDecision, CaseOutcome
 from src.domain.settings import Settings
 from src.services.kad_client import KadInvalidResponseError, ParserApiKadClient
 
@@ -94,4 +95,72 @@ def test_sanitize_params_falls_back_when_court_filter_is_invalid():
     assert sanitized.use_court_filter is False
     assert any("Court" in call for call in calls)
     assert any("Court" not in call for call in calls)
+    asyncio.run(client.aclose())
+
+
+def test_refine_params_with_llm_normalizes_cyrillic_case_type_to_latin():
+    client = ParserApiKadClient(base_url="https://example.com", api_key="token")
+
+    class StubLLM:
+        async def parse_query(self, _query_text: str):
+            return {
+                "article": "723",
+                "full_article": "ст. 723 ГК РФ",
+                "court": "АС Москвы",
+                "year": 2025,
+                "quarter": 1,
+                "case_type": "Г",
+                "date_from": "2025-01-01",
+                "date_to": "2025-03-31",
+            }
+
+    client._llm_reason_extractor = StubLLM()  # type: ignore[assignment]
+    params = client._parser.parse("Практика по статье 723 в АС Москвы за 2025 год")
+
+    refined = asyncio.run(client._refine_params_with_llm("query", params))  # noqa: SLF001
+
+    assert refined.case_type == "G"
+    asyncio.run(client.aclose())
+
+
+def test_enrich_unknown_outcomes_with_llm_updates_unknown_statuses():
+    client = ParserApiKadClient(base_url="https://example.com", api_key="token")
+
+    class StubLLM:
+        async def extract_with_outcome(self, decision: CaseDecision):
+            if decision.case_number.endswith("1"):
+                return ("признание сделки недействительной",), "satisfied"
+            return ("оценка обстоятельств дела",), None
+
+    client._llm_reason_extractor = StubLLM()  # type: ignore[assignment]
+    decisions = [
+        CaseDecision(
+            case_number="А40-1/2025",
+            decision_date=date(2025, 1, 1),
+            outcome=CaseOutcome.UNKNOWN,
+            reasons=("оценка обстоятельств дела",),
+        ),
+        CaseDecision(
+            case_number="А40-2/2025",
+            decision_date=date(2025, 1, 1),
+            outcome=CaseOutcome.UNKNOWN,
+            reasons=("оценка обстоятельств дела",),
+        ),
+    ]
+
+    enriched = asyncio.run(client._enrich_unknown_outcomes_with_llm(decisions))  # noqa: SLF001
+
+    assert enriched[0].outcome == CaseOutcome.SATISFIED
+    assert enriched[0].reasons == ("признание сделки недействительной",)
+    assert enriched[1].outcome == CaseOutcome.UNKNOWN
+    asyncio.run(client.aclose())
+
+
+def test_has_explicit_article_reference_requires_article_anchor():
+    client = ParserApiKadClient(base_url="https://example.com", api_key="token")
+
+    assert client._has_explicit_article_reference("Применена ст. 723 ГК РФ", "723") is True  # noqa: SLF001
+    assert client._has_explicit_article_reference("Указаны цифры 7 2 3 без статьи", "723") is False  # noqa: SLF001
+    assert client._has_explicit_article_reference("спор по статье 61.2 закона о банкротстве", "61.2") is True  # noqa: SLF001
+
     asyncio.run(client.aclose())

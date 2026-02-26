@@ -33,6 +33,7 @@ from src.services.kad_client import (
 from src.services.request_processor import (
     CourtNotFoundError,
     InsufficientQualityError,
+    NoRelevantCasesError,
     NotEnoughData,
 )
 
@@ -268,6 +269,18 @@ async def _run_analysis(message: Message, user_id: UserId, query_text: str) -> N
             "По вашему запросу не найдено дел в указанном суде. "
             "Возможно, название суда указано неточно или суд не поддерживается системой КАД. "
             "Уточните суд и попробуйте снова.",
+            reply_markup=_help_kb(),
+        )
+    except NoRelevantCasesError as exc:
+        log_event(
+            logger,
+            "analysis.failed_no_relevant_cases",
+            processed_cases=exc.total_processed,
+            filtered_by_article=exc.filtered_by_article,
+        )
+        await message.answer(
+            "По выбранной статье в указанном периоде не найдено релевантных судебных актов. "
+            "Попробуйте уточнить формулировку (например, добавить пункт статьи, тип спора или сузить период).",
             reply_markup=_help_kb(),
         )
     except NotEnoughData:
