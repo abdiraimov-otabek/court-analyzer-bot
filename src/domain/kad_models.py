@@ -49,7 +49,11 @@ class FetchStats:
     filtered_by_court: int
     court_compared_cases: int
     court_filter_removed: bool = False
+    # Number of decisions dropped by pre-LLM query scope checks
+    # (article/paragraph/case-type keyword mismatch in decision text).
     filtered_by_article: int = 0
+    # Number of decisions that passed pre-filters but were marked irrelevant by LLM.
+    filtered_by_llm_relevance: int = 0
     total_pages: int = 0
     total_cases_found: int = 0
 

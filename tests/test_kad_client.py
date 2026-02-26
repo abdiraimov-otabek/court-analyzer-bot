@@ -95,3 +95,28 @@ def test_sanitize_params_falls_back_when_court_filter_is_invalid():
     assert any("Court" in call for call in calls)
     assert any("Court" not in call for call in calls)
     asyncio.run(client.aclose())
+
+
+def test_refine_params_with_llm_normalizes_cyrillic_case_type_to_latin():
+    client = ParserApiKadClient(base_url="https://example.com", api_key="token")
+
+    class StubLLM:
+        async def parse_query(self, _query_text: str):
+            return {
+                "article": "723",
+                "full_article": "ст. 723 ГК РФ",
+                "court": "АС Москвы",
+                "year": 2025,
+                "quarter": 1,
+                "case_type": "Г",
+                "date_from": "2025-01-01",
+                "date_to": "2025-03-31",
+            }
+
+    client._llm_reason_extractor = StubLLM()  # type: ignore[assignment]
+    params = client._parser.parse("Практика по статье 723 в АС Москвы за 2025 год")
+
+    refined = asyncio.run(client._refine_params_with_llm("query", params))  # noqa: SLF001
+
+    assert refined.case_type == "G"
+    asyncio.run(client.aclose())
