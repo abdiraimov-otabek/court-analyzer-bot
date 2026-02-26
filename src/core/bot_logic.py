@@ -84,6 +84,11 @@ class BotLogic:
                 return [
                     f"подбираю дела для анализа, найдено {active.collected_cases} из {active.total_cases} дел."
                 ]
+            if active.successful_cases and active.successful_cases != active.processed_cases:
+                return [
+                    f"анализирую, обработано {active.processed_cases} из {active.total_cases} дел "
+                    f"(успешно загружено {active.successful_cases})."
+                ]
             return [
                 f"анализирую, обработано {active.processed_cases} из {active.total_cases} дел."
             ]

@@ -496,6 +496,7 @@ class ParserApiKadClient:
                 decisions, params.article, query_text
             )
 
+            source_decisions = decisions
             relevant_decisions: list[CaseDecision] = []
             filtered_by_relevance = 0
             no_quote_prefix = self._llm_reason_extractor._NO_QUOTE_PREFIX
@@ -554,6 +555,30 @@ class ParserApiKadClient:
 
             decisions = relevant_decisions
             successful_cases = len(decisions)
+
+            # Safety net: if LLM rejected every pre-filtered case for a specific article,
+            # fall back to deterministic article-scope matches instead of returning a
+            # misleading "0 релевантных" for large batches.
+            if pre_llm_count > 0 and not decisions:
+                log_event(
+                    self._logger,
+                    "fetch_decisions.article_classification_all_rejected_fallback",
+                    article=params.article,
+                    pre_llm_count=pre_llm_count,
+                )
+                decisions = [
+                    replace(
+                        d,
+                        reasons=(
+                            "совпадение по статье",
+                            "fallback: deterministic article match",
+                        ),
+                        reason_confidence=0.65,
+                    )
+                    for d in source_decisions
+                ]
+                successful_cases = len(decisions)
+                filtered_by_relevance = 0
 
             # Update the global counter for the final stats object
             filtered_by_llm_relevance = filtered_by_relevance
