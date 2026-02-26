@@ -51,6 +51,8 @@ class KadClient(Protocol):
 
 
 class ParserApiKadClient:
+    _MAX_UNKNOWN_OUTCOME_ENRICHMENT = 120
+
     def __init__(
         self,
         base_url: str,
@@ -285,6 +287,7 @@ class ParserApiKadClient:
         retry_count = 0
         filtered_by_court = 0
         filtered_by_article = 0
+        filtered_by_llm_relevance = 0
         court_compared_cases = 0
         decisions: list[CaseDecision] = []
         details_start = time.perf_counter()
@@ -495,12 +498,21 @@ class ParserApiKadClient:
                 decisions, params.article, query_text
             )
 
+            source_decisions = decisions
             relevant_decisions: list[CaseDecision] = []
             filtered_by_relevance = 0
             no_quote_prefix = self._llm_reason_extractor._NO_QUOTE_PREFIX
-            for decision, (is_relevant, reasons, proof_quote, llm_outcome) in zip(
-                decisions, classify_results
-            ):
+            for idx, decision in enumerate(source_decisions):
+                if idx < len(classify_results):
+                    is_relevant, reasons, proof_quote, llm_outcome = classify_results[idx]
+                else:
+                    # Defensive fallback: keep the case if classification result is missing.
+                    is_relevant, reasons, proof_quote, llm_outcome = (
+                        True,
+                        ("оценка обстоятельств дела", "LLM batch result missing"),
+                        "",
+                        None,
+                    )
                 if is_relevant:
                     # Determine reason_confidence based on proof_quote quality
                     if proof_quote and not proof_quote.startswith(no_quote_prefix):
@@ -546,8 +558,32 @@ class ParserApiKadClient:
             decisions = relevant_decisions
             successful_cases = len(decisions)
 
+            # Safety net: if LLM rejected every pre-filtered case for a specific article,
+            # fall back to deterministic article-scope matches instead of returning a
+            # misleading "0 релевантных" for large batches.
+            if pre_llm_count > 0 and not decisions:
+                log_event(
+                    self._logger,
+                    "fetch_decisions.article_classification_all_rejected_fallback",
+                    article=params.article,
+                    pre_llm_count=pre_llm_count,
+                )
+                decisions = [
+                    replace(
+                        d,
+                        reasons=(
+                            "совпадение по статье",
+                            "fallback: deterministic article match",
+                        ),
+                        reason_confidence=0.65,
+                    )
+                    for d in source_decisions
+                ]
+                successful_cases = len(decisions)
+                filtered_by_relevance = 0
+
             # Update the global counter for the final stats object
-            filtered_by_article += filtered_by_relevance
+            filtered_by_llm_relevance = filtered_by_relevance
 
             log_event(
                 self._logger,
@@ -559,6 +595,11 @@ class ParserApiKadClient:
                 filtered_category=category_filtered,
                 filtered_relevance=filtered_by_relevance,
             )
+
+            decisions = await self._enrich_unknown_outcomes_with_llm(
+                decisions, should_cancel=should_cancel
+            )
+            successful_cases = len(decisions)
 
         if self._llm_reason_extractor is not None:
             self._llm_reason_extractor.reset_fetch_budget()
@@ -575,6 +616,7 @@ class ParserApiKadClient:
                 filtered_by_court=filtered_by_court,
                 court_compared_cases=court_compared_cases,
                 filtered_by_article=filtered_by_article,
+                filtered_by_llm_relevance=filtered_by_llm_relevance,
                 total_pages=pages_count,
                 total_cases_found=len(case_ids),
             ),
@@ -773,6 +815,72 @@ class ParserApiKadClient:
             retry_count=data_result.retry_count,
             had_transient_error=data_result.had_transient_error,
         )
+
+    async def _enrich_unknown_outcomes_with_llm(
+        self,
+        decisions: list[CaseDecision],
+        should_cancel: Callable[[], bool] | None = None,
+    ) -> list[CaseDecision]:
+        if self._llm_reason_extractor is None or not decisions:
+            return decisions
+
+        unknown_indexes = [
+            idx for idx, d in enumerate(decisions) if d.outcome == CaseOutcome.UNKNOWN
+        ]
+        if not unknown_indexes:
+            return decisions
+
+        target_indexes = unknown_indexes[: self._MAX_UNKNOWN_OUTCOME_ENRICHMENT]
+        skipped = max(0, len(unknown_indexes) - len(target_indexes))
+        if skipped > 0:
+            log_event(
+                self._logger,
+                "fetch_decisions.unknown_outcome_enrichment_capped",
+                total_unknown=len(unknown_indexes),
+                enriched=len(target_indexes),
+                skipped=skipped,
+            )
+
+        async def _enrich(index: int):
+            if should_cancel and should_cancel():
+                return index, None
+            d = decisions[index]
+            reasons, llm_outcome = await self._llm_reason_extractor.extract_with_outcome(d)
+            if llm_outcome == "satisfied":
+                updated = replace(d, outcome=CaseOutcome.SATISFIED)
+            elif llm_outcome == "denied":
+                updated = replace(d, outcome=CaseOutcome.DENIED)
+            else:
+                updated = d
+
+            if reasons and reasons != ("оценка обстоятельств дела",):
+                updated = replace(updated, reasons=reasons, reason_confidence=max(updated.reason_confidence, 0.75))
+            return index, updated
+
+        tasks = [asyncio.create_task(_enrich(i)) for i in target_indexes]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        enriched = list(decisions)
+        updated_outcomes = 0
+        for res in results:
+            if isinstance(res, BaseException) or res is None:
+                continue
+            idx, updated = res
+            if updated is None:
+                continue
+            if enriched[idx].outcome == CaseOutcome.UNKNOWN and updated.outcome != CaseOutcome.UNKNOWN:
+                updated_outcomes += 1
+            enriched[idx] = updated
+
+        if updated_outcomes > 0:
+            log_event(
+                self._logger,
+                "fetch_decisions.unknown_outcome_enrichment_done",
+                updated_outcomes=updated_outcomes,
+                total_unknown=len(unknown_indexes),
+            )
+
+        return enriched
 
     def _sanitize_params(self, params: SearchParams) -> SearchParams:
         if params.court is not None:
@@ -1485,8 +1593,8 @@ class ParserApiKadClient:
         else:
             final_court = params.court
 
-        # Map common types to Cyrillic just in case LLM returns Latin (G, B, A)
-        type_map = {"G": "Г", "B": "Б", "A": "А", "Г": "Г", "Б": "Б", "А": "А"}
+        # Normalize case types to KAD API format (Latin: G/B/A).
+        type_map = {"G": "G", "B": "B", "A": "A", "Г": "G", "Б": "B", "А": "A"}
         llm_type = llm_params.get("case_type")
 
         # Defensive: if the parser already identified Bankruptcy (B) for Article 61.2,
