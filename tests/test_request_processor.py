@@ -370,8 +370,7 @@ class ArticleFilteredOutKadClient(KadClient):
                 details_fetch_ms=20,
                 filtered_by_court=0,
                 court_compared_cases=425,
-                filtered_by_article=0,
-                filtered_by_llm_relevance=425,
+                filtered_by_article=425,
             ),
         )
 

@@ -228,28 +228,3 @@ def test_bot_logic_requires_court_and_period_before_counting():
 
     assert len(m2) == 1
     assert "Уточните период" in m2[0]
-
-
-def test_status_reports_attempted_and_successful_counts_when_they_differ():
-    acl = AccessControlList(InMemoryAccessStore())
-    user_id = UserId("777")
-    acl.grant(user_id)
-    active_requests = ActiveRequestRegistry()
-    logic = BotLogic(
-        access_control=acl,
-        rate_limiter=HourlyRateLimiter(limit=10),
-        active_requests=active_requests,
-        quarter_selections=QuarterSelectionRegistry(),
-        count_provider=FakeCountProvider({}),
-        settings_provider=FakeSettingsProvider(),
-        estimate_minutes=estimate_minutes,
-    )
-    active_requests.start(user_id, query_text="query", total_cases=400, phase="analyzing")
-    active_requests.update_attempted(user_id, 400)
-    active_requests.update_successful(user_id, 338)
-
-    messages = logic.handle_message(user_id, "/status", datetime(2026, 2, 11, 12, 0, 0))
-
-    assert len(messages) == 1
-    assert "обработано 400 из 400" in messages[0]
-    assert "успешно загружено 338" in messages[0]

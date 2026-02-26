@@ -168,13 +168,9 @@ class RequestProcessor:
         min_decisions = 1 if article_filtered else 5
         if len(decisions) < min_decisions:
             if article_filtered:
-                total_processed = (
-                    fetch_result.stats.successful_cases
-                    + fetch_result.stats.filtered_by_llm_relevance
-                )
                 raise NoRelevantCasesError(
-                    total_processed=total_processed,
-                    filtered_by_article=fetch_result.stats.filtered_by_llm_relevance,
+                    total_processed=fetch_result.stats.successful_cases,
+                    filtered_by_article=fetch_result.stats.filtered_by_article,
                 )
             if fetch_result.stats.attempted_cases >= 20:
                 # Most cases fetched but filtered by court → court unrecognised by API.
