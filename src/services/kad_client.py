@@ -503,7 +503,7 @@ class ParserApiKadClient:
             filtered_by_relevance = 0
             strict_article_mismatch = 0
             no_quote_prefix = self._llm_reason_extractor._NO_QUOTE_PREFIX
-            for idx, decision in enumerate(source_decisions):
+            for idx, decision in enumerate(decisions):
                 if idx < len(classify_results):
                     is_relevant, reasons, proof_quote, llm_outcome = classify_results[idx]
                 else:
@@ -516,11 +516,11 @@ class ParserApiKadClient:
                     )
                 if is_relevant:
                     # Hard precision gate: for article queries, require explicit article mention
-                    # in event text (e.g. "ст. 61.2").
+                    # in either event text or model proof quote (e.g. "ст. 61.2").
                     if params.article:
                         has_article_ref = self._has_explicit_article_reference(
                             decision.analysis_text or "", params.article
-                        )
+                        ) or self._has_explicit_article_reference(proof_quote, params.article)
                         if not has_article_ref:
                             strict_article_mismatch += 1
                             filtered_by_relevance += 1
@@ -570,6 +570,30 @@ class ParserApiKadClient:
             decisions = relevant_decisions
             successful_cases = len(decisions)
 
+            # Safety net: if LLM rejected every pre-filtered case for a specific article,
+            # fall back to deterministic article-scope matches instead of returning a
+            # misleading "0 релевантных" for large batches.
+            if pre_llm_count > 0 and not decisions:
+                log_event(
+                    self._logger,
+                    "fetch_decisions.article_classification_all_rejected_fallback",
+                    article=params.article,
+                    pre_llm_count=pre_llm_count,
+                )
+                decisions = [
+                    replace(
+                        d,
+                        reasons=(
+                            "совпадение по статье",
+                            "fallback: deterministic article match",
+                        ),
+                        reason_confidence=0.65,
+                    )
+                    for d in source_decisions
+                ]
+                successful_cases = len(decisions)
+                filtered_by_relevance = 0
+
             # Update the global counter for the final stats object
             filtered_by_llm_relevance = filtered_by_relevance
 
@@ -584,6 +608,7 @@ class ParserApiKadClient:
                 filtered_relevance=filtered_by_relevance,
                 filtered_strict_article_mismatch=strict_article_mismatch,
             )
+            successful_cases = len(decisions)
 
             decisions = await self._enrich_unknown_outcomes_with_llm(
                 decisions, should_cancel=should_cancel
