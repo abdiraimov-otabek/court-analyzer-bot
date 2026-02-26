@@ -135,8 +135,8 @@ def test_bot_logic_caps_results_when_quarter_is_still_overflow():
     messages = logic.handle_message(user_id, "1", datetime(2026, 2, 11, 12, 0, 3))
 
     assert len(messages) == 1
-    assert "анализирую первые 2000" in messages[0]
-    assert "Начинаю анализ ~2000 дел" in messages[0]
+    assert "анализирую до 2000" in messages[0]
+    assert "Начинаю анализ до 2000 дел" in messages[0]
 
 
 def test_bot_logic_starts_analysis_for_valid_range():

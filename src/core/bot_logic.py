@@ -203,8 +203,8 @@ class BotLogic:
                 estimate = self._estimate_minutes(settings.max_cases)
                 return [
                     f"В выбранном периоде найдено более {settings.max_cases} дел. "
-                    f"Для соблюдения лимита анализирую первые {settings.max_cases} дел.\n"
-                    f"Начинаю анализ ~{settings.max_cases} дел. Это займет ~{estimate} минут."
+                    f"Для соблюдения лимита анализирую до {settings.max_cases} дел.\n"
+                    f"Начинаю анализ до {settings.max_cases} дел. Это займет ~{estimate} минут."
                 ], True
             self._active_requests.finish(user_id)
             self._quarter_selections.set_pending(user_id, query_text)
@@ -294,8 +294,8 @@ class BotLogic:
                 return [
                     (
                         f"В выбранном периоде найдено более {settings.max_cases} дел. "
-                        f"Для соблюдения лимита анализирую первые {settings.max_cases} дел.\n"
-                        f"Начинаю анализ ~{settings.max_cases} дел. Это займет ~{estimate} минут."
+                        f"Для соблюдения лимита анализирую до {settings.max_cases} дел.\n"
+                        f"Начинаю анализ до {settings.max_cases} дел. Это займет ~{estimate} минут."
                     )
                 ]
             self._active_requests.finish(user_id)

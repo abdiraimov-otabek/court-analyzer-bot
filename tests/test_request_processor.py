@@ -15,6 +15,7 @@ from src.services.hashing import HashingService
 from src.services.kad_client import FetchDecisionsResult, FetchStats, KadClient
 from src.services.request_processor import (
     InsufficientQualityError,
+    NoRelevantCasesError,
     NotEnoughData,
     RequestProcessor,
 )
@@ -335,3 +336,75 @@ def test_request_processor_raises_not_enough_data_when_no_decisions(tmp_path):
 
     with pytest.raises(NotEnoughData):
         asyncio.run(processor.process(user_id, "query 2024", settings))
+
+
+class ArticleFilteredOutKadClient(KadClient):
+    def count_cases(self, query_text: str, settings: Settings) -> int:
+        return 500
+
+    async def fetch_decisions(
+        self,
+        query_text: str,
+        settings: Settings,
+        on_progress=None,
+        on_successful=None,
+        on_retry=None,
+        on_collection_progress=None,
+        on_stage_change=None,
+        should_cancel=None,
+    ) -> FetchDecisionsResult:
+        if on_stage_change:
+            on_stage_change("analyzing")
+        if on_progress:
+            on_progress(425)
+        if on_successful:
+            on_successful(425)
+        return FetchDecisionsResult(
+            decisions=[],
+            stats=FetchStats(
+                attempted_cases=425,
+                successful_cases=425,
+                retry_count=0,
+                effective_concurrency=8,
+                case_id_collection_ms=10,
+                details_fetch_ms=20,
+                filtered_by_court=0,
+                court_compared_cases=425,
+                filtered_by_article=425,
+            ),
+        )
+
+
+def test_request_processor_raises_no_relevant_cases_after_article_filter(tmp_path):
+    settings = Settings(
+        max_cases=500,
+        max_documents_per_case=5,
+        max_pages=20,
+        fetch_concurrency_min=6,
+        fetch_concurrency_max=10,
+        slow_alert_minutes=5,
+        details_cache_ttl_seconds=24 * 60 * 60,
+        analysis_prompt="test",
+        updated_at=datetime(2026, 2, 11, 12, 0, 0),
+    )
+    registry = ActiveRequestRegistry()
+    user_id = UserId("123")
+    registry.start(user_id, query_text="ст 61.2 2024", total_cases=500)
+    cache_repo = AnalysisCacheRepository(
+        SqliteConnection(str(tmp_path / "app.db")), ttl_seconds=60
+    )
+
+    processor = RequestProcessor(
+        kad_client=ArticleFilteredOutKadClient(),
+        analysis_service=AnalysisService(),
+        active_requests=registry,
+        cache_repository=cache_repo,
+        log_repository=InMemoryLogRepository(),
+        hashing_service=HashingService(salt="pepper"),
+    )
+
+    with pytest.raises(NoRelevantCasesError) as exc:
+        asyncio.run(processor.process(user_id, "ст 61.2 2024", settings))
+
+    assert exc.value.total_processed == 425
+    assert exc.value.filtered_by_article == 425

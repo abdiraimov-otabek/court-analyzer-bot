@@ -168,7 +168,10 @@ class RequestProcessor:
         min_decisions = 1 if article_filtered else 5
         if len(decisions) < min_decisions:
             if article_filtered:
-                raise NotEnoughData()
+                raise NoRelevantCasesError(
+                    total_processed=fetch_result.stats.successful_cases,
+                    filtered_by_article=fetch_result.stats.filtered_by_article,
+                )
             if fetch_result.stats.attempted_cases >= 20:
                 # Most cases fetched but filtered by court → court unrecognised by API.
                 if (
@@ -368,6 +371,13 @@ class NotEnoughData(RuntimeError):
 
 class CourtNotFoundError(RuntimeError):
     pass
+
+
+class NoRelevantCasesError(RuntimeError):
+    def __init__(self, total_processed: int, filtered_by_article: int) -> None:
+        super().__init__("no_relevant_cases")
+        self.total_processed = total_processed
+        self.filtered_by_article = filtered_by_article
 
 
 class InsufficientQualityError(RuntimeError):
