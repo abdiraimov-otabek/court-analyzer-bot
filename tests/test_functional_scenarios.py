@@ -104,19 +104,13 @@ def test_edge_scenarios_handle_no_results(query):
     user_id = UserId("123")
     messages = logic.handle_message(user_id, query, datetime(2026, 2, 11, 12, 0, 0))
 
-    messages = logic.handle_message(user_id, query, datetime(2026, 2, 11, 12, 0, 0))
-
-    if query == "!@#$%^&*()":
-        # Pure junk still fails validation -> 1 message
-        assert len(messages) == 1
-        assert (
-            "укажите суд" in messages[0].lower()
-            or "уточните суд" in messages[0].lower()
-        )
-    else:
-        # Potential NL (like "банкротство") or case numbers now pass to evaluation -> 2 messages
+    if query == "9 ААС 2099 год":
         assert len(messages) == 2
         assert "Оцениваю" in messages[0]
+        assert "не найдено" in messages[1]
+    else:
+        assert len(messages) == 1
+        assert "уточните" in messages[0].lower() or "укажите" in messages[0].lower()
 
 
 def test_edge_scenario_handles_too_many_results():

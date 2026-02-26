@@ -1,12 +1,23 @@
 from src.services.query_validator import QueryValidator
 
 
-def test_query_validator_allows_potential_nl_queries():
+def test_query_validator_requires_court_and_period():
     validator = QueryValidator()
-    # These were previously invalid, but now pass to allow LLM rescue
-    assert validator.validate("Практика по статье 61.2 за 2024 год").is_valid is True
-    assert validator.validate("Практика по статье 61.2 в АС Москвы").is_valid is True
-    assert validator.validate("Практика по статье 61.2").is_valid is True
+
+    missing_court = validator.validate("Практика по статье 61.2 за 2024 год")
+    assert missing_court.is_valid is False
+    assert missing_court.missing_court is True
+    assert missing_court.missing_period is False
+
+    missing_period = validator.validate("Практика по статье 61.2 в АС Москвы")
+    assert missing_period.is_valid is False
+    assert missing_period.missing_court is False
+    assert missing_period.missing_period is True
+
+    missing_both = validator.validate("Практика по статье 61.2")
+    assert missing_both.is_valid is False
+    assert missing_both.missing_court is True
+    assert missing_both.missing_period is True
 
 
 def test_query_validator_reports_missing_for_very_short_queries():

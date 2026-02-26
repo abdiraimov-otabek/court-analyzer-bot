@@ -418,3 +418,30 @@ async def test_classify_prompt_includes_case_context():
     assert "А40-99999/2024" in prompt
     assert "Москвы" in prompt
     assert "Банкротство" in prompt
+
+
+@pytest.mark.asyncio
+async def test_classify_batch_pads_missing_items_from_llm_response():
+    """If LLM returns fewer items than requested, missing ones must not be dropped."""
+    http = AsyncMock()
+    # Simulate truncation: 10 decisions sent, but only 1 result returned by model
+    api_response = [
+        {
+            "relevant": True,
+            "reasons": ["основание"],
+            "proof_quote": "цитата",
+            "outcome": "denied",
+        }
+    ]
+    http.post = AsyncMock(
+        return_value=_mock_response(_api_body(json.dumps(api_response, ensure_ascii=False)))
+    )
+    extractor = _make_extractor(http_client=http)
+
+    decisions = [_make_decision(f"text {i}", case_number=f"А40-{i}/2024") for i in range(10)]
+    results = await extractor.classify_batch(decisions, "61.2", "ст. 61.2")
+
+    assert len(results) == 10
+    assert results[0][0] is True
+    # Padded entries must keep cases relevant to avoid catastrophic data loss
+    assert all(is_rel for is_rel, *_ in results)

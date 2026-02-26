@@ -26,11 +26,6 @@ class QueryValidator:
         if not any(c.isalnum() for c in clean_text):
             return QueryValidationResult(missing_court=True, missing_period=True)
 
-        if len(clean_text) >= 5:
-            # Let it pass to async flow where LLM will refine/validate parameters.
-            # This follows the "Prioritize LLM" audit recommendation for better NL support.
-            return QueryValidationResult(missing_court=False, missing_period=False)
-
         params = self._parser.parse(query_text)
         return QueryValidationResult(
             missing_court=not bool(params.court),
