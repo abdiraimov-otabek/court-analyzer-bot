@@ -51,6 +51,8 @@ class KadClient(Protocol):
 
 
 class ParserApiKadClient:
+    _MAX_UNKNOWN_OUTCOME_ENRICHMENT = 120
+
     def __init__(
         self,
         base_url: str,
@@ -594,6 +596,11 @@ class ParserApiKadClient:
                 filtered_relevance=filtered_by_relevance,
             )
 
+            decisions = await self._enrich_unknown_outcomes_with_llm(
+                decisions, should_cancel=should_cancel
+            )
+            successful_cases = len(decisions)
+
         if self._llm_reason_extractor is not None:
             self._llm_reason_extractor.reset_fetch_budget()
         self._current_article = None
@@ -808,6 +815,72 @@ class ParserApiKadClient:
             retry_count=data_result.retry_count,
             had_transient_error=data_result.had_transient_error,
         )
+
+    async def _enrich_unknown_outcomes_with_llm(
+        self,
+        decisions: list[CaseDecision],
+        should_cancel: Callable[[], bool] | None = None,
+    ) -> list[CaseDecision]:
+        if self._llm_reason_extractor is None or not decisions:
+            return decisions
+
+        unknown_indexes = [
+            idx for idx, d in enumerate(decisions) if d.outcome == CaseOutcome.UNKNOWN
+        ]
+        if not unknown_indexes:
+            return decisions
+
+        target_indexes = unknown_indexes[: self._MAX_UNKNOWN_OUTCOME_ENRICHMENT]
+        skipped = max(0, len(unknown_indexes) - len(target_indexes))
+        if skipped > 0:
+            log_event(
+                self._logger,
+                "fetch_decisions.unknown_outcome_enrichment_capped",
+                total_unknown=len(unknown_indexes),
+                enriched=len(target_indexes),
+                skipped=skipped,
+            )
+
+        async def _enrich(index: int):
+            if should_cancel and should_cancel():
+                return index, None
+            d = decisions[index]
+            reasons, llm_outcome = await self._llm_reason_extractor.extract_with_outcome(d)
+            if llm_outcome == "satisfied":
+                updated = replace(d, outcome=CaseOutcome.SATISFIED)
+            elif llm_outcome == "denied":
+                updated = replace(d, outcome=CaseOutcome.DENIED)
+            else:
+                updated = d
+
+            if reasons and reasons != ("оценка обстоятельств дела",):
+                updated = replace(updated, reasons=reasons, reason_confidence=max(updated.reason_confidence, 0.75))
+            return index, updated
+
+        tasks = [asyncio.create_task(_enrich(i)) for i in target_indexes]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        enriched = list(decisions)
+        updated_outcomes = 0
+        for res in results:
+            if isinstance(res, BaseException) or res is None:
+                continue
+            idx, updated = res
+            if updated is None:
+                continue
+            if enriched[idx].outcome == CaseOutcome.UNKNOWN and updated.outcome != CaseOutcome.UNKNOWN:
+                updated_outcomes += 1
+            enriched[idx] = updated
+
+        if updated_outcomes > 0:
+            log_event(
+                self._logger,
+                "fetch_decisions.unknown_outcome_enrichment_done",
+                updated_outcomes=updated_outcomes,
+                total_unknown=len(unknown_indexes),
+            )
+
+        return enriched
 
     def _sanitize_params(self, params: SearchParams) -> SearchParams:
         if params.court is not None:
