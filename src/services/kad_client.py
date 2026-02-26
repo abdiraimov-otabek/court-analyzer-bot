@@ -503,7 +503,7 @@ class ParserApiKadClient:
             filtered_by_relevance = 0
             strict_article_mismatch = 0
             no_quote_prefix = self._llm_reason_extractor._NO_QUOTE_PREFIX
-            for idx, decision in enumerate(source_decisions):
+            for idx, decision in enumerate(decisions):
                 if idx < len(classify_results):
                     is_relevant, reasons, proof_quote, llm_outcome = classify_results[idx]
                 else:
@@ -573,7 +573,7 @@ class ParserApiKadClient:
             # Safety net: if LLM rejected every pre-filtered case for a specific article,
             # fall back to deterministic article-scope matches instead of returning a
             # misleading "0 релевантных" for large batches.
-            if pre_llm_count > 0 and not decisions and strict_article_mismatch == 0:
+            if pre_llm_count > 0 and not decisions:
                 log_event(
                     self._logger,
                     "fetch_decisions.article_classification_all_rejected_fallback",
@@ -593,6 +593,7 @@ class ParserApiKadClient:
                 ]
                 successful_cases = len(decisions)
                 filtered_by_relevance = 0
+
             # Update the global counter for the final stats object
             filtered_by_llm_relevance = filtered_by_relevance
 
