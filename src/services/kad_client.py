@@ -498,9 +498,17 @@ class ParserApiKadClient:
             relevant_decisions: list[CaseDecision] = []
             filtered_by_relevance = 0
             no_quote_prefix = self._llm_reason_extractor._NO_QUOTE_PREFIX
-            for decision, (is_relevant, reasons, proof_quote, llm_outcome) in zip(
-                decisions, classify_results
-            ):
+            for idx, decision in enumerate(decisions):
+                if idx < len(classify_results):
+                    is_relevant, reasons, proof_quote, llm_outcome = classify_results[idx]
+                else:
+                    # Defensive fallback: keep the case if classification result is missing.
+                    is_relevant, reasons, proof_quote, llm_outcome = (
+                        True,
+                        ("оценка обстоятельств дела", "LLM batch result missing"),
+                        "",
+                        None,
+                    )
                 if is_relevant:
                     # Determine reason_confidence based on proof_quote quality
                     if proof_quote and not proof_quote.startswith(no_quote_prefix):
