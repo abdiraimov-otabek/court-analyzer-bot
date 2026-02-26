@@ -501,6 +501,7 @@ class ParserApiKadClient:
             source_decisions = decisions
             relevant_decisions: list[CaseDecision] = []
             filtered_by_relevance = 0
+            strict_article_mismatch = 0
             no_quote_prefix = self._llm_reason_extractor._NO_QUOTE_PREFIX
             for idx, decision in enumerate(decisions):
                 if idx < len(classify_results):
@@ -514,6 +515,17 @@ class ParserApiKadClient:
                         None,
                     )
                 if is_relevant:
+                    # Hard precision gate: for article queries, require explicit article mention
+                    # in either event text or model proof quote (e.g. "ст. 61.2").
+                    if params.article:
+                        has_article_ref = self._has_explicit_article_reference(
+                            decision.analysis_text or "", params.article
+                        ) or self._has_explicit_article_reference(proof_quote, params.article)
+                        if not has_article_ref:
+                            strict_article_mismatch += 1
+                            filtered_by_relevance += 1
+                            continue
+
                     # Determine reason_confidence based on proof_quote quality
                     if proof_quote and not proof_quote.startswith(no_quote_prefix):
                         reason_conf = 1.0
@@ -594,6 +606,7 @@ class ParserApiKadClient:
                 relevant=len(decisions),
                 filtered_category=category_filtered,
                 filtered_relevance=filtered_by_relevance,
+                filtered_strict_article_mismatch=strict_article_mismatch,
             )
 
             decisions = await self._enrich_unknown_outcomes_with_llm(
@@ -1421,6 +1434,19 @@ class ParserApiKadClient:
                     return False
 
         return True
+
+    def _has_explicit_article_reference(self, text: str, article: str) -> bool:
+        if not text or not article:
+            return False
+        normalized_article = article.replace(",", ".")
+        compact = re.escape(normalized_article)
+        patterns = [
+            rf"ст\.?\s*{compact}\b",
+            rf"стать[ьяи]\s*{compact}\b",
+            rf"article\s*{compact}\b",
+        ]
+        lowered = text.lower()
+        return any(re.search(pattern, lowered) for pattern in patterns)
 
     def _text_has_article(self, text: str, article: str) -> bool:
         normalized_article = article.replace(",", ".")

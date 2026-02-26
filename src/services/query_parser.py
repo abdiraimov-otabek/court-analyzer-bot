@@ -23,6 +23,10 @@ _COURT_LOWERCASE_WORDS = frozenset({
 })
 
 
+
+# Tokens that can follow a court mention in NL queries, but are not part of court name.
+_COURT_STOP_WORDS = frozenset({"за", "по", "на", "с", "к", "о", "об", "для"})
+
 def _court_fragment_to_title(fragment: str) -> str:
     """Convert ALL-CAPS court name fragment to proper Russian casing."""
     return " ".join(
@@ -127,7 +131,12 @@ class QueryParser:
 
         as_match = re.search(r"ас\s+([а-я-]+(?:\s+[а-я-]+){0,2})", text_lower)
         if as_match:
-            city = _court_fragment_to_title(as_match.group(1))
+            tokens = [t for t in as_match.group(1).split() if t]
+            while tokens and tokens[-1] in _COURT_STOP_WORDS:
+                tokens.pop()
+            if not tokens:
+                return None
+            city = _court_fragment_to_title(" ".join(tokens))
             return f"АС {city}"
 
         return None
