@@ -162,7 +162,7 @@ class RequestProcessor:
             raise RequestCancelled()
         if fetch_result.stats.court_filter_removed:
             raise CourtNotFoundError()
-        article_filtered = fetch_result.stats.filtered_by_article > 0
+        article_filtered = fetch_result.stats.filtered_by_llm_relevance > 0
         # After article classification, even 1 relevant case is valid data —
         # the LLM already confirmed relevance, don't reject small sets.
         min_decisions = 1 if article_filtered else 5

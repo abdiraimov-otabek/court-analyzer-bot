@@ -285,6 +285,7 @@ class ParserApiKadClient:
         retry_count = 0
         filtered_by_court = 0
         filtered_by_article = 0
+        filtered_by_llm_relevance = 0
         court_compared_cases = 0
         decisions: list[CaseDecision] = []
         details_start = time.perf_counter()
@@ -555,7 +556,7 @@ class ParserApiKadClient:
             successful_cases = len(decisions)
 
             # Update the global counter for the final stats object
-            filtered_by_article += filtered_by_relevance
+            filtered_by_llm_relevance = filtered_by_relevance
 
             log_event(
                 self._logger,
@@ -583,6 +584,7 @@ class ParserApiKadClient:
                 filtered_by_court=filtered_by_court,
                 court_compared_cases=court_compared_cases,
                 filtered_by_article=filtered_by_article,
+                filtered_by_llm_relevance=filtered_by_llm_relevance,
                 total_pages=pages_count,
                 total_cases_found=len(case_ids),
             ),
@@ -1493,8 +1495,8 @@ class ParserApiKadClient:
         else:
             final_court = params.court
 
-        # Map common types to Cyrillic just in case LLM returns Latin (G, B, A)
-        type_map = {"G": "Г", "B": "Б", "A": "А", "Г": "Г", "Б": "Б", "А": "А"}
+        # Normalize case types to KAD API format (Latin: G/B/A).
+        type_map = {"G": "G", "B": "B", "A": "A", "Г": "G", "Б": "B", "А": "A"}
         llm_type = llm_params.get("case_type")
 
         # Defensive: if the parser already identified Bankruptcy (B) for Article 61.2,
