@@ -502,7 +502,7 @@ class ParserApiKadClient:
             relevant_decisions: list[CaseDecision] = []
             filtered_by_relevance = 0
             no_quote_prefix = self._llm_reason_extractor._NO_QUOTE_PREFIX
-            for idx, decision in enumerate(source_decisions):
+            for idx, decision in enumerate(decisions):
                 if idx < len(classify_results):
                     is_relevant, reasons, proof_quote, llm_outcome = classify_results[idx]
                 else:

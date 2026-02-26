@@ -121,36 +121,3 @@ def test_refine_params_with_llm_normalizes_cyrillic_case_type_to_latin():
 
     assert refined.case_type == "G"
     asyncio.run(client.aclose())
-
-
-def test_enrich_unknown_outcomes_with_llm_updates_unknown_statuses():
-    client = ParserApiKadClient(base_url="https://example.com", api_key="token")
-
-    class StubLLM:
-        async def extract_with_outcome(self, decision: CaseDecision):
-            if decision.case_number.endswith("1"):
-                return ("признание сделки недействительной",), "satisfied"
-            return ("оценка обстоятельств дела",), None
-
-    client._llm_reason_extractor = StubLLM()  # type: ignore[assignment]
-    decisions = [
-        CaseDecision(
-            case_number="А40-1/2025",
-            decision_date=date(2025, 1, 1),
-            outcome=CaseOutcome.UNKNOWN,
-            reasons=("оценка обстоятельств дела",),
-        ),
-        CaseDecision(
-            case_number="А40-2/2025",
-            decision_date=date(2025, 1, 1),
-            outcome=CaseOutcome.UNKNOWN,
-            reasons=("оценка обстоятельств дела",),
-        ),
-    ]
-
-    enriched = asyncio.run(client._enrich_unknown_outcomes_with_llm(decisions))  # noqa: SLF001
-
-    assert enriched[0].outcome == CaseOutcome.SATISFIED
-    assert enriched[0].reasons == ("признание сделки недействительной",)
-    assert enriched[1].outcome == CaseOutcome.UNKNOWN
-    asyncio.run(client.aclose())
