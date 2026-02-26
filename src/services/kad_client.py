@@ -608,6 +608,7 @@ class ParserApiKadClient:
                 filtered_relevance=filtered_by_relevance,
                 filtered_strict_article_mismatch=strict_article_mismatch,
             )
+            successful_cases = len(decisions)
 
             decisions = await self._enrich_unknown_outcomes_with_llm(
                 decisions, should_cancel=should_cancel
