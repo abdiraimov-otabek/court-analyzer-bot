@@ -135,8 +135,8 @@ def test_bot_logic_caps_results_when_quarter_is_still_overflow():
     messages = logic.handle_message(user_id, "1", datetime(2026, 2, 11, 12, 0, 3))
 
     assert len(messages) == 1
-    assert "анализирую первые 2000" in messages[0]
-    assert "Начинаю анализ ~2000 дел" in messages[0]
+    assert "анализирую до 2000" in messages[0]
+    assert "Начинаю анализ до 2000 дел" in messages[0]
 
 
 def test_bot_logic_starts_analysis_for_valid_range():
@@ -212,9 +212,8 @@ def test_status_reports_collection_progress():
     assert "120 из 500" in messages[0]
 
 
-def test_bot_logic_allows_potential_nl_queries_for_async_process():
-    # Ambiguous but potential legal queries (>= 5 chars) now pass to evaluation
-    # Use fresh logic for each call to ensure a clean state (no active request collisions)
+def test_bot_logic_requires_court_and_period_before_counting():
+    # Prevent expensive and misleading searches when query misses required params.
     u = UserId("123")
 
     m1 = build_logic(mapping={}).handle_message(
@@ -223,12 +222,9 @@ def test_bot_logic_allows_potential_nl_queries_for_async_process():
     m2 = build_logic(mapping={}).handle_message(
         u, "Практика по статье 61.2 в АС Москвы", datetime(2026, 2, 11, 12, 0, 0)
     )
-    m3 = build_logic(mapping={}).handle_message(
-        u, "Практика по статье 61.2", datetime(2026, 2, 11, 12, 0, 0)
-    )
 
-    # They should proceed to evaluation phase (2 messages: ACK + analysis start/fail)
-    assert len(m1) == 2
-    assert len(m2) == 2
-    assert len(m3) == 2
-    assert "Оцениваю" in m1[0]
+    assert len(m1) == 1
+    assert "Уточните суд" in m1[0]
+
+    assert len(m2) == 1
+    assert "Уточните период" in m2[0]
