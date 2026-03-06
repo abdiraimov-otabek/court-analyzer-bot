@@ -348,8 +348,8 @@ class LLMReasonExtractor:
                 result = await self._call_with_retry(text, outcome)
             # item 1.7: Bounded Cache
             if len(self._cache) > self._MAX_CACHE_SIZE:
-                # Simple eviction: clear 25% if full
-                keys_to_remove = list(self._cache.keys())[:500]
+                # Simple eviction: clear 10 if full
+                keys_to_remove = list(self._cache.keys())[:10]
                 for k in keys_to_remove:
                     self._cache.pop(k, None)
 
@@ -387,9 +387,8 @@ class LLMReasonExtractor:
             async with self._semaphore:
                 reasons, outcome = await self._call_extract_api(ctx)
 
-            # item 1.7: Bounded Cache
             if len(self._outcome_cache) > self._MAX_CACHE_SIZE:
-                keys_to_remove = list(self._outcome_cache.keys())[:500]
+                keys_to_remove = list(self._outcome_cache.keys())[:10]
                 for k in keys_to_remove:
                     self._outcome_cache.pop(k, None)
 

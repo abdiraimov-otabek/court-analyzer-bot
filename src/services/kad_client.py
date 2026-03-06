@@ -51,6 +51,8 @@ class KadClient(Protocol):
 
 
 class ParserApiKadClient:
+    _MAX_UNKNOWN_OUTCOME_ENRICHMENT = 120
+
     def __init__(
         self,
         base_url: str,
@@ -499,6 +501,7 @@ class ParserApiKadClient:
             source_decisions = decisions
             relevant_decisions: list[CaseDecision] = []
             filtered_by_relevance = 0
+            strict_article_mismatch = 0
             no_quote_prefix = self._llm_reason_extractor._NO_QUOTE_PREFIX
             for idx, decision in enumerate(decisions):
                 if idx < len(classify_results):
@@ -512,6 +515,17 @@ class ParserApiKadClient:
                         None,
                     )
                 if is_relevant:
+                    # Hard precision gate: for article queries, require explicit article mention
+                    # in either event text or model proof quote (e.g. "ст. 61.2").
+                    if params.article:
+                        has_article_ref = self._has_explicit_article_reference(
+                            decision.analysis_text or "", params.article
+                        ) or self._has_explicit_article_reference(proof_quote, params.article)
+                        if not has_article_ref:
+                            strict_article_mismatch += 1
+                            filtered_by_relevance += 1
+                            continue
+
                     # Determine reason_confidence based on proof_quote quality
                     if proof_quote and not proof_quote.startswith(no_quote_prefix):
                         reason_conf = 1.0
@@ -592,7 +606,14 @@ class ParserApiKadClient:
                 relevant=len(decisions),
                 filtered_category=category_filtered,
                 filtered_relevance=filtered_by_relevance,
+                filtered_strict_article_mismatch=strict_article_mismatch,
             )
+            successful_cases = len(decisions)
+
+            decisions = await self._enrich_unknown_outcomes_with_llm(
+                decisions, should_cancel=should_cancel
+            )
+            successful_cases = len(decisions)
 
         if self._llm_reason_extractor is not None:
             self._llm_reason_extractor.reset_fetch_budget()
@@ -808,6 +829,72 @@ class ParserApiKadClient:
             retry_count=data_result.retry_count,
             had_transient_error=data_result.had_transient_error,
         )
+
+    async def _enrich_unknown_outcomes_with_llm(
+        self,
+        decisions: list[CaseDecision],
+        should_cancel: Callable[[], bool] | None = None,
+    ) -> list[CaseDecision]:
+        if self._llm_reason_extractor is None or not decisions:
+            return decisions
+
+        unknown_indexes = [
+            idx for idx, d in enumerate(decisions) if d.outcome == CaseOutcome.UNKNOWN
+        ]
+        if not unknown_indexes:
+            return decisions
+
+        target_indexes = unknown_indexes[: self._MAX_UNKNOWN_OUTCOME_ENRICHMENT]
+        skipped = max(0, len(unknown_indexes) - len(target_indexes))
+        if skipped > 0:
+            log_event(
+                self._logger,
+                "fetch_decisions.unknown_outcome_enrichment_capped",
+                total_unknown=len(unknown_indexes),
+                enriched=len(target_indexes),
+                skipped=skipped,
+            )
+
+        async def _enrich(index: int):
+            if should_cancel and should_cancel():
+                return index, None
+            d = decisions[index]
+            reasons, llm_outcome = await self._llm_reason_extractor.extract_with_outcome(d)
+            if llm_outcome == "satisfied":
+                updated = replace(d, outcome=CaseOutcome.SATISFIED)
+            elif llm_outcome == "denied":
+                updated = replace(d, outcome=CaseOutcome.DENIED)
+            else:
+                updated = d
+
+            if reasons and reasons != ("оценка обстоятельств дела",):
+                updated = replace(updated, reasons=reasons, reason_confidence=max(updated.reason_confidence, 0.75))
+            return index, updated
+
+        tasks = [asyncio.create_task(_enrich(i)) for i in target_indexes]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        enriched = list(decisions)
+        updated_outcomes = 0
+        for res in results:
+            if isinstance(res, BaseException) or res is None:
+                continue
+            idx, updated = res
+            if updated is None:
+                continue
+            if enriched[idx].outcome == CaseOutcome.UNKNOWN and updated.outcome != CaseOutcome.UNKNOWN:
+                updated_outcomes += 1
+            enriched[idx] = updated
+
+        if updated_outcomes > 0:
+            log_event(
+                self._logger,
+                "fetch_decisions.unknown_outcome_enrichment_done",
+                updated_outcomes=updated_outcomes,
+                total_unknown=len(unknown_indexes),
+            )
+
+        return enriched
 
     def _sanitize_params(self, params: SearchParams) -> SearchParams:
         if params.court is not None:
@@ -1348,6 +1435,19 @@ class ParserApiKadClient:
                     return False
 
         return True
+
+    def _has_explicit_article_reference(self, text: str, article: str) -> bool:
+        if not text or not article:
+            return False
+        normalized_article = article.replace(",", ".")
+        compact = re.escape(normalized_article)
+        patterns = [
+            rf"ст\.?\s*{compact}\b",
+            rf"стать[ьяи]\s*{compact}\b",
+            rf"article\s*{compact}\b",
+        ]
+        lowered = text.lower()
+        return any(re.search(pattern, lowered) for pattern in patterns)
 
     def _text_has_article(self, text: str, article: str) -> bool:
         normalized_article = article.replace(",", ".")
