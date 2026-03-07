@@ -473,148 +473,6 @@ class ParserApiKadClient:
             if invalid_failures > 0:
                 raise KadInvalidResponseError("KAD API request failed")
 
-        # When article is specified, first hard-filter by case category, then classify via LLM
-        if params.article and decisions:
-            pre_filter_count = len(decisions)
-            category_filtered = 0
-            # Removed the aggressive 'Б' case category filter.
-            # Bankruptcy adversarial proceedings (complaints, invalidations under art. 60/61)
-            # are frequently classified as 'Г' (Civil) by the KAD system. Filtering them
-            # out here causes massive false negatives.
-            pre_llm_count = len(decisions)
-
-        if params.article and self._llm_reason_extractor is not None and decisions:
-            if on_stage_change:
-                on_stage_change("classifying")
-            log_event(
-                self._logger,
-                "fetch_decisions.article_classification_start",
-                article=params.article,
-                total_decisions=len(decisions),
-            )
-
-            # Batch classification for 100% data quality and cost reduction
-            classify_results = await self._llm_reason_extractor.classify_batch(
-                decisions, params.article, query_text
-            )
-
-            source_decisions = decisions
-            relevant_decisions: list[CaseDecision] = []
-            filtered_by_relevance = 0
-            strict_article_mismatch = 0
-            no_quote_prefix = self._llm_reason_extractor._NO_QUOTE_PREFIX
-            for idx, decision in enumerate(decisions):
-                if idx < len(classify_results):
-                    is_relevant, reasons, proof_quote, llm_outcome = classify_results[idx]
-                else:
-                    # Defensive fallback: keep the case if classification result is missing.
-                    is_relevant, reasons, proof_quote, llm_outcome = (
-                        True,
-                        ("оценка обстоятельств дела", "LLM batch result missing"),
-                        "",
-                        None,
-                    )
-                if is_relevant:
-                    # Hard precision gate: for article queries, require explicit article mention
-                    # in either event text or model proof quote (e.g. "ст. 61.2").
-                    if params.article:
-                        has_article_ref = self._has_explicit_article_reference(
-                            decision.analysis_text or "", params.article
-                        ) or self._has_explicit_article_reference(proof_quote, params.article)
-                        if not has_article_ref:
-                            strict_article_mismatch += 1
-                            filtered_by_relevance += 1
-                            continue
-
-                    # Determine reason_confidence based on proof_quote quality
-                    if proof_quote and not proof_quote.startswith(no_quote_prefix):
-                        reason_conf = 1.0
-                    else:
-                        reason_conf = 0.7
-
-                    updated = replace(
-                        decision, reasons=reasons, proof_quote=proof_quote,
-                        reason_confidence=reason_conf,
-                    )
-
-                    confidence = 1.0
-                    conflicts = []
-
-                    if llm_outcome:
-                        if updated.outcome == CaseOutcome.UNKNOWN:
-                            # Pure LLM reliance (no regex backing) drops confidence safely
-                            confidence -= 0.05
-                            if llm_outcome == "satisfied":
-                                updated = replace(
-                                    updated, outcome=CaseOutcome.SATISFIED
-                                )
-                            elif llm_outcome == "denied":
-                                updated = replace(updated, outcome=CaseOutcome.DENIED)
-                        else:
-                            # Rule-based detection succeeded. Verify LLM matches.
-                            if updated.outcome.value != llm_outcome:
-                                confidence -= 1.0
-                                conflicts.append(
-                                    f"Conflict: Rules engine detected '{updated.outcome.value}' but LLM extracted '{llm_outcome}'"
-                                )
-
-                    updated = replace(
-                        updated,
-                        confidence_score=max(0.0, confidence),
-                        validation_conflicts=tuple(conflicts),
-                    )
-                    relevant_decisions.append(updated)
-                else:
-                    filtered_by_relevance += 1
-
-            decisions = relevant_decisions
-            successful_cases = len(decisions)
-
-            # Safety net: if LLM rejected every pre-filtered case for a specific article,
-            # fall back to deterministic article-scope matches instead of returning a
-            # misleading "0 релевантных" for large batches.
-            if pre_llm_count > 0 and not decisions:
-                log_event(
-                    self._logger,
-                    "fetch_decisions.article_classification_all_rejected_fallback",
-                    article=params.article,
-                    pre_llm_count=pre_llm_count,
-                )
-                decisions = [
-                    replace(
-                        d,
-                        reasons=(
-                            "совпадение по статье",
-                            "fallback: deterministic article match",
-                        ),
-                        reason_confidence=0.65,
-                    )
-                    for d in source_decisions
-                ]
-                successful_cases = len(decisions)
-                filtered_by_relevance = 0
-
-            # Update the global counter for the final stats object
-            filtered_by_llm_relevance = filtered_by_relevance
-
-            log_event(
-                self._logger,
-                "fetch_decisions.article_classification_done",
-                article=params.article,
-                total_input=pre_filter_count,
-                pre_llm_count=pre_llm_count,
-                relevant=len(decisions),
-                filtered_category=category_filtered,
-                filtered_relevance=filtered_by_relevance,
-                filtered_strict_article_mismatch=strict_article_mismatch,
-            )
-            successful_cases = len(decisions)
-
-            decisions = await self._enrich_unknown_outcomes_with_llm(
-                decisions, should_cancel=should_cancel
-            )
-            successful_cases = len(decisions)
-
         if self._llm_reason_extractor is not None:
             self._llm_reason_extractor.reset_fetch_budget()
         self._current_article = None
@@ -859,7 +717,10 @@ class ParserApiKadClient:
             if should_cancel and should_cancel():
                 return index, None
             d = decisions[index]
-            reasons, llm_outcome = await self._llm_reason_extractor.extract_with_outcome(d)
+            (
+                reasons,
+                llm_outcome,
+            ) = await self._llm_reason_extractor.extract_with_outcome(d)
             if llm_outcome == "satisfied":
                 updated = replace(d, outcome=CaseOutcome.SATISFIED)
             elif llm_outcome == "denied":
@@ -868,7 +729,11 @@ class ParserApiKadClient:
                 updated = d
 
             if reasons and reasons != ("оценка обстоятельств дела",):
-                updated = replace(updated, reasons=reasons, reason_confidence=max(updated.reason_confidence, 0.75))
+                updated = replace(
+                    updated,
+                    reasons=reasons,
+                    reason_confidence=max(updated.reason_confidence, 0.75),
+                )
             return index, updated
 
         tasks = [asyncio.create_task(_enrich(i)) for i in target_indexes]
@@ -882,7 +747,10 @@ class ParserApiKadClient:
             idx, updated = res
             if updated is None:
                 continue
-            if enriched[idx].outcome == CaseOutcome.UNKNOWN and updated.outcome != CaseOutcome.UNKNOWN:
+            if (
+                enriched[idx].outcome == CaseOutcome.UNKNOWN
+                and updated.outcome != CaseOutcome.UNKNOWN
+            ):
                 updated_outcomes += 1
             enriched[idx] = updated
 
@@ -1264,7 +1132,9 @@ class ParserApiKadClient:
 
     def _extract_outcome_and_reasons(
         self, events: list[dict]
-    ) -> tuple[CaseOutcome, tuple[str, ...], date, str, tuple[dict[str, str], ...], float]:
+    ) -> tuple[
+        CaseOutcome, tuple[str, ...], date, str, tuple[dict[str, str], ...], float
+    ]:
         if not events:
             return (
                 CaseOutcome.UNKNOWN,
@@ -1348,15 +1218,26 @@ class ParserApiKadClient:
                     seen_urls.add(d["url"])
 
         # Reasons extraction still focuses on the decisive text, but fallback uses the combined text
-        reasons, reason_conf = self._reason_extractor.extract_with_confidence(prepared[decisive_idx][0])
+        reasons, reason_conf = self._reason_extractor.extract_with_confidence(
+            prepared[decisive_idx][0]
+        )
         if not reasons or reasons == ("оценка обстоятельств дела",):
-            reasons, reason_conf = self._reason_extractor.extract_with_confidence(analysis_text)
+            reasons, reason_conf = self._reason_extractor.extract_with_confidence(
+                analysis_text
+            )
 
         if not reasons:
             reasons = ("оценка обстоятельств дела",)
             reason_conf = 0.1
 
-        return outcome, reasons, decision_date, analysis_text, tuple(all_docs), reason_conf
+        return (
+            outcome,
+            reasons,
+            decision_date,
+            analysis_text,
+            tuple(all_docs),
+            reason_conf,
+        )
 
     def _build_event_text(self, event: dict) -> str:
         return " ".join([
@@ -1439,6 +1320,21 @@ class ParserApiKadClient:
     def _has_explicit_article_reference(self, text: str, article: str) -> bool:
         if not text or not article:
             return False
+        lowered = text.lower()
+
+        if article == "61.2":
+            if any(
+                k in lowered
+                for k in ("61.2", "подозрительн", "оспариван", "недействительн сделк")
+            ):
+                return True
+        elif article == "61.3":
+            if any(
+                k in lowered
+                for k in ("61.3", "предпочтени", "оспариван", "недействительн сделк")
+            ):
+                return True
+
         normalized_article = article.replace(",", ".")
         compact = re.escape(normalized_article)
         patterns = [
@@ -1446,7 +1342,9 @@ class ParserApiKadClient:
             rf"стать[ьяи]\s*{compact}\b",
             rf"article\s*{compact}\b",
         ]
-        lowered = text.lower()
+        if "." in compact:
+            patterns.append(rf"\b{compact}\b")
+
         return any(re.search(pattern, lowered) for pattern in patterns)
 
     def _text_has_article(self, text: str, article: str) -> bool:

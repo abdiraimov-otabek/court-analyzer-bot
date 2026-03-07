@@ -372,7 +372,9 @@ class LLMReasonExtractor:
         if not ctx:
             return self._FALLBACK, None
 
-        cache_key = hashlib.sha256(ctx.encode()).hexdigest()
+        cache_key = hashlib.sha256(
+            f"{decision.outcome.value}:{ctx}".encode()
+        ).hexdigest()
         if cache_key in self._outcome_cache:
             return self._outcome_cache[cache_key]
 
@@ -385,7 +387,9 @@ class LLMReasonExtractor:
             self._budget_remaining -= 1
         try:
             async with self._semaphore:
-                reasons, outcome = await self._call_extract_api(ctx)
+                reasons, outcome = await self._call_extract_with_outcome(
+                    ctx, decision.outcome
+                )
 
             if len(self._outcome_cache) > self._MAX_CACHE_SIZE:
                 keys_to_remove = list(self._outcome_cache.keys())[:50]

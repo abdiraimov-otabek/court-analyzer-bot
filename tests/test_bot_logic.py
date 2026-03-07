@@ -110,7 +110,7 @@ def test_bot_logic_starts_analysis_after_quarter_selected():
     assert "Выберите период" in first[1]
     assert len(second) == 1
     assert "Начинаю анализ" in second[0]
-    assert "120" in second[0]
+    assert "50" in second[0]
 
 
 def test_bot_logic_rejects_invalid_quarter_input():

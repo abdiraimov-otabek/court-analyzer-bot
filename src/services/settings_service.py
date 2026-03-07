@@ -29,7 +29,7 @@ class SettingsService:
         min_known_outcomes: int,
         send_partial_file_on_quality_fail: bool,
     ) -> Settings:
-        if max_cases < 5 or max_cases > 50:
+        if max_cases < 5 or max_cases > 5000:
             raise ValueError("max_cases must be between 5 and 5000")
         if max_documents_per_case <= 0:
             raise ValueError("max_documents_per_case must be positive")
@@ -45,10 +45,20 @@ class SettingsService:
             raise ValueError("details_cache_ttl_seconds must be >= 60")
         if not analysis_prompt.strip():
             raise ValueError("analysis_prompt cannot be empty")
-        if unknown_outcome_threshold_percent < 1 or unknown_outcome_threshold_percent > 100:
-            raise ValueError("unknown_outcome_threshold_percent must be between 1 and 100")
-        if court_mismatch_threshold_percent < 1 or court_mismatch_threshold_percent > 100:
-            raise ValueError("court_mismatch_threshold_percent must be between 1 and 100")
+        if (
+            unknown_outcome_threshold_percent < 1
+            or unknown_outcome_threshold_percent > 100
+        ):
+            raise ValueError(
+                "unknown_outcome_threshold_percent must be between 1 and 100"
+            )
+        if (
+            court_mismatch_threshold_percent < 1
+            or court_mismatch_threshold_percent > 100
+        ):
+            raise ValueError(
+                "court_mismatch_threshold_percent must be between 1 and 100"
+            )
         if min_known_outcomes < 5:
             raise ValueError("min_known_outcomes must be >= 5")
         if min_known_outcomes > max_cases:

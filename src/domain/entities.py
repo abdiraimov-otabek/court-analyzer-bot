@@ -11,6 +11,20 @@ class CaseOutcome(str, Enum):
     UNKNOWN = "unknown"
 
 
+class EvidenceTier(str, Enum):
+    TIER_A_EXPLICIT_MATCH = "Tier A (Explicit)"
+    TIER_B_PROBABLE_MATCH = "Tier B (Probable)"
+    TIER_C_WEAK_MATCH = "Tier C (Weak)"
+    TIER_D_NO_MATCH = "Tier D (None)"
+
+
+class ConfidenceScore(str, Enum):
+    CONFIRMED = "Confirmed"
+    PROBABLE = "Probable"
+    WEAK = "Weak"
+    REJECTED = "Rejected"
+
+
 @dataclass(frozen=True)
 class CaseDecision:
     case_number: str
@@ -24,9 +38,15 @@ class CaseDecision:
     case_category: str = ""  # "Б", "Г", "А", or "" if unknown
     document_links: tuple[dict[str, str], ...] = ()
     proof_quote: str = ""  # Direct citation from the act for verifiable accuracy
-    reason_confidence: float = 1.0  # How confident we are in the extracted reasons (0.0-1.0)
-    confidence_score: float = 1.0
+    reason_confidence: float = 1.0  # Legacy float confidence
+    confidence_score: float = 1.0  # Legacy float confidence accumulator
     validation_conflicts: tuple[str, ...] = ()
+
+    # High-Precision Pipeline Tracking
+    matched_article: str = ""
+    evidence_quote: str = ""
+    evidence_tier: EvidenceTier = EvidenceTier.TIER_D_NO_MATCH
+    validation_confidence: ConfidenceScore = ConfidenceScore.REJECTED
 
 
 @dataclass(frozen=True)

@@ -1,8 +1,8 @@
 from datetime import datetime
 
-from src.infrastructure.sqlite import SqliteConnection
-from src.infrastructure.settings_repository import SettingsRepository
 from src.domain.settings import Settings
+from src.infrastructure.settings_repository import SettingsRepository
+from src.infrastructure.sqlite import SqliteConnection
 
 
 def test_settings_repository_roundtrip(tmp_path):
@@ -11,7 +11,7 @@ def test_settings_repository_roundtrip(tmp_path):
     repo = SettingsRepository(connection)
 
     default_settings = repo.get()
-    assert default_settings.max_cases == 2000
+    assert default_settings.max_cases == 50
     assert default_settings.fetch_concurrency_min == 6
     assert default_settings.fetch_concurrency_max == 10
     assert default_settings.allow_all_users is False

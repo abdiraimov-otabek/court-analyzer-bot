@@ -268,8 +268,5 @@ def test_analysis_service_provides_top_reasons_even_when_reason_lists_are_empty(
         service.build_result("АС города Москвы", "2024 год", decisions)
     )
 
-    assert (
-        "Топ-2 основания для удовлетворения: оценка обстоятельств дела"
-        in result.summary
-    )
-    assert "Топ-2 основания для отказа: оценка обстоятельств дела" in result.summary
+    assert "Топ-2 основания для удовлетворения: нет данных" in result.summary
+    assert "Топ-2 основания для отказа: нет данных" in result.summary

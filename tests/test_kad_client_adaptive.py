@@ -1,6 +1,6 @@
 import asyncio
-from datetime import date, datetime
 import sqlite3
+from datetime import date, datetime
 
 import httpx
 
@@ -8,7 +8,11 @@ from src.domain.entities import CaseDecision, CaseOutcome
 from src.domain.settings import Settings
 from src.infrastructure.case_details_cache_repository import CaseDetailsCacheRepository
 from src.infrastructure.sqlite import SqliteConnection
-from src.services.kad_client import DecisionFetchOutcome, KadUnavailableError, ParserApiKadClient
+from src.services.kad_client import (
+    DecisionFetchOutcome,
+    KadUnavailableError,
+    ParserApiKadClient,
+)
 
 
 def build_settings(max_cases: int = 24) -> Settings:
@@ -31,8 +35,10 @@ def test_adaptive_concurrency_increases_after_stable_windows():
     async def fake_sanitize(params):
         return params
 
-    async def fake_collect(_params, _settings, should_cancel=None, on_collection_progress=None):
-        return [f"id-{idx}" for idx in range(24)]
+    async def fake_collect(
+        _params, _settings, should_cancel=None, on_collection_progress=None
+    ):
+        return [f"id-{idx}" for idx in range(24)], 1
 
     async def fake_fetch(case_id, settings):
         idx = int(case_id.split("-")[1])
@@ -65,8 +71,10 @@ def test_adaptive_concurrency_decreases_on_transient_errors():
     async def fake_sanitize(params):
         return params
 
-    async def fake_collect(_params, _settings, should_cancel=None, on_collection_progress=None):
-        return [f"id-{idx}" for idx in range(14)]
+    async def fake_collect(
+        _params, _settings, should_cancel=None, on_collection_progress=None
+    ):
+        return [f"id-{idx}" for idx in range(14)], 1
 
     async def fake_fetch(case_id, settings):
         idx = int(case_id.split("-")[1])
@@ -117,14 +125,18 @@ def test_request_json_async_retries_429_then_succeeds(monkeypatch):
         return None
 
     monkeypatch.setattr(asyncio, "sleep", fast_sleep)
-    result = asyncio.run(client._request_json_async("GET", "/search", params={"key": "token"}))
+    result = asyncio.run(
+        client._request_json_async("GET", "/search", params={"key": "token"})
+    )
     assert result.retry_count == 2
     assert result.had_transient_error is True
     assert result.data["Success"] == 1
 
 
 def test_fetch_decisions_uses_case_details_cache(tmp_path):
-    cache_repo = CaseDetailsCacheRepository(SqliteConnection(str(tmp_path / "app.db")), ttl_seconds=3600)
+    cache_repo = CaseDetailsCacheRepository(
+        SqliteConnection(str(tmp_path / "app.db")), ttl_seconds=3600
+    )
     cached_decision = CaseDecision(
         case_number="A40-1/2023",
         decision_date=date(2023, 3, 15),
@@ -143,8 +155,10 @@ def test_fetch_decisions_uses_case_details_cache(tmp_path):
     async def fake_sanitize(params):
         return params
 
-    async def fake_collect(_params, _settings, should_cancel=None, on_collection_progress=None):
-        return ["case-1"]
+    async def fake_collect(
+        _params, _settings, should_cancel=None, on_collection_progress=None
+    ):
+        return ["case-1"], 1
 
     async def fail_request_json_async(method: str, path: str, params: dict):
         raise AssertionError("details_by_id request should not happen on cache hit")
@@ -166,8 +180,10 @@ def test_fetch_decisions_continues_on_partial_unavailable_errors():
     async def fake_sanitize(params):
         return params
 
-    async def fake_collect(_params, _settings, should_cancel=None, on_collection_progress=None):
-        return [f"id-{idx}" for idx in range(12)]
+    async def fake_collect(
+        _params, _settings, should_cancel=None, on_collection_progress=None
+    ):
+        return [f"id-{idx}" for idx in range(12)], 1
 
     async def fake_fetch(case_id, settings):
         idx = int(case_id.split("-")[1])
@@ -212,8 +228,10 @@ def test_fetch_decisions_ignores_cache_write_operational_errors():
     async def fake_sanitize(params):
         return params
 
-    async def fake_collect(_params, _settings, should_cancel=None, on_collection_progress=None):
-        return ["case-1"]
+    async def fake_collect(
+        _params, _settings, should_cancel=None, on_collection_progress=None
+    ):
+        return ["case-1"], 1
 
     async def fake_request_json_async(method: str, path: str, params: dict):
         return type(
@@ -263,8 +281,10 @@ def test_fetch_decisions_filters_out_other_courts_when_court_is_requested():
     async def fake_sanitize(params):
         return params
 
-    async def fake_collect(_params, _settings, should_cancel=None, on_collection_progress=None):
-        return ["id-1", "id-2", "id-3"]
+    async def fake_collect(
+        _params, _settings, should_cancel=None, on_collection_progress=None
+    ):
+        return ["id-1", "id-2", "id-3"], 1
 
     async def fake_fetch(case_id, settings):
         court_map = {
@@ -288,11 +308,17 @@ def test_fetch_decisions_filters_out_other_courts_when_court_is_requested():
     client._collect_case_ids = fake_collect  # type: ignore[method-assign]
     client._fetch_case_decision_with_metrics = fake_fetch  # type: ignore[method-assign]
 
-    result = asyncio.run(client.fetch_decisions("Практика в АС СПб за 2025 год", build_settings(max_cases=3)))
+    result = asyncio.run(
+        client.fetch_decisions(
+            "Практика в АС СПб за 2025 год", build_settings(max_cases=3)
+        )
+    )
 
     assert result.stats.attempted_cases == 3
     assert len(result.decisions) == 2
-    assert all("Санкт-Петербурга" in decision.court_name for decision in result.decisions)
+    assert all(
+        "Санкт-Петербурга" in decision.court_name for decision in result.decisions
+    )
     asyncio.run(client.aclose())
 
 
@@ -302,8 +328,10 @@ def test_fetch_decisions_does_not_drop_cases_on_article_only_query():
     async def fake_sanitize(params):
         return params
 
-    async def fake_collect(_params, _settings, should_cancel=None, on_collection_progress=None):
-        return ["id-1", "id-2"]
+    async def fake_collect(
+        _params, _settings, should_cancel=None, on_collection_progress=None
+    ):
+        return ["id-1", "id-2"], 1
 
     async def fake_fetch(case_id, settings):
         text_map = {
@@ -327,7 +355,11 @@ def test_fetch_decisions_does_not_drop_cases_on_article_only_query():
     client._collect_case_ids = fake_collect  # type: ignore[method-assign]
     client._fetch_case_decision_with_metrics = fake_fetch  # type: ignore[method-assign]
 
-    result = asyncio.run(client.fetch_decisions("Практика по ст.61.3 в АС Москвы за 2025 год", build_settings(max_cases=2)))
+    result = asyncio.run(
+        client.fetch_decisions(
+            "Практика по ст.61.3 в АС Москвы за 2025 год", build_settings(max_cases=2)
+        )
+    )
 
     assert result.stats.attempted_cases == 2
     assert len(result.decisions) == 2
@@ -340,8 +372,10 @@ def test_fetch_decisions_filters_by_requested_paragraph():
     async def fake_sanitize(params):
         return params
 
-    async def fake_collect(_params, _settings, should_cancel=None, on_collection_progress=None):
-        return ["id-1", "id-2"]
+    async def fake_collect(
+        _params, _settings, should_cancel=None, on_collection_progress=None
+    ):
+        return ["id-1", "id-2"], 1
 
     async def fake_fetch(case_id, settings):
         text_map = {
@@ -365,7 +399,12 @@ def test_fetch_decisions_filters_by_requested_paragraph():
     client._collect_case_ids = fake_collect  # type: ignore[method-assign]
     client._fetch_case_decision_with_metrics = fake_fetch  # type: ignore[method-assign]
 
-    result = asyncio.run(client.fetch_decisions("Практика по п.2 ст.61.3 в АС Москвы за 2025 год", build_settings(max_cases=2)))
+    result = asyncio.run(
+        client.fetch_decisions(
+            "Практика по п.2 ст.61.3 в АС Москвы за 2025 год",
+            build_settings(max_cases=2),
+        )
+    )
 
     assert result.stats.attempted_cases == 2
     assert len(result.decisions) == 1
@@ -388,7 +427,9 @@ def test_extract_outcome_and_reasons_uses_final_decisive_event():
         },
     ]
 
-    outcome, reasons, decision_date, analysis_text, document_links, reason_conf = client._extract_outcome_and_reasons(events)  # noqa: SLF001
+    outcome, reasons, decision_date, analysis_text, document_links, reason_conf = (
+        client._extract_outcome_and_reasons(events)
+    )  # noqa: SLF001
 
     assert outcome == CaseOutcome.DENIED
     assert any("пропуск срока" in r for r in reasons)
@@ -412,7 +453,9 @@ def test_extract_outcome_and_reasons_uses_latest_decisive_event_when_last_event_
         },
     ]
 
-    outcome, reasons, decision_date, analysis_text, document_links, reason_conf = client._extract_outcome_and_reasons(events)  # noqa: SLF001
+    outcome, reasons, decision_date, analysis_text, document_links, reason_conf = (
+        client._extract_outcome_and_reasons(events)
+    )  # noqa: SLF001
 
     assert outcome == CaseOutcome.SATISFIED
     assert decision_date == date(2024, 1, 10)
@@ -431,7 +474,9 @@ def test_extract_outcome_and_reasons_returns_unknown_when_no_decisive_events():
         },
     ]
 
-    outcome, reasons, decision_date, analysis_text, document_links, reason_conf = client._extract_outcome_and_reasons(events)  # noqa: SLF001
+    outcome, reasons, decision_date, analysis_text, document_links, reason_conf = (
+        client._extract_outcome_and_reasons(events)
+    )  # noqa: SLF001
 
     assert outcome == CaseOutcome.UNKNOWN
     assert reasons == ("оценка обстоятельств дела",)

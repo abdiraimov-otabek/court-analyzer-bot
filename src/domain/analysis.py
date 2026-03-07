@@ -4,13 +4,28 @@ from collections import Counter
 from datetime import date
 from typing import TYPE_CHECKING
 
-from src.domain.entities import AnalysisResult, CaseDecision, CaseOutcome
+from src.domain.entities import (
+    AnalysisResult,
+    CaseDecision,
+    CaseOutcome,
+    ConfidenceScore,
+    EvidenceTier,
+)
 
 if TYPE_CHECKING:
     from src.services.llm_reason_extractor import LLMReasonExtractor
 
 
 class AnalysisService:
+    _PLACEHOLDER_REASONS = frozenset(
+        {
+            "",
+            "не указано",
+            "нет данных",
+            "оценка обстоятельств дела",
+        }
+    )
+
     def __init__(self, llm_reason_extractor: LLMReasonExtractor | None = None) -> None:
         self._llm_reason_extractor = llm_reason_extractor
 
@@ -22,6 +37,7 @@ class AnalysisService:
         article: str | None = None,
         total_pages: int = 0,
         total_cases_found: int = 0,
+        include_narrative_summary: bool = True,
     ) -> AnalysisResult:
         satisfied = 0
         denied = 0
@@ -34,18 +50,19 @@ class AnalysisService:
         review_decisions = []
 
         for decision in decisions:
-            if decision.confidence_score >= 0.98:
+            if self._is_verifiable(decision):
                 verifiable_decisions.append(decision)
                 outcome = self.normalize_outcome(decision)
+                meaningful_reasons = self._meaningful_reasons(decision.reasons)
                 if outcome == CaseOutcome.SATISFIED:
                     satisfied += 1
-                    satisfied_reasons.update(decision.reasons)
+                    satisfied_reasons.update(meaningful_reasons)
                 elif outcome == CaseOutcome.DENIED:
                     denied += 1
-                    denied_reasons.update(decision.reasons)
+                    denied_reasons.update(meaningful_reasons)
                 else:
                     unknown += 1
-                all_reasons.update(decision.reasons)
+                all_reasons.update(meaningful_reasons)
             else:
                 review_decisions.append(decision)
 
@@ -78,7 +95,7 @@ class AnalysisService:
             conf_sum = sum(d.reason_confidence for d in verifiable_decisions)
             avg_reason_conf = conf_sum / len(verifiable_decisions)
 
-        if self._llm_reason_extractor:
+        if self._llm_reason_extractor and include_narrative_summary:
             summary = await self._llm_reason_extractor.generate_summary(
                 court=court,
                 period=period,
@@ -160,8 +177,30 @@ class AnalysisService:
 
     def _format_fallback_top(self, reasons: Counter[str]) -> str:
         if not reasons:
-            return "оценка обстоятельств дела"
+            return "нет данных"
         return "; ".join(reason for reason, _ in reasons.most_common(2))
+
+    def _meaningful_reasons(self, reasons: tuple[str, ...]) -> tuple[str, ...]:
+        filtered = []
+        for reason in reasons:
+            normalized = reason.strip().lower()
+            if normalized in self._PLACEHOLDER_REASONS:
+                continue
+            filtered.append(reason)
+        return tuple(filtered)
+
+    def _is_verifiable(self, decision: CaseDecision) -> bool:
+        has_validation_metadata = (
+            bool(decision.matched_article)
+            or bool(decision.evidence_quote)
+            or decision.evidence_tier != EvidenceTier.TIER_D_NO_MATCH
+        )
+        if has_validation_metadata:
+            return decision.validation_confidence in (
+                ConfidenceScore.CONFIRMED,
+                ConfidenceScore.PROBABLE,
+            )
+        return decision.confidence_score >= 0.98
 
     def _format_case(self, decision: CaseDecision) -> str:
         case_label = decision.case_number or (
@@ -174,22 +213,34 @@ class AnalysisService:
         quote_text = ""
         if decision.proof_quote:
             quote_text = f" | Цитата: {decision.proof_quote}"
+        if decision.evidence_quote and decision.evidence_quote != "N/A":
+            quote_text = f" | Цитата: {decision.evidence_quote}"
 
-        validation_text = ""
-        if decision.validation_conflicts:
-            validation_text = (
-                f" | ⚠️Конфликт: {', '.join(decision.validation_conflicts)}"
-            )
-        elif decision.confidence_score < 0.98:
-            validation_text = f" | ⚠️Низкая уверенность: {decision.confidence_score}"
+        confidence_display = (
+            decision.validation_confidence.value
+            if hasattr(decision, "validation_confidence")
+            else "Unknown"
+        )
+        article_display = (
+            decision.matched_article
+            if hasattr(decision, "matched_article") and decision.matched_article
+            else "N/A"
+        )
+        tier_display = (
+            decision.evidence_tier.name if hasattr(decision, "evidence_tier") else "N/A"
+        )
+
+        validation_text = f" | Анализ: Уверенность: {confidence_display}, Статья: {article_display} ({tier_display})"
 
         docs_text = ""
         if decision.document_links:
             doc_links = [f"[{d['name']}]({d['url']})" for d in decision.document_links]
             docs_text = " | Документы: " + ", ".join(doc_links)
+
         return (
             f"{case_label} | {self._format_date(decision.decision_date)} | "
-            f"{self._format_outcome(decision)} | Суд: {court} | Основание: {reason} | Ссылка: {link}{quote_text}{validation_text}{docs_text}"
+            f"{self._format_outcome(decision)} | Суд: {court} | Основание: {reason} | "
+            f"Ссылка: {link}{quote_text}{validation_text}{docs_text}"
         )
 
     def _format_date(self, value: date) -> str:

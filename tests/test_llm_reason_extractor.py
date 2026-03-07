@@ -227,6 +227,28 @@ def _make_decision(
 
 
 @pytest.mark.asyncio
+async def test_extract_with_outcome_returns_reasons_and_outcome():
+    http = AsyncMock()
+    body = json.dumps(
+        {"reasons": ["оспаривание сделки"], "outcome": "satisfied"},
+        ensure_ascii=False,
+    )
+    http.post = AsyncMock(return_value=_mock_response(_api_body(body)))
+    extractor = _make_extractor(http_client=http)
+
+    decision = _make_decision(
+        analysis_text="Спор по ст. 61.2 Закона о банкротстве",
+        outcome=CaseOutcome.UNKNOWN,
+    )
+
+    reasons, outcome = await extractor.extract_with_outcome(decision)
+
+    assert reasons == ("оспаривание сделки",)
+    assert outcome == "satisfied"
+    http.post.assert_called_once()
+
+
+@pytest.mark.asyncio
 async def test_classify_relevant_case_returns_true_and_reasons():
     http = AsyncMock()
     labels = [

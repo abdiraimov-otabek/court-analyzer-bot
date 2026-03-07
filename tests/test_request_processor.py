@@ -6,6 +6,7 @@ import pytest
 
 from src.domain.analysis import AnalysisService
 from src.domain.entities import CaseDecision, CaseOutcome
+from src.domain.kad_models import SearchParams
 from src.domain.settings import Settings
 from src.domain.value_objects import UserId
 from src.infrastructure.cache_repository import AnalysisCacheRepository
@@ -94,6 +95,16 @@ class FakeKadClient(KadClient):
                 details_fetch_ms=20,
                 filtered_by_court=0,
                 court_compared_cases=5,
+            ),
+            params=SearchParams(
+                None,
+                None,
+                None,
+                None,
+                "АС города Москвы",
+                None,
+                None,
+                "ст 61.2" if "ст" in query_text else None,
             ),
         )
 
@@ -230,6 +241,16 @@ class MostlyUnknownKadClient(KadClient):
                 filtered_by_court=0,
                 court_compared_cases=60,
             ),
+            params=SearchParams(
+                None,
+                None,
+                None,
+                None,
+                "АС города Москвы",
+                None,
+                None,
+                "ст 61.2" if "ст" in query_text else None,
+            ),
         )
 
 
@@ -272,6 +293,99 @@ def test_request_processor_blocks_final_summary_on_quality_gate(tmp_path):
     assert exc.value.case_list
 
 
+class WeakEvidenceArticleKadClient(KadClient):
+    def count_cases(self, query_text: str, settings: Settings) -> int:
+        return 80
+
+    async def fetch_decisions(
+        self,
+        query_text: str,
+        settings: Settings,
+        on_progress=None,
+        on_successful=None,
+        on_retry=None,
+        on_collection_progress=None,
+        on_stage_change=None,
+        should_cancel=None,
+    ) -> FetchDecisionsResult:
+        if on_stage_change:
+            on_stage_change("analyzing")
+        decisions = [
+            CaseDecision(
+                case_number=f"A40-{idx}/2025",
+                decision_date=date(2025, 1, 10),
+                outcome=CaseOutcome.SATISFIED if idx % 2 == 0 else CaseOutcome.DENIED,
+                reasons=("оспаривание сделки",),
+                court_name="АС города Москвы",
+                analysis_text="Краткая карточка без текста статьи и без цитаты",
+            )
+            for idx in range(80)
+        ]
+        if on_progress:
+            on_progress(80)
+        return FetchDecisionsResult(
+            decisions=decisions,
+            stats=FetchStats(
+                attempted_cases=80,
+                successful_cases=80,
+                retry_count=0,
+                effective_concurrency=8,
+                case_id_collection_ms=10,
+                details_fetch_ms=20,
+                filtered_by_court=0,
+                court_compared_cases=80,
+            ),
+            params=SearchParams(
+                None,
+                None,
+                None,
+                None,
+                "АС города Москвы",
+                None,
+                None,
+                "61.2",
+            ),
+        )
+
+
+def test_request_processor_rejects_all_weak_article_matches(tmp_path):
+    settings = Settings(
+        max_cases=80,
+        max_documents_per_case=5,
+        max_pages=20,
+        fetch_concurrency_min=6,
+        fetch_concurrency_max=10,
+        slow_alert_minutes=5,
+        details_cache_ttl_seconds=24 * 60 * 60,
+        analysis_prompt="test",
+        updated_at=datetime(2026, 2, 11, 12, 0, 0),
+        min_known_outcomes=20,
+    )
+    registry = ActiveRequestRegistry()
+    user_id = UserId("456")
+    registry.start(user_id, query_text="ст 61.2 2025", total_cases=80)
+    cache_repo = AnalysisCacheRepository(
+        SqliteConnection(str(tmp_path / "app.db")), ttl_seconds=60
+    )
+
+    processor = RequestProcessor(
+        kad_client=WeakEvidenceArticleKadClient(),
+        analysis_service=AnalysisService(),
+        active_requests=registry,
+        cache_repository=cache_repo,
+        log_repository=InMemoryLogRepository(),
+        hashing_service=HashingService(salt="pepper"),
+    )
+
+    with pytest.raises(InsufficientQualityError) as exc:
+        asyncio.run(processor.process(user_id, "ст 61.2 2025", settings))
+
+    assert exc.value.reason_code == "no_verified_cases"
+    assert exc.value.verified_cases == 0
+    assert "не найдено ни одного подтвержденного" in exc.value.summary.lower()
+    assert exc.value.case_list
+
+
 class EmptyResultKadClient(KadClient):
     def count_cases(self, query_text: str, settings: Settings) -> int:
         return 50
@@ -302,6 +416,16 @@ class EmptyResultKadClient(KadClient):
                 details_fetch_ms=20,
                 filtered_by_court=0,
                 court_compared_cases=0,
+            ),
+            params=SearchParams(
+                None,
+                None,
+                None,
+                None,
+                "АС города Москвы",
+                None,
+                None,
+                "ст 61.2" if "ст" in query_text else None,
             ),
         )
 
@@ -371,6 +495,16 @@ class ArticleFilteredOutKadClient(KadClient):
                 filtered_by_court=0,
                 court_compared_cases=425,
                 filtered_by_article=425,
+            ),
+            params=SearchParams(
+                None,
+                None,
+                None,
+                None,
+                "АС города Москвы",
+                None,
+                None,
+                "ст 61.2" if "ст" in query_text else None,
             ),
         )
 

@@ -18,6 +18,7 @@ def build_cases_excel(case_list: str) -> bytes:
         "Основание",
         "Ссылка",
         "Цитата",
+        "Уверенность (Анализ)",
         "Документы",
     ]
     sheet.append(headers)
@@ -38,10 +39,22 @@ def build_cases_excel(case_list: str) -> bytes:
     for line in case_list.splitlines():
         if not line.strip():
             continue
-        case_number, d_date, outcome, court, reason, link, quote, docs = (
+        if " | " not in line or line.lstrip().startswith("⚠️"):
+            continue
+        case_number, d_date, outcome, court, reason, link, quote, analysis_col, docs = (
             _parse_case_line(line)
         )
-        sheet.append([case_number, d_date, outcome, court, reason, link, quote, docs])
+        sheet.append([
+            case_number,
+            d_date,
+            outcome,
+            court,
+            reason,
+            link,
+            quote,
+            analysis_col,
+            docs,
+        ])
 
     # Styling content
     for row in sheet.iter_rows(min_row=2):
@@ -57,7 +70,7 @@ def build_cases_excel(case_list: str) -> bytes:
                 cell.style = "Hyperlink"
 
     # Column widths
-    column_widths = [16, 12, 16, 30, 40, 30, 60, 40]
+    column_widths = [16, 12, 16, 30, 40, 30, 60, 35, 40]
     for i, width in enumerate(column_widths):
         col_letter = sheet.cell(row=1, column=i + 1).column_letter
         sheet.column_dimensions[col_letter].width = width
@@ -67,7 +80,7 @@ def build_cases_excel(case_list: str) -> bytes:
     return output.getvalue()
 
 
-def _parse_case_line(line: str) -> tuple[str, str, str, str, str, str, str, str]:
+def _parse_case_line(line: str) -> tuple[str, str, str, str, str, str, str, str, str]:
     parts = [part.strip() for part in line.split(" | ")]
     case_number = parts[0] if len(parts) > 0 else ""
     decision_date = parts[1] if len(parts) > 1 else ""
@@ -77,6 +90,7 @@ def _parse_case_line(line: str) -> tuple[str, str, str, str, str, str, str, str]
     reason = ""
     link = ""
     quote = ""
+    analysis_col = ""
     docs = ""
     for part in parts[3:]:
         if part.startswith("Суд:"):
@@ -87,7 +101,19 @@ def _parse_case_line(line: str) -> tuple[str, str, str, str, str, str, str, str]
             link = part.replace("Ссылка:", "", 1).strip()
         elif part.startswith("Цитата:"):
             quote = part.replace("Цитата:", "", 1).strip()
+        elif part.startswith("Анализ:"):
+            analysis_col = part.replace("Анализ:", "", 1).strip()
         elif part.startswith("Документы:"):
             docs = part.replace("Документы:", "", 1).strip()
 
-    return case_number, decision_date, outcome, court, reason, link, quote, docs
+    return (
+        case_number,
+        decision_date,
+        outcome,
+        court,
+        reason,
+        link,
+        quote,
+        analysis_col,
+        docs,
+    )

@@ -253,8 +253,10 @@ async def _run_analysis(message: Message, user_id: UserId, query_text: str) -> N
             "analysis.failed_quality",
             reason_code=exc.reason_code,
             total_cases=exc.total_cases,
+            verified_cases=exc.verified_cases,
             known_cases=exc.known_cases,
             unknown_cases=exc.unknown_cases,
+            quote_backed_cases=exc.quote_backed_cases,
             unknown_share=round(exc.unknown_share, 4),
             court_mismatch_share=round(exc.court_mismatch_share, 4),
         )

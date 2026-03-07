@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import sqlite3
 import time
 from datetime import date, datetime, timedelta
 
@@ -19,17 +21,26 @@ class CaseDetailsCacheRepository:
         self._connection = connection
         self._last_cleanup_at = 0.0
         self._ttl = timedelta(seconds=ttl_seconds)
+        self._disabled = False
+        self._logger = logging.getLogger("case_details_cache_repository")
 
     def get(self, case_id: str, now: datetime) -> CaseDecision | None:
+        if self._disabled:
+            return None
         t_now = time.time()
         if t_now - self._last_cleanup_at > 60:
             self._cleanup(now)
             self._last_cleanup_at = t_now
-        with self._connection.connect() as conn:
-            row = conn.execute(
-                "select payload, expires_at from case_details_cache where case_id = ?",
-                (case_id,),
-            ).fetchone()
+        try:
+            with self._connection.connect() as conn:
+                row = conn.execute(
+                    "select payload, expires_at from case_details_cache where case_id = ?",
+                    (case_id,),
+                ).fetchone()
+        except sqlite3.DatabaseError as exc:
+            if self._disable_on_corruption(exc):
+                return None
+            raise
         if row is None:
             return None
         expires_at = datetime.fromisoformat(row["expires_at"])
@@ -48,35 +59,75 @@ class CaseDetailsCacheRepository:
         now: datetime,
         ttl_seconds: int | None = None,
     ) -> None:
+        if self._disabled:
+            return
         payload = self._serialize_decision(decision)
         ttl = self._ttl if ttl_seconds is None else timedelta(seconds=ttl_seconds)
         expires_at = now + ttl
-        with self._connection.connect() as conn:
-            conn.execute(
-                """
-                insert into case_details_cache (case_id, payload, created_at, expires_at)
-                values (?, ?, ?, ?)
-                on conflict(case_id) do update set
-                    payload=excluded.payload,
-                    created_at=excluded.created_at,
-                    expires_at=excluded.expires_at
-                """,
-                (case_id, payload, now.isoformat(), expires_at.isoformat()),
-            )
-            conn.commit()
+        try:
+            with self._connection.connect() as conn:
+                conn.execute(
+                    """
+                    insert into case_details_cache (case_id, payload, created_at, expires_at)
+                    values (?, ?, ?, ?)
+                    on conflict(case_id) do update set
+                        payload=excluded.payload,
+                        created_at=excluded.created_at,
+                        expires_at=excluded.expires_at
+                    """,
+                    (case_id, payload, now.isoformat(), expires_at.isoformat()),
+                )
+                conn.commit()
+        except sqlite3.DatabaseError as exc:
+            if self._disable_on_corruption(exc):
+                return
+            raise
 
     def delete(self, case_id: str) -> None:
-        with self._connection.connect() as conn:
-            conn.execute("delete from case_details_cache where case_id = ?", (case_id,))
-            conn.commit()
+        if self._disabled:
+            return
+        try:
+            with self._connection.connect() as conn:
+                conn.execute(
+                    "delete from case_details_cache where case_id = ?", (case_id,)
+                )
+                conn.commit()
+        except sqlite3.DatabaseError as exc:
+            if self._disable_on_corruption(exc):
+                return
+            raise
 
     def _cleanup(self, now: datetime) -> None:
-        with self._connection.connect() as conn:
-            conn.execute(
-                "delete from case_details_cache where expires_at <= ?",
-                (now.isoformat(),),
+        if self._disabled:
+            return
+        try:
+            with self._connection.connect() as conn:
+                conn.execute(
+                    "delete from case_details_cache where expires_at <= ?",
+                    (now.isoformat(),),
+                )
+                conn.commit()
+        except sqlite3.DatabaseError as exc:
+            if self._disable_on_corruption(exc):
+                return
+            raise
+
+    def _disable_on_corruption(self, exc: sqlite3.DatabaseError) -> bool:
+        message = str(exc).lower()
+        corruption_markers = (
+            "database disk image is malformed",
+            "malformed",
+            "file is not a database",
+        )
+        if not any(marker in message for marker in corruption_markers):
+            return False
+        if not self._disabled:
+            self._logger.warning(
+                "case_details_cache.disabled_due_to_corruption",
+                extra={"error": str(exc)},
             )
-            conn.commit()
+        self._disabled = True
+        return True
 
     def _serialize_decision(self, decision: CaseDecision) -> str:
         return json.dumps(
