@@ -121,7 +121,7 @@ class FailingLogRepository:
 
 def test_request_processor_caches_and_logs(tmp_path):
     settings = Settings(
-        max_cases=500,
+        max_cases=50,
         max_documents_per_case=5,
         max_pages=20,
         fetch_concurrency_min=6,
@@ -158,7 +158,7 @@ def test_request_processor_caches_and_logs(tmp_path):
 
 def test_request_processor_returns_result_even_if_cache_and_log_write_fail():
     settings = Settings(
-        max_cases=500,
+        max_cases=50,
         max_documents_per_case=5,
         max_pages=20,
         fetch_concurrency_min=6,
@@ -235,7 +235,7 @@ class MostlyUnknownKadClient(KadClient):
 
 def test_request_processor_blocks_final_summary_on_quality_gate(tmp_path):
     settings = Settings(
-        max_cases=500,
+        max_cases=50,
         max_documents_per_case=5,
         max_pages=20,
         fetch_concurrency_min=6,
@@ -274,7 +274,7 @@ def test_request_processor_blocks_final_summary_on_quality_gate(tmp_path):
 
 class EmptyResultKadClient(KadClient):
     def count_cases(self, query_text: str, settings: Settings) -> int:
-        return 500
+        return 50
 
     async def fetch_decisions(
         self,
@@ -308,7 +308,7 @@ class EmptyResultKadClient(KadClient):
 
 def test_request_processor_raises_not_enough_data_when_no_decisions(tmp_path):
     settings = Settings(
-        max_cases=500,
+        max_cases=50,
         max_documents_per_case=5,
         max_pages=20,
         fetch_concurrency_min=6,
@@ -320,7 +320,7 @@ def test_request_processor_raises_not_enough_data_when_no_decisions(tmp_path):
     )
     registry = ActiveRequestRegistry()
     user_id = UserId("123")
-    registry.start(user_id, query_text="query 2024", total_cases=500)
+    registry.start(user_id, query_text="query 2024", total_cases=50)
     cache_repo = AnalysisCacheRepository(
         SqliteConnection(str(tmp_path / "app.db")), ttl_seconds=60
     )
@@ -340,7 +340,7 @@ def test_request_processor_raises_not_enough_data_when_no_decisions(tmp_path):
 
 class ArticleFilteredOutKadClient(KadClient):
     def count_cases(self, query_text: str, settings: Settings) -> int:
-        return 500
+        return 50
 
     async def fetch_decisions(
         self,
@@ -377,7 +377,7 @@ class ArticleFilteredOutKadClient(KadClient):
 
 def test_request_processor_raises_no_relevant_cases_after_article_filter(tmp_path):
     settings = Settings(
-        max_cases=500,
+        max_cases=50,
         max_documents_per_case=5,
         max_pages=20,
         fetch_concurrency_min=6,
@@ -389,7 +389,7 @@ def test_request_processor_raises_no_relevant_cases_after_article_filter(tmp_pat
     )
     registry = ActiveRequestRegistry()
     user_id = UserId("123")
-    registry.start(user_id, query_text="ст 61.2 2024", total_cases=500)
+    registry.start(user_id, query_text="ст 61.2 2024", total_cases=50)
     cache_repo = AnalysisCacheRepository(
         SqliteConnection(str(tmp_path / "app.db")), ttl_seconds=60
     )

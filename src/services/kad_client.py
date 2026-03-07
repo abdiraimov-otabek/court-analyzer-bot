@@ -213,7 +213,7 @@ class ParserApiKadClient:
             # Issue #5: Reset before setting to ensure clean slate per request
             self._llm_reason_extractor.reset_fetch_budget()
             # When article is specified, every case needs classification — raise budget
-            self._llm_reason_extractor.set_fetch_budget(max_calls=600)
+            self._llm_reason_extractor.set_fetch_budget(max_calls=50)
         if should_cancel and should_cancel():
             return self._empty_fetch_result()
         if params.case_number:

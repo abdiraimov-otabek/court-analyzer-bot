@@ -23,7 +23,7 @@ class FakeCountProvider:
 
 
 class FakeSettingsProvider:
-    def __init__(self, max_cases: int = 2000, allow_all_users: bool = False) -> None:
+    def __init__(self, max_cases: int = 50, allow_all_users: bool = False) -> None:
         self._settings = Settings(
             max_cases=max_cases,
             max_documents_per_case=5,
@@ -85,7 +85,7 @@ def test_bot_logic_allows_small_non_zero_result_count():
 
 
 def test_bot_logic_offers_quarter_choice_for_too_many_results():
-    logic = build_logic(mapping={VALID_QUERY: 2001})
+    logic = build_logic(mapping={VALID_QUERY: 51})
     user_id = UserId("123")
 
     messages = logic.handle_message(
@@ -135,8 +135,8 @@ def test_bot_logic_caps_results_when_quarter_is_still_overflow():
     messages = logic.handle_message(user_id, "1", datetime(2026, 2, 11, 12, 0, 3))
 
     assert len(messages) == 1
-    assert "анализирую до 2000" in messages[0]
-    assert "Начинаю анализ до 2000 дел" in messages[0]
+    assert "анализирую до 50" in messages[0]
+    assert "Начинаю анализ до 50 дел" in messages[0]
 
 
 def test_bot_logic_starts_analysis_for_valid_range():
@@ -201,15 +201,15 @@ def test_status_reports_collection_progress():
         estimate_minutes=estimate_minutes,
     )
     active_requests.start(
-        user_id, query_text="query", total_cases=500, phase="collecting"
+        user_id, query_text="query", total_cases=50, phase="collecting"
     )
-    active_requests.update_collected(user_id, 120)
+    active_requests.update_collected(user_id, 42)
 
     messages = logic.handle_message(user_id, "/status", datetime(2026, 2, 11, 12, 0, 0))
 
     assert len(messages) == 1
     assert "подбираю дела" in messages[0]
-    assert "120 из 500" in messages[0]
+    assert "42 из 50" in messages[0]
 
 
 def test_bot_logic_requires_court_and_period_before_counting():
