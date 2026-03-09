@@ -64,7 +64,7 @@ class JsonFormatter(logging.Formatter):
             try:
                 from dataclasses import asdict, is_dataclass
 
-                if is_dataclass(obj):
+                if is_dataclass(obj) and not isinstance(obj, type):
                     return asdict(obj)
             except ImportError:
                 pass
@@ -102,7 +102,7 @@ class ConsoleFormatter(logging.Formatter):
                 try:
                     from dataclasses import asdict, is_dataclass
 
-                    if is_dataclass(obj):
+                    if is_dataclass(obj) and not isinstance(obj, type):
                         return asdict(obj)
                 except ImportError:
                     pass

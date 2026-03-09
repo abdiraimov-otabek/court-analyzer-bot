@@ -119,7 +119,5 @@ async def test_golden_dataset_verifiability():
     is_rel, reasons, quote, llm_outcome = await extractor.classify_and_extract(
         d4, "61.2", "ст. 61.2 банкротство"
     )
-    assert is_rel is True, "Relevant case without quote should stay relevant"
-    assert "оспаривание" in reasons[0]
-    assert quote.startswith("НЕТ_ЦИТАТЫ")
-    assert llm_outcome == "satisfied"
+    assert is_rel is False, "Relevant case without quote should be rejected under strict rules"
+    assert "Отклонено:" in reasons[0]

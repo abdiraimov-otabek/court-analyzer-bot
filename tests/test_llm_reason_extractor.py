@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import date as _date
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -204,9 +205,6 @@ async def test_semaphore_limits_concurrency():
 
 # --- classify_and_extract tests ---
 
-from datetime import date as _date
-
-
 def _make_decision(
     analysis_text: str = "Отказать в удовлетворении / Определение",
     outcome: CaseOutcome = CaseOutcome.DENIED,
@@ -388,11 +386,11 @@ async def test_classify_budget_exhausted_keeps_case():
 
 
 @pytest.mark.asyncio
-async def test_classify_relevant_without_quote_stays_relevant():
-    """A case marked relevant by LLM but without a proof_quote should remain relevant.
+async def test_classify_relevant_without_quote_is_rejected():
+    """A case marked relevant by LLM but without a proof_quote should be rejected.
 
-    Previously, this was hard-rejected. Now it should stay relevant with a
-    НЕТ_ЦИТАТЫ prefix in proof_quote.
+    Previously this was kept, but strict logic requires either a quote or
+    a logical deduction.
     """
     http = AsyncMock()
     labels = ["неравноценное встречное исполнение (п.1 ст.61.2)"]
@@ -411,10 +409,8 @@ async def test_classify_relevant_without_quote_stays_relevant():
         decision, "61.2"
     )
 
-    assert is_relevant is True
-    assert reasons == tuple(labels)
-    assert quote.startswith("НЕТ_ЦИТАТЫ")
-    assert llm_outcome == "satisfied"
+    assert is_relevant is False
+    assert "Отклонено:" in reasons[0]
 
 
 @pytest.mark.asyncio

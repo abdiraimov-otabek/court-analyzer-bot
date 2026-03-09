@@ -202,7 +202,8 @@ class RequestProcessor:
                     "KAD returned no case data despite large result set"
                 )
             raise NotEnoughData()
-        verifiable_records = self._select_verifiable_records(validated_records)
+        article_requested = bool((params.article if params else None) or metadata.article)
+        verifiable_records = self._select_verifiable_records(validated_records, article_requested)
         verifiable_decisions = [record.decision for record in verifiable_records]
         satisfied_cases = self._count_outcomes(
             verifiable_decisions, CaseOutcome.SATISFIED
@@ -269,7 +270,7 @@ class RequestProcessor:
             if known_courts:
                 court_for_summary = Counter(known_courts).most_common(1)[0][0]
 
-        article_requested = bool((params.article if params else None) or metadata.article)
+        # article_requested already calculated above
         quality_reason = self._get_quality_reason(
             known_cases=known_cases,
             unknown_share=unknown_share,
@@ -393,22 +394,32 @@ class RequestProcessor:
     ) -> str | None:
         if verified_cases == 0:
             return "no_verified_cases"
-        if article_requested and quote_backed_cases == 0:
-            return "no_direct_quotes"
+        if article_requested:
+            # If an article is specifically requested, we trust KAD's search engine hits
+            # and our LLM classification more. We allow summaries even with low 
+            # quote-backed percentage, as long as we have at least SOME verified cases.
+            if verified_cases > 0:
+                return None
+            return "no_verified_cases"
+
         if known_cases < settings.min_known_outcomes:
             return "known_below_threshold"
         if unknown_share >= settings.unknown_outcome_threshold_percent / 100:
             return "unknown_share_high"
+                
         if court_mismatch_share >= settings.court_mismatch_threshold_percent / 100:
             return "court_mismatch_high"
         return None
 
-    def _select_verifiable_records(self, validated_records):
+    def _select_verifiable_records(self, validated_records, article_requested: bool):
+        allowed_scores = [ConfidenceScore.CONFIRMED, ConfidenceScore.PROBABLE]
+        if article_requested:
+            allowed_scores.append(ConfidenceScore.WEAK)
+            
         return [
             record
             for record in validated_records
-            if record.confidence
-            in (ConfidenceScore.CONFIRMED, ConfidenceScore.PROBABLE)
+            if record.confidence in allowed_scores
         ]
 
     def _has_evidence_quote(self, decision: CaseDecision) -> bool:

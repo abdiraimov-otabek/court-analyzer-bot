@@ -85,7 +85,6 @@ class LLMReasonExtractor:
 
     _FALLBACK: tuple[str, ...] = ("оценка обстоятельств дела",)
     _NOT_RELEVANT: tuple[str, ...] = ("НЕ_РЕЛЕВАНТНО",)
-    _NO_QUOTE_PREFIX = "НЕТ_ЦИТАТЫ"
     _CANONICAL_SET: frozenset[str] = frozenset(_CANONICAL_LABELS)
     _MAX_RETRIES = 1
 
@@ -187,8 +186,9 @@ class LLMReasonExtractor:
                 f'8. "date_to": конкретная дата конца в формате ГГГГ-ММ-ДД (если указан месяц, например "март 2024" -> "2024-03-31").\n\n'
                 f"ПРАВИЛА:\n"
                 f'- В поле "full_article" ДОБАВЛЯЙ аббревиатуру кодекса (ГК, НК, УК) или краткое название закона, если они упомянуты или понятны из контекста.\n'
-                f'- Если статья из ГК РФ или других кодексов (кроме Закона о банкротстве), ставь case_type: "Г".\n'
-                f'- Если в запросе есть слово "банкротство" или ст. 61.2, 61.3, 127-ФЗ, ставь case_type: "Б".\n'
+                f'- Статьи 61.1, 61.2, 61.3, 61.4, 61.6–61.9, 100, 134, 138, 142, 213.11, 213.32 — это статьи Закона о банкротстве (127-ФЗ). Для них ставь case_type: "Б" и в full_article пиши "ст. X Закона о банкротстве".\n'
+                f'- Если в запросе есть слово "банкрот", "несостоятельност" или упомянут 127-ФЗ — ставь case_type: "Б".\n'
+                f'- Если статья из ГК РФ, НК РФ или других кодексов (не из Закона о банкротстве) — ставь case_type: "Г".\n'
                 f"- Если параметр не указан, ставь null.\n\n"
                 f"Верни ТОЛЬКО чистый JSON."
             )
@@ -490,7 +490,7 @@ class LLMReasonExtractor:
         # 1. Check cache first
         for i, decision in enumerate(decisions):
             context = self._build_case_context(decision)
-            if not context.strip():
+            if not context or not context.strip():
                 results[i] = (False, self._NOT_RELEVANT, "", None)
                 continue
 
@@ -580,13 +580,13 @@ class LLMReasonExtractor:
             f"ЦЕЛЕВАЯ СТАТЬЯ: {article}\n\n"
             f"АКТЫ ДЛЯ АНАЛИЗА:\n"
             f"{cases_text}\n\n"
-            f"СТРОГИЕ КРИТЕРИИ РЕЛЕВАНТНОСТИ:\n"
-            f"1. **Суть**: Акт релевантен, если в нем упоминается ст. {article} в связи с оспариванием сделок, действиями управляющего или иными существенными вопросами дела. Если статья — ключевой элемент спора, relevant: true.\n"
-            f"2. **Процессуальный мусор**: Обычное упоминание номера статьи в списке (например, 'ходатайство №60') БЕЗ связи с существом дела — relevant: false. Но если ст. {article} является основанием для заявления/жалобы, даже если она упомянута кратко — relevant: true.\n"
-            f"3. **Контекст**: Если целевая статья упоминается лишь в списке других статей без обсуждения её сути, но из контекста понятно, что это тема спора — relevant: true.\n\n"
+            f"СТРОГИЕ КРИТЕРИИ ДЛЯ 100% УВЕРЕННОСТИ:\n"
+            f"1. **Суть**: Акт релевантен, если в нем документально доказано, что судебный акт отвечает запросу пользователя. Статья {article} должна быть ключевым элементом спора.\n"
+            f"2. **Процессуальный мусор**: Обычное упоминание номера статьи в списке без связи с существом дела — relevant: false. Если есть малейшие сомнения — relevant: false.\n"
+            f"3. **Контекст**: Если суть спора, указанная пользователем, на 100% совпадает с сутью акта, только тогда relevant: true.\n\n"
             f"ТРЕБОВАНИЯ К ПОЛЯМ ОТВЕТА:\n"
             f"- **reasons**: Пиши профессиональным юридическим языком суть спора.\n"
-            f'- **proof_quote**: Если relevant: true, приведи краткую цитату из текста. Если прямую цитату найти невозможно, напиши "НЕТ_ЦИТАТЫ: <краткое обоснование релевантности>".\n'
+            f"- **proof_quote**: ТЫ ОБЯЗАН ДОКАЗАТЬ РЕЛЕВАНТНОСТЬ. Приведи точную цитату из текста ИЛИ твой строгий логический вывод (доказательство), который на 100% подтверждает релевантность запросу. БЕЗ ДОКАЗАТЕЛЬСТВА ДЕЛО СЧИТАЕТСЯ МУСОРОМ. Пустое поле разрешено только если relevant: false.\n"
             f'- **outcome**: "satisfied" (удовлетворено/обоснованно), "denied" (отказано/необоснованно) или "NOT FOUND IN DOCUMENT".\n\n'
             f"ФОРМАТ ОТВЕТА — СТРОГИЙ JSON-МАССИВ (ровно {len(decisions)} элементов):\n"
             f"[\n"
@@ -676,10 +676,11 @@ class LLMReasonExtractor:
                     llm_outcome = "denied"
                 # Else: NOT FOUND IN DOCUMENT implies None
 
-                # When relevant but no quote, keep relevant but note the absence.
-                # Downstream code will assign lower reason_confidence.
+                # Relaxed Logic: If relevant but absolutely no quote or rationale is provided, 
+                # we no longer reject it. Instead, we use a fallback and flag it.
                 if is_relevant and not proof_quote:
-                    proof_quote = f"{self._NO_QUOTE_PREFIX}: релевантность определена по контексту"
+                    # Upgrade to a "Weak" match downstream but don't drop the case
+                    proof_quote = "Прямая цитата не найдена в доступных фрагментах (LLM подтвердила релевантность без цитаты)"
 
                 if not reasons:
                     reasons = [self._FALLBACK[0]]
@@ -794,12 +795,11 @@ class LLMReasonExtractor:
             f"ЦЕЛЕВАЯ СТАТЬЯ: {article}\n"
             f"КОНТЕКСТ ИЗ КАД:\n{context}\n"
             f"ИСХОД ДЕЛА: {outcome_ru}\n\n"
-            f"СТРОГИЕ КРИТЕРИИ (ДЛЯ 100% ТОЧНОСТИ):\n"
-            f"1. СТАТЬЯ: Акт ДОЛЖЕН быть по ст. {article} в контексте запроса пользователя. Если статья иная — НЕ_РЕЛЕВАНТНО.\n"
-            f"2. ЗАКОН: Акт должен относиться к той же области права, что и запрос. Если запрос и акт про разные области — НЕ_РЕЛЕВАНТНО.\n"
-            f"3. СОДЕРЖАНИЕ: Процедурные определения (о назначении и т.д.) БЕЗ сути — НЕ_РЕЛЕВАНТНО.\n"
-            f"4. СУТЬ: Если ст. {article} лишь упомянута, а спор о другом — НЕ_РЕЛЕВАНТНО.\n"
-            f"5. ЦИТАТА: ОБЯЗАТЕЛЬНО приведи короткую цитату (1-2 предложения), подтверждающую суть спора по ст. {article}.\n\n"
+            f"СТРОГИЕ КРИТЕРИИ ДЛЯ 100% УВЕРЕННОСТИ:\n"
+            f"1. СТАТЬЯ: Акт ДОЛЖЕН быть по ст. {article} в строгом контексте запроса ({query_text}). Если статья иная или контекст не совпадает — НЕ_РЕЛЕВАНТНО.\n"
+            f"2. ЗАКОН: Акт должен относиться к той же области права, что и запрос. Если есть малейшие сомнения — НЕ_РЕЛЕВАНТНО.\n"
+            f"3. СОДЕРЖАНИЕ: Процедурные определения БЕЗ сути рассматриваемого спора — НЕ_РЕЛЕВАНТНО.\n"
+            f"4. СУТЬ И ДОКАЗАТЕЛЬСТВО: ТЫ ОБЯЗАН ДОКАЗАТЬ РЕЛЕВАНТНОСТЬ. В `proof_quote` приведи короткую цитату (1-2 предложения) или строгий логический вывод (доказательство), на 100% доказывающий суть спора по ст. {article}. БЕЗ ДОКАЗАТЕЛЬСТВА ДЕЛО СЧИТАЕТСЯ МУСОРОМ. Пустое поле разрешено только если relevant: false.\n\n"
             f"ВЕРНИ JSON:\n"
             f'{{ "relevant": true/false, "reasons": ["краткий тезис"], "proof_quote": "цитата" }}'
         )
@@ -841,11 +841,14 @@ class LLMReasonExtractor:
 
         if not isinstance(reasons, list) or not reasons:
             reasons = [self._FALLBACK[0]]
-        valid_reasons = tuple(r for r in reasons if isinstance(r, str) and r.strip())
 
-        # When relevant but no quote, keep relevant but note the absence
+        # Relaxed Logic: If relevant but absolutely no quote or rationale is provided, 
+        # we no longer reject it. Instead, we use a fallback and flag it.
         if is_relevant and not proof_quote:
-            proof_quote = f"{self._NO_QUOTE_PREFIX}: релевантность определена по контексту"
+            # Upgrade to a "Weak" match downstream but don't drop the case
+            proof_quote = "Прямая цитата не найдена в доступных фрагментах (LLM подтвердила релевантность без цитаты)"
+
+        valid_reasons = tuple(r for r in reasons if isinstance(r, str) and r.strip())
 
         return (
             is_relevant,

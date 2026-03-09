@@ -49,8 +49,10 @@ class AnalysisService:
         verifiable_decisions = []
         review_decisions = []
 
+        article_requested = bool(article)
+
         for decision in decisions:
-            if self._is_verifiable(decision):
+            if self._is_verifiable(decision, article_requested):
                 verifiable_decisions.append(decision)
                 outcome = self.normalize_outcome(decision)
                 meaningful_reasons = self._meaningful_reasons(decision.reasons)
@@ -189,17 +191,17 @@ class AnalysisService:
             filtered.append(reason)
         return tuple(filtered)
 
-    def _is_verifiable(self, decision: CaseDecision) -> bool:
+    def _is_verifiable(self, decision: CaseDecision, article_requested: bool = False) -> bool:
         has_validation_metadata = (
             bool(decision.matched_article)
             or bool(decision.evidence_quote)
             or decision.evidence_tier != EvidenceTier.TIER_D_NO_MATCH
         )
         if has_validation_metadata:
-            return decision.validation_confidence in (
-                ConfidenceScore.CONFIRMED,
-                ConfidenceScore.PROBABLE,
-            )
+            allowed = [ConfidenceScore.CONFIRMED, ConfidenceScore.PROBABLE]
+            if article_requested:
+                allowed.append(ConfidenceScore.WEAK)
+            return decision.validation_confidence in allowed
         return decision.confidence_score >= 0.98
 
     def _format_case(self, decision: CaseDecision) -> str:

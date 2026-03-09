@@ -12,8 +12,11 @@ class EvidenceScorer:
             return ConfidenceScore.REJECTED
 
         if outcome == CaseOutcome.UNKNOWN:
-            # If we don't know the outcome, even a Tier A match cannot be Confirmed.
-            # It's weak evidence of practice until outcome is known.
+            # If we don't know the outcome but we have strong evidence of relevance 
+            # (Tier A or B), we should still consider it PROBABLE practice, 
+            # just with an unknown result.
+            if tier in (EvidenceTier.TIER_A_EXPLICIT_MATCH, EvidenceTier.TIER_B_PROBABLE_MATCH):
+                return ConfidenceScore.PROBABLE
             return ConfidenceScore.WEAK
 
         if tier == EvidenceTier.TIER_A_EXPLICIT_MATCH:

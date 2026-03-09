@@ -149,7 +149,12 @@ class KadPipeline:
             validated_records.append(record)
 
             # Only count 'Confirmed' and 'Probable' as totally successful for the UI progress
-            if confidence in (ConfidenceScore.CONFIRMED, ConfidenceScore.PROBABLE):
+            # If an article is requested, we also count 'Weak' matches because they come from KAD search
+            success_thresholds = [ConfidenceScore.CONFIRMED, ConfidenceScore.PROBABLE]
+            if params.article:
+                success_thresholds.append(ConfidenceScore.WEAK)
+
+            if confidence in success_thresholds:
                 validated_count += 1
                 if on_successful:
                     on_successful(validated_count)

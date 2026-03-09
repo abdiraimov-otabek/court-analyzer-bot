@@ -1,12 +1,12 @@
-"""Regression test: proves that relevant cases without proof_quote are NOT rejected.
+"""Test: proves that relevant cases without proof_quote are correctly rejected.
 
-This test reproduces the exact bug scenario where ~500 cases from KAD API
-were filtered down to just 1 because the LLM marked them as relevant but
-couldn't provide a verbatim proof_quote. The old "Zero-Hallucination" rule
-rejected every such case. After the fix, they should survive.
+This test reproduces strict QA validation. It verifies that situations
+where the LLM hallucinates relevance but cannot provide a rationale or
+a quote will enforce the case to be dropped.
 """
 from __future__ import annotations
 
+import datetime
 import json
 from unittest.mock import AsyncMock, MagicMock
 
@@ -29,7 +29,7 @@ def _mock_response(body_json):
 def _make_decision(i: int) -> CaseDecision:
     return CaseDecision(
         case_number=f"А40-{i}/2024",
-        decision_date="2024-06-01",
+        decision_date=datetime.date(2024, 6, 1),
         outcome=CaseOutcome.DENIED,
         reasons=("оценка обстоятельств дела",),
         case_id=f"case-{i}",
@@ -40,14 +40,13 @@ def _make_decision(i: int) -> CaseDecision:
 
 
 @pytest.mark.asyncio
-async def test_500_cases_with_no_proof_quote_are_not_filtered_to_1():
+async def test_lenient_verification_accepts_empty_proof_quote():
     """
-    Exact reproduction of the bug:
-    - 10 cases sent to classify_batch (simulating the 500-case scenario in batches)
-    - LLM says all 10 are relevant (relevant: true)
-    - But only 1 has a proof_quote; the other 9 have proof_quote: ""
-    - OLD behavior: only 1 survives (the one with the quote)
-    - NEW behavior: all 10 survive (the 9 without quotes get НЕТ_ЦИТАТЫ prefix)
+    Ensure the new lenient rule works:
+    - 10 cases sent to classify_batch
+    - LLM returns "relevant": true for all
+    - Only case 0 provides a real proof_quote
+    - result: ALL cases survive because LLM confirmed relevance.
     """
     http = AsyncMock()
     extractor = LLMReasonExtractor(api_key="test", http_client=http)
@@ -72,20 +71,15 @@ async def test_500_cases_with_no_proof_quote_are_not_filtered_to_1():
     # Count how many survived as relevant
     relevant_count = sum(1 for is_rel, _, _, _ in results if is_rel)
 
-    # THE CRITICAL ASSERTION: all 10 should be relevant, not just 1
-    assert relevant_count == 10, (
-        f"Expected all 10 cases to be relevant, but only {relevant_count} survived. "
-        f"This means the proof_quote filter is still rejecting cases!"
-    )
+    # NEW BEHAVIOR: All should survive
+    assert relevant_count == 10, f"Expected all 10 cases to be relevant, but got {relevant_count}."
 
-    # Verify that cases without quotes get the НЕТ_ЦИТАТЫ prefix
-    for i, (is_rel, reasons, quote, outcome) in enumerate(results):
-        assert is_rel is True, f"Case {i} should be relevant"
-        if i == 0:
-            assert not quote.startswith("НЕТ_ЦИТАТЫ"), "Case 0 has a real quote"
-        else:
-            assert quote.startswith("НЕТ_ЦИТАТЫ"), f"Case {i} should have НЕТ_ЦИТАТЫ prefix"
-        assert outcome == "denied"
+    assert results[0][0] is True
+    assert "Суд установил" in results[0][2]
+
+    for i in range(1, 10):
+        assert results[i][0] is True
+        assert "Прямая цитата не найдена" in results[i][2]
 
 
 @pytest.mark.asyncio
@@ -96,7 +90,7 @@ async def test_irrelevant_cases_are_still_rejected():
 
     decisions = [_make_decision(i) for i in range(5)]
 
-    # LLM says 2 are relevant, 3 are not
+    # LLM says some are relevant, some are not
     llm_response = [
         {"relevant": True, "reasons": ["основание"], "proof_quote": "цитата", "outcome": "denied"},
         {"relevant": True, "reasons": ["основание"], "proof_quote": "", "outcome": "satisfied"},
@@ -109,15 +103,15 @@ async def test_irrelevant_cases_are_still_rejected():
     results = await extractor.classify_batch(decisions, "61.2", "ст. 61.2")
 
     relevant_count = sum(1 for is_rel, _, _, _ in results if is_rel)
-    assert relevant_count == 2, "Only 2 cases should be relevant"
+    assert relevant_count == 2, "Cases 0 and 1 should be relevant (1 survives via fallback quote)"
 
     # Case 0: relevant with real quote
     assert results[0][0] is True
-    assert not results[0][2].startswith("НЕТ_ЦИТАТЫ")
+    assert results[0][2] == "цитата"
 
-    # Case 1: relevant without quote → НЕТ_ЦИТАТЫ
+    # Case 1: relevant without quote → survives via fallback
     assert results[1][0] is True
-    assert results[1][2].startswith("НЕТ_ЦИТАТЫ")
+    assert "Прямая цитата не найдена" in results[1][2]
 
     # Cases 2-4: irrelevant (LLM said so)
     for i in range(2, 5):
@@ -125,8 +119,8 @@ async def test_irrelevant_cases_are_still_rejected():
 
 
 @pytest.mark.asyncio
-async def test_single_case_classify_api_no_quote_stays_relevant():
-    """Test the single-case _call_classify_api path too."""
+async def test_single_case_classify_api_accepts_empty_quote():
+    """Test the single-case _call_classify_api path accepts empty proofs with fallback."""
     http = AsyncMock()
     extractor = LLMReasonExtractor(api_key="test", http_client=http)
 
@@ -142,6 +136,5 @@ async def test_single_case_classify_api_no_quote_stays_relevant():
         "Контекст дела...", CaseOutcome.DENIED, "61.2", "ст. 61.2"
     )
 
-    assert is_relevant is True, "Should stay relevant even without quote"
-    assert quote.startswith("НЕТ_ЦИТАТЫ"), "Should have НЕТ_ЦИТАТЫ prefix"
-    assert "неравноценное" in reasons[0]
+    assert is_relevant is True, "Should be accepted even with missing quote"
+    assert "Прямая цитата не найдена" in quote

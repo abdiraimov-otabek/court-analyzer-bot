@@ -208,9 +208,12 @@ async def _run_analysis(message: Message, user_id: UserId, query_text: str) -> N
     set_request_context(request_id, user_hash, "telegram_bot")
     settings = container.settings_service.get_settings()
     processor = container.build_request_processor()
+    async def _send_answer(text: str) -> None:
+        await message.answer(text)
+
     slow_alert_task = asyncio.create_task(
         send_slow_alert_if_needed(
-            send_answer=message.answer,
+            send_answer=_send_answer,
             delay_seconds=settings.slow_alert_minutes * 60,
         )
     )

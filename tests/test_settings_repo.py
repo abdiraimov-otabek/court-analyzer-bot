@@ -17,7 +17,7 @@ def test_settings_repository_roundtrip(tmp_path):
     assert default_settings.allow_all_users is False
     assert default_settings.unknown_outcome_threshold_percent == 35
     assert default_settings.court_mismatch_threshold_percent == 20
-    assert default_settings.min_known_outcomes == 50
+    assert default_settings.min_known_outcomes == 5
     assert default_settings.send_partial_file_on_quality_fail is True
 
     updated = Settings(

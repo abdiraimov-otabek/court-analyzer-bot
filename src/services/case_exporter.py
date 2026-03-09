@@ -3,11 +3,14 @@ from __future__ import annotations
 from io import BytesIO
 
 from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.worksheet import Worksheet
 
 
 def build_cases_excel(case_list: str) -> bytes:
     workbook = Workbook()
     sheet = workbook.active
+    assert isinstance(sheet, Worksheet)
     sheet.title = "Cases"
 
     headers = [
@@ -72,7 +75,7 @@ def build_cases_excel(case_list: str) -> bytes:
     # Column widths
     column_widths = [16, 12, 16, 30, 40, 30, 60, 35, 40]
     for i, width in enumerate(column_widths):
-        col_letter = sheet.cell(row=1, column=i + 1).column_letter
+        col_letter = get_column_letter(i + 1)
         sheet.column_dimensions[col_letter].width = width
 
     output = BytesIO()

@@ -1,7 +1,6 @@
 import asyncio
-from datetime import date, datetime
+from datetime import datetime
 
-from src.domain.entities import CaseDecision, CaseOutcome
 from src.domain.settings import Settings
 from src.services.kad_client import KadInvalidResponseError, ParserApiKadClient
 

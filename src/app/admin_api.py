@@ -138,7 +138,9 @@ async def require_admin_session(request: Request) -> None:
             in request.headers.get("Content-Type", "")
         ):
             form_data = await request.form()
-            csrf_token = form_data.get("csrf_token")
+            csrf_token_raw = form_data.get("csrf_token")
+            if isinstance(csrf_token_raw, str):
+                csrf_token = csrf_token_raw
 
         if not csrf_cookie or csrf_cookie != csrf_token:
             raise HTTPException(status_code=403, detail="CSRF token mismatch")
@@ -274,7 +276,7 @@ async def logout(request: Request):
 @app.get(
     "/admin", response_class=HTMLResponse, dependencies=[Depends(require_admin_session)]
 )
-def admin_ui(request: Request) -> HTMLResponse:
+def admin_ui(request: Request) -> Response:
     if not _validate_session(request.cookies.get("admin_session")):
         return RedirectResponse(url="/admin/login", status_code=303)
     settings = container.settings_service.get_settings()

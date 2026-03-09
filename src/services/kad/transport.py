@@ -51,7 +51,7 @@ class KadTransport:
         url = f"{self.base_url}{path}"
         rate_limit_attempts = 0
         unavailable_attempts = 0
-        last_error = None
+        last_error: Exception | None = None
 
         for _ in range(5):
             try:
@@ -112,7 +112,7 @@ class KadTransport:
         unavailable_attempts = 0
         retry_count = 0
         had_transient = False
-        last_error = None
+        last_error: Exception | None = None
 
         for _ in range(5):
             try:

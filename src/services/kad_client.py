@@ -289,7 +289,7 @@ class ParserApiKadClient:
         filtered_by_article = 0
         filtered_by_llm_relevance = 0
         court_compared_cases = 0
-        decisions: list[CaseDecision] = []
+        fetched_decisions: list[CaseDecision] = []
         details_start = time.perf_counter()
         unavailable_failures = 0
         rate_limit_failures = 0
@@ -343,7 +343,7 @@ class ParserApiKadClient:
                     if on_progress:
                         on_progress(attempted_cases)
                     try:
-                        outcome = await task
+                        fetch_outcome = await task
                     except KadUnavailableError:
                         unavailable_failures += 1
                         target_concurrency = max(
@@ -382,8 +382,8 @@ class ParserApiKadClient:
                             attempted_cases=attempted_cases,
                         )
                         continue
-                    if outcome.decision is not None:
-                        decision = outcome.decision
+                    if fetch_outcome.decision is not None:
+                        decision = fetch_outcome.decision
                         if not self._matches_query_scope(decision, params):
                             filtered_by_article += 1
                             continue
@@ -400,16 +400,16 @@ class ParserApiKadClient:
                                 continue
                             if not actual_court_tokens and params.court:
                                 decision = replace(decision, court_name=params.court)
-                        decisions.append(decision)
+                        fetched_decisions.append(decision)
                         successful_cases += 1
                         if on_successful:
                             on_successful(successful_cases)
-                    if outcome.retry_count:
-                        retry_count += outcome.retry_count
+                    if fetch_outcome.retry_count:
+                        retry_count += fetch_outcome.retry_count
                         if on_retry:
                             on_retry(retry_count)
 
-                    if outcome.had_transient_error:
+                    if fetch_outcome.had_transient_error:
                         target_concurrency = max(
                             min_concurrency, target_concurrency - 2
                         )
@@ -477,7 +477,7 @@ class ParserApiKadClient:
             self._llm_reason_extractor.reset_fetch_budget()
         self._current_article = None
         return FetchDecisionsResult(
-            decisions=decisions,
+            decisions=fetched_decisions,
             stats=FetchStats(
                 attempted_cases=attempted_cases,
                 successful_cases=successful_cases,
@@ -717,6 +717,8 @@ class ParserApiKadClient:
             if should_cancel and should_cancel():
                 return index, None
             d = decisions[index]
+            if self._llm_reason_extractor is None:
+                return index, d
             (
                 reasons,
                 llm_outcome,
@@ -871,9 +873,17 @@ class ParserApiKadClient:
         if params.inn_or_name:
             query["Inn"] = params.inn_or_name
 
-        # Priority 1: full_article (e.g. "ст. 723 ГК РФ") — best for full-text precision
-        # Priority 2: article (e.g. "723") — fallback
-        search_text = params.full_article or params.article
+        # Priority 1: full_article (e.g. "ст. 134 Закона о банкротстве") — best for full-text precision
+        # Priority 2: article with "ст. " prefix — avoids false positives when searching plain numbers.
+        #   Searching "134" would match "134 дня", "пункт 134", etc.
+        #   Searching "ст. 134" narrows results to actual article references.
+        if params.full_article:
+            search_text: str | None = params.full_article
+        elif params.article and "." not in params.article:
+            # Plain integer article (e.g. "134", "100") — prefix to be precise
+            search_text = f"ст. {params.article}"
+        else:
+            search_text = params.article
         if search_text:
             query["Text"] = search_text
 
@@ -1487,7 +1497,10 @@ class ParserApiKadClient:
 
         # Guardrail: If regex already found a quarter, and LLM output differs or is null,
         # we trust the regex more (it's "cheap" and deterministic).
-        llm_quarter = llm_params.get("quarter")
+        llm_quarter_raw = llm_params.get("quarter")
+        llm_quarter: int | None = int(llm_quarter_raw) if llm_quarter_raw is not None and str(llm_quarter_raw).isdigit() else None
+
+        final_quarter: int | None = None
         if params._regex_quarter and (
             not llm_quarter or str(llm_quarter) != str(params._regex_quarter)
         ):
@@ -1511,23 +1524,27 @@ class ParserApiKadClient:
             date_from, date_to = self._parser._build_period(year, final_quarter)
 
         llm_court = llm_params.get("court")
+        final_court: str | None = None
         if llm_court:
             # Try to normalize LLM output using our regex-based rules
-            normalized_llm_court = self._parser._extract_court(llm_court)
-            final_court = normalized_llm_court or llm_court
+            normalized_llm_court = self._parser._extract_court(str(llm_court))
+            final_court = normalized_llm_court or str(llm_court)
         else:
             final_court = params.court
 
         # Normalize case types to KAD API format (Latin: G/B/A).
         type_map = {"G": "G", "B": "B", "A": "A", "Г": "G", "Б": "B", "А": "A"}
         llm_type = llm_params.get("case_type")
+        mapped_type: str | None = None
+        if isinstance(llm_type, str):
+            mapped_type = type_map.get(llm_type, llm_type)
 
         # Defensive: if the parser already identified Bankruptcy (B) for Article 61.2,
         # don't let the LLM downgrade it to General (G).
         if params.case_type == "B":
-            final_type = "B"
+            final_type: str | None = "B"
         else:
-            final_type = type_map.get(llm_type, llm_type) or params.case_type
+            final_type = mapped_type or params.case_type
 
         # Merge with regex results, preferring LLM for these fields
         refined = replace(

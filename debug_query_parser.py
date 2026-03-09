@@ -53,18 +53,27 @@ class QueryParser:
 
     def _extract_quarter(self, text: str) -> int | None:
         lowered = text.lower()
-        if "1 кварт" in lowered or "i кварт" in lowered: return 1
-        if "2 кварт" in lowered or "ii кварт" in lowered: return 2
-        if "3 кварт" in lowered or "iii кварт" in lowered: return 3
-        if "4 кварт" in lowered or "iv кварт" in lowered: return 4
+        if "1 кварт" in lowered or "i кварт" in lowered:
+            return 1
+        if "2 кварт" in lowered or "ii кварт" in lowered:
+            return 2
+        if "3 кварт" in lowered or "iii кварт" in lowered:
+            return 3
+        if "4 кварт" in lowered or "iv кварт" in lowered:
+            return 4
         return None
 
     def _build_period(self, year: str | None, quarter: int | None) -> tuple[str | None, str | None]:
-        if not year: return None, None
-        if not quarter: return f"{year}-01-01", f"{year}-12-31"
-        if quarter == 1: return f"{year}-01-01", f"{year}-03-31"
-        if quarter == 2: return f"{year}-04-01", f"{year}-06-30"
-        if quarter == 3: return f"{year}-07-01", f"{year}-09-30"
+        if not year:
+            return None, None
+        if not quarter:
+            return f"{year}-01-01", f"{year}-12-31"
+        if quarter == 1:
+            return f"{year}-01-01", f"{year}-03-31"
+        if quarter == 2:
+            return f"{year}-04-01", f"{year}-06-30"
+        if quarter == 3:
+            return f"{year}-07-01", f"{year}-09-30"
         return f"{year}-10-01", f"{year}-12-31"
 
     def _extract_inn(self, text: str) -> str | None:
@@ -87,7 +96,8 @@ class QueryParser:
 
     def _extract_article(self, text: str) -> str | None:
         match = self._article_pattern.search(text)
-        if match: return match.group(1)
+        if match:
+            return match.group(1)
         match = self._plain_article_pattern.search(text)
         return match.group(1) if match else None
 
@@ -100,8 +110,10 @@ class QueryParser:
         # ст.61.2/61.3 are bankruptcy
         if article and (article.startswith("61.2") or article.startswith("61.3")):
             return "B"
-        if "банкрот" in lowered: return "B"
-        if "административ" in lowered: return "A"
+        if "банкрот" in lowered:
+            return "B"
+        if "административ" in lowered:
+            return "A"
         return "G"
 
 parser = QueryParser()

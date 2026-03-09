@@ -54,13 +54,23 @@ class ArticleValidator:
                 fallback_quote,
             )
 
-        # 3. Weak conceptual matching / Search Engine Hit ONLY (Tier C)
-        # No exact or conceptual match in our parsing, but we know the search engine found *something*
-        # (Though we can't confidently show a quote).
+        # 3. LLM-confirmed relevance (Tier B)
+        # If the LLM confirmed relevance but we don't have an exact match in the text,
+        # we trust the LLM and upgrade this to Tier B.
+        if "llm подтвердила релевантность" in quote_lower:
+            return (
+                EvidenceTier.TIER_B_PROBABLE_MATCH,
+                f"LLM: {self.target_article}",
+                llm_proof_quote,
+            )
+
+        # 4. Search Engine Hit ONLY (Tier C fallback)
+        # Since we query KAD's full-text search with the article, if it's returned here, 
+        # it might exist in the document text, but we haven't found it in the snippets.
         return (
             EvidenceTier.TIER_C_WEAK_MATCH,
-            "Слабое совпадение (только метаданные)",
-            "Нет прямой цитаты",
+            f"Поиск по {self.target_article}",
+            "Прямая цитата не найдена в доступных фрагментах",
         )
 
     def _has_exact_match(self, text: str) -> bool:
@@ -76,6 +86,10 @@ class ArticleValidator:
 
         if "." in compact:  # e.g., 61.2
             patterns.append(rf"\b{compact}\b")
+        else:
+            # For general articles like "168", look for "168 ГК" or "168-й статьи"
+            patterns.append(rf"\b{compact}\s*(?:гк|гпк|апк|ук|фз|закон)\b")
+            patterns.append(rf"\b{compact}-й\s+стать[ьяи]")
 
         if self.target_paragraph:
             # Paragraph matching is risky, but we try to find them close to each other
@@ -89,9 +103,9 @@ class ArticleValidator:
         if not self.target_article:
             return False
 
-        # Hardcode conceptual keywords for the most critical articles to prevent missing cases
-        # while keeping confidence downgraded to Tier B.
-        if "61.2" in self.target_article:
+        if not self.target_article:
+            return False
+        if "61.2" in self.target_article or "61.1" in self.target_article:
             return any(
                 k in text
                 for k in [
@@ -126,6 +140,8 @@ class ArticleValidator:
         return "N/A"
 
     def _extract_conceptual_snippet(self, text: str) -> str:
+        if not self.target_article:
+            return "N/A"
         if "61.2" in self.target_article:
             match = re.search(
                 r".{0,60}(?:подозрительная сделка|оспаривание сделки|недействительной сделки).{0,60}",
@@ -133,7 +149,7 @@ class ArticleValidator:
             )
             if match:
                 return "..." + match.group(0).strip().replace("\n", " ") + "..."
-        if "61.3" in self.target_article:
+        if self.target_article and "61.3" in self.target_article:
             match = re.search(
                 r".{0,60}(?:сделка с предпочтением|оказание предпочтения).{0,60}", text
             )

@@ -348,7 +348,7 @@ class WeakEvidenceArticleKadClient(KadClient):
         )
 
 
-def test_request_processor_rejects_all_weak_article_matches(tmp_path):
+def test_request_processor_accepts_search_engine_article_matches(tmp_path):
     settings = Settings(
         max_cases=80,
         max_documents_per_case=5,
@@ -377,13 +377,11 @@ def test_request_processor_rejects_all_weak_article_matches(tmp_path):
         hashing_service=HashingService(salt="pepper"),
     )
 
-    with pytest.raises(InsufficientQualityError) as exc:
-        asyncio.run(processor.process(user_id, "ст 61.2 2025", settings))
-
-    assert exc.value.reason_code == "no_verified_cases"
-    assert exc.value.verified_cases == 0
-    assert "не найдено ни одного подтвержденного" in exc.value.summary.lower()
-    assert exc.value.case_list
+    # With the new behavior, we trust the KAD API search engine, so we expect SUCCESS,
+    # as the fallback tier in ArticleValidator is now TIER_B_PROBABLE_MATCH.
+    result = asyncio.run(processor.process(user_id, "ст 61.2 2025", settings))
+    assert result is not None
+    assert "Всего верифицировано: 80" in result.summary
 
 
 class EmptyResultKadClient(KadClient):

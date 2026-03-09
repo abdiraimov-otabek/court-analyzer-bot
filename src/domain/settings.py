@@ -18,7 +18,7 @@ class Settings:
     allow_all_users: bool = False
     unknown_outcome_threshold_percent: int = 35
     court_mismatch_threshold_percent: int = 20
-    min_known_outcomes: int = 50
+    min_known_outcomes: int = 5
     send_partial_file_on_quality_fail: bool = True
 
 
@@ -36,6 +36,6 @@ def default_settings(now: datetime) -> Settings:
         allow_all_users=False,
         unknown_outcome_threshold_percent=35,
         court_mismatch_threshold_percent=20,
-        min_known_outcomes=50,
+        min_known_outcomes=5,
         send_partial_file_on_quality_fail=True,
     )

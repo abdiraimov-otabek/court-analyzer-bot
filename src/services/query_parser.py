@@ -7,6 +7,19 @@ from src.domain.kad_models import SearchParams
 # Abbreviations that must stay ALL-CAPS inside court name fragments.
 _COURT_CAPS = frozenset({"АО", "НАО", "ХМАО", "ЯНАО", "ЧАО", "ЕАО", "ЛО", "МО"})
 
+# Articles that belong to Закон о банкротстве (127-ФЗ) — always triggers case_type=B.
+# Includes both ст.61.x series and other key bankruptcy articles.
+_BANKRUPTCY_LAW_ARTICLES = frozenset({
+    "61.1", "61.2", "61.3", "61.4", "61.6", "61.7", "61.8", "61.9",
+    "10",    # злоупотребление в банкротстве
+    "100",   # установление требований
+    "134",   # очерёдность удовлетворения требований
+    "138",   # требования залогодержателей
+    "142",   # расчёты с кредиторами
+    "213.11",
+    "213.32",
+})
+
 # Generic geographic nouns that are lowercase in Russian court names.
 _COURT_LOWERCASE_WORDS = frozenset({
     "и",
@@ -143,9 +156,10 @@ class QueryParser:
 
     def _extract_case_type(self, text: str, article: str | None = None) -> str | None:
         text_lower = text.lower()
-        if article and str(article).startswith("61."):
+        # Articles from Закон о банкротстве (127-ФЗ) always mean bankruptcy proceedings
+        if article and (article in _BANKRUPTCY_LAW_ARTICLES or str(article).startswith("61.")):
             return "B"
-        if "банкрот" in text_lower:
+        if "банкрот" in text_lower or "несостоятельност" in text_lower:
             return "B"
         if "административ" in text_lower:
             return "A"
