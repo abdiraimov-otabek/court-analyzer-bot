@@ -113,22 +113,15 @@ class AnalysisService:
                 reason_confidence=avg_reason_conf,
             )
         else:
-            article_line = f"Статья: {article} | " if article else ""
-            pagination_line = ""
-            if total_pages > 1:
-                pagination_line = f"Найдено {total_cases_found} дел ({total_pages} стр.). Обработано {total_all} дел. "
+            summary = "Детальная сводка не сформирована."
 
-            quality_note = ""
-            if avg_reason_conf < 0.6:
-                quality_note = "\n⚠️ Низкая уверенность в основаниях: часть дел классифицирована без прямых цитат из судебных актов."
-
-            summary = (
-                "СВОДКА ПО ЗАПРОСУ:\n"
-                f"Суд: {court} | Период: {period} | {article_line}{pagination_line}Всего верифицировано: {total_verifiable} (из {total_all})\n"
-                f"Статистика: {stats}\n"
-                f"Топ-2 основания для удовлетворения: {top_satisfied}\n"
-                f"Топ-2 основания для отказа: {top_denied}{quality_note}"
-            )
+        article_line = f" | Статья: {article}" if article else ""
+        header = (
+            "СВОДКА ПО ЗАПРОСУ:\n"
+            f"Суд: {court} | Период: {period}{article_line} | Всего дел: {total_verifiable}\n"
+            f"Статистика: {stats}\n\n"
+        )
+        summary = header + summary
 
         case_list = self.build_case_list(verifiable_decisions)
         if review_decisions:

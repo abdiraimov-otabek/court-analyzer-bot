@@ -19,7 +19,7 @@ from src.infrastructure.sqlite import SqliteConnection
 from src.services.access_control import AccessControlList
 from src.services.active_requests import ActiveRequestRegistry
 from src.services.hashing import HashingService
-from src.services.kad_client import ParserApiKadClient
+from src.services.postgres_kad_client import PostgresKadClient
 from src.services.llm_reason_extractor import LLMReasonExtractor
 from src.services.quarter_selection import QuarterSelectionRegistry
 from src.services.rate_limit import HourlyRateLimiter
@@ -30,6 +30,8 @@ from src.services.settings_service import SettingsService
 class Container:
     def __init__(self, config: AppConfig) -> None:
         self.config = config
+        from src.app.config import initialize_db
+        initialize_db(config)
         self.connection = SqliteConnection(config.database_path)
         self.settings_repository = SettingsRepository(self.connection)
         self.settings_service = SettingsService(self.settings_repository)
@@ -53,7 +55,7 @@ class Container:
         limits = httpx.Limits(max_connections=100, max_keepalive_connections=50)
         self.sync_http_client = httpx.Client(timeout=30, limits=limits)
         self.async_http_client = httpx.AsyncClient(timeout=30, limits=limits)
-        self._kad_client: ParserApiKadClient | None = None
+        self._kad_client: PostgresKadClient | None = None
         self._llm_extractor: LLMReasonExtractor | None = None
 
     def build_bot_logic(self) -> BotLogic:
@@ -78,20 +80,13 @@ class Container:
             hashing_service=self._build_hashing_service(),
         )
 
-    def _get_kad_client(self) -> ParserApiKadClient:
+    def _get_kad_client(self) -> PostgresKadClient:
         if self._kad_client is None:
             self._kad_client = self._build_kad_client()
         return self._kad_client
 
-    def _build_kad_client(self) -> ParserApiKadClient:
-        if not self.config.kad_api_base_url or not self.config.kad_api_key:
-            raise RuntimeError("KAD API config is missing")
-        return ParserApiKadClient(
-            base_url=self.config.kad_api_base_url,
-            api_key=self.config.kad_api_key,
-            sync_http_client=self.sync_http_client,
-            async_http_client=self.async_http_client,
-            details_cache_repository=self.case_details_cache_repository,
+    def _build_kad_client(self) -> PostgresKadClient:
+        return PostgresKadClient(
             llm_reason_extractor=self._get_llm_reason_extractor(),
         )
 

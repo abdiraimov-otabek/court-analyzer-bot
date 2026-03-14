@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+*.db
+*.log
+.git/
+.antigravity/
+brain/
+*.xlsx
+/tmp/

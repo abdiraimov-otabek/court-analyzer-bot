@@ -289,41 +289,17 @@ class RequestProcessor:
             article=metadata.article,
             total_pages=fetch_result_stats.total_pages,
             total_cases_found=fetch_result_stats.total_cases_found,
-            include_narrative_summary=quality_reason is None,
+            include_narrative_summary=True,
         )
         build_duration_ms = int((datetime.now() - build_start).total_seconds() * 1000)
+        # Quality check logging remains for internal monitoring, but we no longer block the response
         if quality_reason is not None:
             log_event(
                 self._logger,
-                "analysis.quality_failed",
+                "analysis.quality_note",
                 reason_code=quality_reason,
                 total_cases=len(decisions),
                 verified_cases=len(verifiable_decisions),
-                known_cases=known_cases,
-                unknown_cases=unknown_cases,
-                quote_backed_cases=quote_backed_cases,
-                unknown_share=round(unknown_share, 4),
-                court_mismatch_share=round(court_mismatch_share, 4),
-            )
-            raise InsufficientQualityError(
-                reason_code=quality_reason,
-                total_cases=len(decisions),
-                verified_cases=len(verifiable_decisions),
-                known_cases=known_cases,
-                unknown_cases=unknown_cases,
-                quote_backed_cases=quote_backed_cases,
-                unknown_share=unknown_share,
-                court_mismatch_share=court_mismatch_share,
-                summary=self._build_quality_warning(
-                    reason_code=quality_reason,
-                    total_cases=len(decisions),
-                    verified_cases=len(verifiable_decisions),
-                    known_cases=known_cases,
-                    unknown_cases=unknown_cases,
-                    quote_backed_cases=quote_backed_cases,
-                    article_requested=article_requested,
-                ),
-                case_list=result.case_list,
             )
 
         try:
