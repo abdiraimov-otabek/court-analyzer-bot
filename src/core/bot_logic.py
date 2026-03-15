@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import re
 from dataclasses import dataclass
@@ -60,7 +62,7 @@ class BotLogic:
     def handle_message(self, user_id: UserId, text: str, now: datetime) -> list[str]:
         if text == "/start":
             return [
-                "Привет! Я помогу проанализировать судебные акты из КАД. "
+                "Привет! Я помогу проанализировать судебные акты из база данных. "
                 "Укажите в запросе суд и период. "
                 "Пример: 'Практика по статье 61.2 Закона о банкротстве в АС Москвы за 2024 год'."
             ]
@@ -78,9 +80,16 @@ class BotLogic:
                 return ["Нет активного запроса."]
             if active.cancelled:
                 return ["Запрос отменяется."]
-            if active.phase == "counting":
+            if active.phase in {"queued", "counting", "estimating_scope"}:
                 return ["Оцениваю объем данных..."]
-            if active.phase == "collecting":
+            if active.phase in {
+                "collecting",
+                "searching_ras",
+                "enriching_metadata",
+                "selecting_documents",
+                "fetching_html",
+                "extracting",
+            }:
                 return [
                     f"подбираю дела для анализа, найдено {active.collected_cases} из {active.total_cases} дел."
                 ]
@@ -100,6 +109,7 @@ class BotLogic:
                 return ["Запрос отменен."]
             if active is None:
                 return ["Нет активного запроса."]
+            self._active_requests.set_phase(user_id, "cancelled")
             self._active_requests.cancel(user_id)
             return ["Запрос отменен."]
 
@@ -120,7 +130,7 @@ class BotLogic:
             return ["Превышен лимит 10 запросов в час. Попробуйте позже."]
 
         return self._start_query(
-            user_id=user_id, raw_query=text, include_ack=True, apply_rate_limit=False
+            user_id=user_id, raw_query=text, include_ack=True
         )
 
     def pre_validate(
@@ -149,28 +159,44 @@ class BotLogic:
                 pending_quarter.base_query, choice
             )
             query = QueryText(quarter_query)
-            started = self._active_requests.start(
-                user_id, query_text=query.value, total_cases=0, phase="counting"
+            started = self._active_requests.start_or_reuse(
+                user_id=user_id,
+                request_id=self._build_request_id(query.value, settings),
+                query_text=query.value,
+                total_cases=0,
+                phase="queued",
             )
-            if not started:
+            if started.status == "duplicate":
+                return [self._build_duplicate_status_message(started.active_request)]
+            if started.status != "started":
                 return ["У вас уже есть активный запрос. Дождитесь его завершения."]
             return PreValidateResult(query_text=query.value, is_quarter_selection=True)
-
-        if self._active_requests.get(user_id) is not None:
-            return ["У вас уже есть активный запрос. Дождитесь его завершения."]
-
-        if not self._rate_limiter.allow(user_id, now):
-            return ["Превышен лимит 10 запросов в час. Попробуйте позже."]
 
         validation = self._query_validator.validate(text)
         if not validation.is_valid:
             return [self._build_validation_message(validation)]
 
         query = QueryText(text)
-        started = self._active_requests.start(
-            user_id, query_text=query.value, total_cases=0, phase="counting"
+        request_id = self._build_request_id(query.value, settings)
+        active = self._active_requests.get(user_id)
+        if active is not None:
+            if active.request_id == request_id:
+                return [self._build_duplicate_status_message(active)]
+            return ["У вас уже есть активный запрос. Дождитесь его завершения."]
+
+        if not self._rate_limiter.allow(user_id, now):
+            return ["Превышен лимит 10 запросов в час. Попробуйте позже."]
+
+        started = self._active_requests.start_or_reuse(
+            user_id=user_id,
+            request_id=request_id,
+            query_text=query.value,
+            total_cases=0,
+            phase="queued",
         )
-        if not started:
+        if started.status == "duplicate":
+            return [self._build_duplicate_status_message(started.active_request)]
+        if started.status != "started":
             return ["У вас уже есть активный запрос. Дождитесь его завершения."]
         return PreValidateResult(query_text=query.value, is_quarter_selection=False)
 
@@ -196,7 +222,7 @@ class BotLogic:
         if count == 0:
             self._active_requests.finish(user_id)
             return [
-                "По вашему запросу в КАД не найдено подходящих судебных актов. "
+                "По вашему запросу в база данных не найдено подходящих судебных актов. "
                 "Попробуйте изменить формулировку."
             ], False
 
@@ -236,7 +262,6 @@ class BotLogic:
             user_id=user_id,
             raw_query=quarter_query,
             include_ack=False,
-            apply_rate_limit=False,
             allow_cap_on_overflow=True,
         )
 
@@ -245,25 +270,27 @@ class BotLogic:
         user_id: UserId,
         raw_query: str,
         include_ack: bool,
-        apply_rate_limit: bool,
         allow_cap_on_overflow: bool = False,
     ) -> list[str]:
-        if apply_rate_limit and not self._rate_limiter.allow(user_id, datetime.now()):
-            return ["Превышен лимит 10 запросов в час. Попробуйте позже."]
-
         validation = self._query_validator.validate(raw_query)
         if not validation.is_valid:
             return [self._build_validation_message(validation)]
 
         query = QueryText(raw_query)
-        started = self._active_requests.start(
-            user_id, query_text=query.value, total_cases=0, phase="counting"
+        settings = self._settings_provider.get_settings()
+        started = self._active_requests.start_or_reuse(
+            user_id=user_id,
+            request_id=self._build_request_id(query.value, settings),
+            query_text=query.value,
+            total_cases=0,
+            phase="estimating_scope",
         )
-        if not started:
+        if started.status == "duplicate":
+            return [self._build_duplicate_status_message(started.active_request)]
+        if started.status != "started":
             return ["У вас уже есть активный запрос. Дождитесь его завершения."]
         ack = "Принял. Оцениваю объем данных..."
         try:
-            settings = self._settings_provider.get_settings()
             count_start = datetime.now()
             count = self._count_provider.count_cases(query.value, settings)
             count_duration_ms = int(
@@ -284,7 +311,7 @@ class BotLogic:
         if count == 0:
             self._active_requests.finish(user_id)
             messages = [
-                "По вашему запросу в КАД не найдено подходящих судебных актов. "
+                "По вашему запросу в база данных не найдено подходящих судебных актов. "
                 "Попробуйте изменить формулировку."
             ]
             if include_ack:
@@ -344,10 +371,30 @@ class BotLogic:
         return f"{base_query} {quarter_label}"
 
     def _build_validation_message(self, validation: QueryValidationResult) -> str:
+        if validation.missing_court and validation.missing_period and validation.missing_law:
+            return (
+                "Для запуска анализа укажите суд, период и закон/кодекс. "
+                "Пример: 'Практика по статье 61.2 Закона о банкротстве в АС Москвы за 2024 год'."
+            )
         if validation.missing_court and validation.missing_period:
             return (
                 "Для запуска анализа укажите суд и период (год или квартал+год). "
                 "Пример: 'Практика по статье 61.2 Закона о банкротстве в АС Москвы за 2024 год'."
+            )
+        if validation.missing_law and validation.missing_court:
+            return (
+                "Уточните закон/кодекс и суд для анализа. "
+                "Пример: '... по ст. 723 ГК РФ в АС Москвы за 2024 год'."
+            )
+        if validation.missing_law and validation.missing_period:
+            return (
+                "Уточните закон/кодекс и период анализа. "
+                "Пример: '... по ст. 723 ГК РФ за 2024 год' или '... по ст. 61.3 Закона о банкротстве 2 квартал 2024'."
+            )
+        if validation.missing_law:
+            return (
+                "Уточните закон или кодекс для статьи. "
+                "Пример: '... по ст. 723 ГК РФ ...' или '... по ст. 61.2 Закона о банкротстве ...'."
             )
         if validation.missing_court:
             return (
@@ -357,4 +404,39 @@ class BotLogic:
         return (
             "Уточните период анализа (год или квартал+год). "
             "Пример: '... за 2024 год' или '... 2 квартал 2024'."
+        )
+
+    def _build_request_id(self, query_text: str, settings: Settings) -> str:
+        raw = json.dumps(
+            {
+                "query_text": query_text,
+                "max_cases": settings.max_cases,
+                "max_documents_per_case": settings.max_documents_per_case,
+                "max_pages": settings.max_pages,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+    def _build_duplicate_status_message(self, active) -> str:
+        if active is None:
+            return "Идентичный запрос уже выполняется."
+        if active.phase in {"queued", "counting", "estimating_scope"}:
+            return "Идентичный запрос уже выполняется. Оцениваю объем данных..."
+        if active.phase in {
+            "collecting",
+            "searching_ras",
+            "enriching_metadata",
+            "selecting_documents",
+            "fetching_html",
+            "extracting",
+        }:
+            return (
+                "Идентичный запрос уже выполняется. "
+                f"Подбираю дела для анализа: {active.collected_cases} из {active.total_cases}."
+            )
+        return (
+            "Идентичный запрос уже выполняется. "
+            f"Анализирую: {active.processed_cases} из {active.total_cases}."
         )

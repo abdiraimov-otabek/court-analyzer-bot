@@ -133,6 +133,12 @@ components:
         max_pages:
           type: integer
           example: 20
+        max_llm_calls_per_request:
+          type: integer
+          example: 50
+        max_analysis_text_length:
+          type: integer
+          example: 50000
         fetch_concurrency_min:
           type: integer
           example: 6
@@ -148,6 +154,36 @@ components:
         allow_all_users:
           type: boolean
           example: false
+        unknown_outcome_threshold_percent:
+          type: integer
+          example: 35
+        court_mismatch_threshold_percent:
+          type: integer
+          example: 20
+        min_known_outcomes:
+          type: integer
+          example: 5
+        send_partial_file_on_quality_fail:
+          type: boolean
+          example: true
+        pdf_required_for_article_queries:
+          type: boolean
+          example: true
+        enable_ocr_fallback:
+          type: boolean
+          example: true
+        candidate_pool_multiplier:
+          type: integer
+          example: 4
+        max_pdf_pages_per_case:
+          type: integer
+          example: 20
+        pdf_fetch_timeout_seconds:
+          type: integer
+          example: 45
+        allow_law_inference:
+          type: boolean
+          example: true
         analysis_prompt:
           type: string
           example: "Сформируй статистику по результатам рассмотрения..."
@@ -155,11 +191,23 @@ components:
         - max_cases
         - max_documents_per_case
         - max_pages
+        - max_llm_calls_per_request
+        - max_analysis_text_length
         - fetch_concurrency_min
         - fetch_concurrency_max
         - slow_alert_minutes
         - details_cache_ttl_seconds
         - allow_all_users
+        - unknown_outcome_threshold_percent
+        - court_mismatch_threshold_percent
+        - min_known_outcomes
+        - send_partial_file_on_quality_fail
+        - pdf_required_for_article_queries
+        - enable_ocr_fallback
+        - candidate_pool_multiplier
+        - max_pdf_pages_per_case
+        - pdf_fetch_timeout_seconds
+        - allow_law_inference
         - analysis_prompt
     AllowedUser:
       type: object
@@ -175,6 +223,9 @@ components:
         telegram_id:
           type: string
           example: "123456789"
+        request_id:
+          type: string
+          example: "9f2d6a5b3d5d6f4e"
         phase:
           type: string
           example: analyzing

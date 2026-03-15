@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src.domain.entities import CaseDecision, CaseOutcome
+from src.domain.case_models import SearchParams
 from src.services.llm_reason_extractor import LLMReasonExtractor
 
 
@@ -463,3 +464,120 @@ async def test_classify_batch_pads_missing_items_from_llm_response():
     assert results[0][0] is True
     # Padded entries must keep cases relevant to avoid catastrophic data loss
     assert all(is_rel for is_rel, *_ in results)
+
+
+@pytest.mark.asyncio
+async def test_choose_decisive_pdf_uses_fast_model_and_selected_index():
+    http = AsyncMock()
+    http.post = AsyncMock(
+        return_value=_mock_response(
+            _api_body(json.dumps({"selected_index": 2, "reason": "Это финальное решение"}, ensure_ascii=False))
+        )
+    )
+    extractor = _make_extractor(http_client=http)
+    decision = _make_decision()
+    params = SearchParams(
+        inn_or_name=None,
+        inn_type=None,
+        date_from="2025-01-01",
+        date_to="2025-03-31",
+        court="АС города Москвы",
+        case_type=None,
+        case_number=None,
+        article="723",
+        full_article="ст. 723 ГК РФ",
+        law_family="ГК РФ",
+        law_display_name="ГК РФ",
+    )
+    candidates = [
+        {"name": "Исковое заявление", "url": "https://example.com/1.pdf", "date": "2025-01-10", "category": "procedural_act"},
+        {"name": "Решение суда", "url": "https://example.com/2.pdf", "date": "2025-02-01", "category": "merits_act"},
+    ]
+
+    selected = await extractor.choose_decisive_pdf(
+        decision=decision,
+        params=params,
+        candidates=candidates,
+    )
+
+    assert selected == candidates[1]
+    assert http.post.call_count == 1
+    assert http.post.call_args.kwargs["json"]["model"] == "google/gemini-2.5-flash"
+
+
+@pytest.mark.asyncio
+async def test_analyze_pdf_case_rejects_relevant_answer_without_quote():
+    http = AsyncMock()
+    http.post = AsyncMock(
+        return_value=_mock_response(
+            _api_body(
+                json.dumps(
+                    {
+                        "relevant": True,
+                        "reasons": ["неравноценное встречное исполнение"],
+                        "proof_quote": "",
+                        "outcome": "satisfied",
+                    },
+                    ensure_ascii=False,
+                )
+            )
+        )
+    )
+    extractor = _make_extractor(http_client=http)
+    decision = _make_decision(analysis_text="PDF text")
+    params = SearchParams(
+        inn_or_name=None,
+        inn_type=None,
+        date_from="2025-01-01",
+        date_to="2025-03-31",
+        court="АС города Москвы",
+        case_type=None,
+        case_number=None,
+        article="61.2",
+        full_article="ст. 61.2 Закона о банкротстве",
+        law_family="127-ФЗ",
+        law_display_name="Закона о банкротстве",
+    )
+
+    relevant, reasons, quote, llm_outcome = await extractor.analyze_pdf_case(
+        decision=decision,
+        params=params,
+        pdf_text="... ст. 61.2 Закона о банкротстве ...",
+    )
+
+    assert relevant is False
+    assert "Отклонено:" in reasons[0]
+    assert quote == ""
+    assert llm_outcome is None
+
+
+@pytest.mark.asyncio
+async def test_analyze_pdf_case_fails_closed_on_llm_error():
+    http = AsyncMock()
+    http.post = AsyncMock(side_effect=RuntimeError("boom"))
+    extractor = _make_extractor(http_client=http)
+    decision = _make_decision(analysis_text="PDF text")
+    params = SearchParams(
+        inn_or_name=None,
+        inn_type=None,
+        date_from="2025-01-01",
+        date_to="2025-03-31",
+        court="АС города Москвы",
+        case_type=None,
+        case_number=None,
+        article="61.2",
+        full_article="ст. 61.2 Закона о банкротстве",
+        law_family="127-ФЗ",
+        law_display_name="Закона о банкротстве",
+    )
+
+    relevant, reasons, quote, llm_outcome = await extractor.analyze_pdf_case(
+        decision=decision,
+        params=params,
+        pdf_text="... ст. 61.2 Закона о банкротстве ...",
+    )
+
+    assert relevant is False
+    assert "Отклонено:" in reasons[0]
+    assert quote == ""
+    assert llm_outcome is None

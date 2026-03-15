@@ -1,4 +1,4 @@
-from src.services.kad_client import QueryParser
+from src.services.database_case_client import QueryParser
 
 
 def test_query_parser_extracts_year_and_quarter():
@@ -64,6 +64,10 @@ def test_query_parser_extracts_article_and_sets_bankruptcy_case_type_for_61_seri
 
     assert params.article == "61.3"
     assert params.case_type == "B"
+    assert params.full_article == "ст. 61.3 Закона о банкротстве"
+    assert params.law_family == "127-ФЗ"
+    assert params.law_display_name == "Закона о банкротстве"
+    assert params.law_inferred is True
 
 
 def test_query_parser_extracts_paragraph_reference():
@@ -72,3 +76,15 @@ def test_query_parser_extracts_paragraph_reference():
 
     assert params.article == "61.3"
     assert params.paragraph == "2"
+    assert params.full_article == "п. 2 ст. 61.3 Закона о банкротстве"
+
+
+def test_query_parser_extracts_explicit_non_bankruptcy_law():
+    parser = QueryParser()
+    params = parser.parse("Практика по статье 723 ГК РФ в АС Москвы за 2025 год")
+
+    assert params.article == "723"
+    assert params.full_article == "ст. 723 ГК РФ"
+    assert params.law_family == "ГК РФ"
+    assert params.law_display_name == "ГК РФ"
+    assert params.law_inferred is False

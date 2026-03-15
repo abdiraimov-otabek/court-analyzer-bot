@@ -20,12 +20,10 @@ class AllowedUsersRepository:
                 "insert or ignore into allowed_users (telegram_id, created_at) values (?, ?)",
                 (telegram_id, datetime.now().isoformat()),
             )
-            conn.commit()
 
     def revoke(self, telegram_id: str) -> None:
         with self._connection.connect() as conn:
             conn.execute("delete from allowed_users where telegram_id = ?", (telegram_id,))
-            conn.commit()
 
     def is_allowed(self, telegram_id: str) -> bool:
         with self._connection.connect() as conn:

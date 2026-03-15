@@ -1,4 +1,4 @@
-"""Direct unit tests for ParserApiKadClient._map_outcome.
+"""Direct unit tests for DatabaseCaseClient._map_outcome.
 
 Covers every branch:
   - Each _DENIED_COMBINED regex (original 8 + new 4 = 12 patterns)
@@ -12,17 +12,17 @@ from __future__ import annotations
 import pytest
 
 from src.domain.entities import CaseOutcome
-from src.services.kad_client import ParserApiKadClient
+from src.services.database_case_client import DatabaseCaseClient
 
 
 @pytest.fixture()
-def client() -> ParserApiKadClient:
-    return ParserApiKadClient(base_url="http://test", api_key="key")
+def client() -> DatabaseCaseClient:
+    return DatabaseCaseClient(base_url="http://test", api_key="key")
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
-def outcome(client: ParserApiKadClient, text: str) -> CaseOutcome:
+def outcome(client: DatabaseCaseClient, text: str) -> CaseOutcome:
     return client._map_outcome(text)
 
 

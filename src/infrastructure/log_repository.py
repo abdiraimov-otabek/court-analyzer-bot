@@ -18,4 +18,3 @@ class LogRepository:
                 """,
                 (hashed_user_id, query_text, result_summary, datetime.now().isoformat()),
             )
-            conn.commit()

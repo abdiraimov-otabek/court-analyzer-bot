@@ -6,11 +6,18 @@ from datetime import datetime
 from src.domain.value_objects import UserId
 
 
+@dataclass(frozen=True)
+class RequestStartResult:
+    status: str
+    active_request: "ActiveRequest | None" = None
+
+
 @dataclass
 class ActiveRequest:
     user_id: UserId
     query_text: str
     total_cases: int
+    request_id: str = ""
     started_at: datetime = field(default_factory=datetime.now)
     processed_cases: int = 0
     collected_cases: int = 0
@@ -18,7 +25,7 @@ class ActiveRequest:
     successful_cases: int = 0
     retry_count: int = 0
     cancelled: bool = False
-    phase: str = "counting"
+    phase: str = "queued"
 
 
 class ActiveRequestRegistry:
@@ -33,23 +40,49 @@ class ActiveRequestRegistry:
         user_id: UserId,
         query_text: str,
         total_cases: int,
-        phase: str = "counting",
+        phase: str = "queued",
     ) -> bool:
+        result = self.start_or_reuse(
+            user_id=user_id,
+            request_id="",
+            query_text=query_text,
+            total_cases=total_cases,
+            phase=phase,
+        )
+        return result.status == "started"
+
+    def start_or_reuse(
+        self,
+        user_id: UserId,
+        request_id: str,
+        query_text: str,
+        total_cases: int,
+        phase: str = "queued",
+    ) -> RequestStartResult:
         with self._lock:
-            if user_id in self._active:
-                return False
-            self._active[user_id] = ActiveRequest(
+            existing = self._active.get(user_id)
+            if existing is not None:
+                if request_id and existing.request_id == request_id:
+                    return RequestStartResult(
+                        status="duplicate", active_request=existing
+                    )
+                return RequestStartResult(status="busy", active_request=existing)
+            active = ActiveRequest(
                 user_id=user_id,
                 query_text=query_text,
                 total_cases=total_cases,
+                request_id=request_id,
                 phase=phase,
             )
+            self._active[user_id] = active
         if self._db_repo is not None:
             try:
-                self._db_repo.upsert(str(user_id.value), query_text, phase, total_cases)
+                self._db_repo.upsert(
+                    str(user_id.value), request_id, query_text, phase, total_cases
+                )
             except Exception:
                 pass
-        return True
+        return RequestStartResult(status="started", active_request=active)
 
     def update_query_text(self, user_id: UserId, query_text: str) -> None:
         with self._lock:
@@ -69,11 +102,25 @@ class ActiveRequestRegistry:
 
     def get(self, user_id: UserId) -> ActiveRequest | None:
         with self._lock:
-            return self._active.get(user_id)
+            active = self._active.get(user_id)
+        if active is not None or self._db_repo is None:
+            return active
+        row = self._db_repo.get(str(user_id.value))
+        return self._deserialize(row)
 
     def list_all(self) -> list[ActiveRequest]:
         with self._lock:
-            return list(self._active.values())
+            active = list(self._active.values())
+        if self._db_repo is None:
+            return active
+        persisted = {
+            record.user_id.value: record
+            for record in map(self._deserialize, self._db_repo.list_all())
+            if record is not None
+        }
+        for record in active:
+            persisted[record.user_id.value] = record
+        return list(persisted.values())
 
     def update_processed(self, user_id: UserId, processed_cases: int) -> None:
         with self._lock:
@@ -148,3 +195,15 @@ class ActiveRequestRegistry:
         if self._db_repo is not None:
             return self._db_repo.is_cancelled(str(user_id.value))
         return False
+
+    def _deserialize(self, row) -> ActiveRequest | None:
+        if not row:
+            return None
+        return ActiveRequest(
+            user_id=UserId(str(row["user_id"])),
+            request_id=row.get("request_id", ""),
+            query_text=row["query_text"],
+            total_cases=int(row.get("total_cases", 0)),
+            phase=row.get("phase", "queued"),
+            cancelled=bool(row.get("cancelled", False)),
+        )

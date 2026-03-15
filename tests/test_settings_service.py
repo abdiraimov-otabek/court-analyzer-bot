@@ -23,11 +23,21 @@ def test_settings_service_updates_valid_values(tmp_path):
         court_mismatch_threshold_percent=20,
         min_known_outcomes=50,
         send_partial_file_on_quality_fail=True,
+        pdf_required_for_article_queries=True,
+        enable_ocr_fallback=False,
+        candidate_pool_multiplier=3,
+        max_pdf_pages_per_case=25,
+        pdf_fetch_timeout_seconds=60,
+        allow_law_inference=False,
+        max_llm_calls_per_request=25,
+        max_analysis_text_length=25_000,
     )
 
     assert updated.max_cases == 400
     assert updated.max_documents_per_case == 7
     assert updated.max_pages == 30
+    assert updated.max_llm_calls_per_request == 25
+    assert updated.max_analysis_text_length == 25_000
     assert updated.fetch_concurrency_min == 6
     assert updated.fetch_concurrency_max == 10
     assert updated.slow_alert_minutes == 5
@@ -38,6 +48,12 @@ def test_settings_service_updates_valid_values(tmp_path):
     assert updated.court_mismatch_threshold_percent == 20
     assert updated.min_known_outcomes == 50
     assert updated.send_partial_file_on_quality_fail is True
+    assert updated.pdf_required_for_article_queries is True
+    assert updated.enable_ocr_fallback is False
+    assert updated.candidate_pool_multiplier == 3
+    assert updated.max_pdf_pages_per_case == 25
+    assert updated.pdf_fetch_timeout_seconds == 60
+    assert updated.allow_law_inference is False
 
 
 @pytest.mark.parametrize(
@@ -121,6 +137,41 @@ def test_settings_service_updates_valid_values(tmp_path):
             "min_known_outcomes": 101,
             "analysis_prompt": "x",
         },
+        {
+            "max_cases": 100,
+            "max_documents_per_case": 5,
+            "max_pages": 20,
+            "analysis_prompt": "x",
+            "candidate_pool_multiplier": 0,
+        },
+        {
+            "max_cases": 100,
+            "max_documents_per_case": 5,
+            "max_pages": 20,
+            "analysis_prompt": "x",
+            "max_pdf_pages_per_case": 201,
+        },
+        {
+            "max_cases": 100,
+            "max_documents_per_case": 5,
+            "max_pages": 20,
+            "analysis_prompt": "x",
+            "pdf_fetch_timeout_seconds": 4,
+        },
+        {
+            "max_cases": 100,
+            "max_documents_per_case": 5,
+            "max_pages": 20,
+            "analysis_prompt": "x",
+            "max_llm_calls_per_request": 501,
+        },
+        {
+            "max_cases": 100,
+            "max_documents_per_case": 5,
+            "max_pages": 20,
+            "analysis_prompt": "x",
+            "max_analysis_text_length": 999,
+        },
     ],
 )
 def test_settings_service_rejects_invalid_values(tmp_path, payload):
@@ -142,4 +193,12 @@ def test_settings_service_rejects_invalid_values(tmp_path, payload):
             court_mismatch_threshold_percent=payload.get("court_mismatch_threshold_percent", 20),
             min_known_outcomes=payload.get("min_known_outcomes", 50),
             send_partial_file_on_quality_fail=payload.get("send_partial_file_on_quality_fail", True),
+            pdf_required_for_article_queries=payload.get("pdf_required_for_article_queries", True),
+            enable_ocr_fallback=payload.get("enable_ocr_fallback", True),
+            candidate_pool_multiplier=payload.get("candidate_pool_multiplier", 4),
+            max_pdf_pages_per_case=payload.get("max_pdf_pages_per_case", 20),
+            pdf_fetch_timeout_seconds=payload.get("pdf_fetch_timeout_seconds", 45),
+            allow_law_inference=payload.get("allow_law_inference", True),
+            max_llm_calls_per_request=payload.get("max_llm_calls_per_request", 50),
+            max_analysis_text_length=payload.get("max_analysis_text_length", 50_000),
         )

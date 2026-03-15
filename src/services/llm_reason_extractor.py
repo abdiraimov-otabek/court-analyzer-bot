@@ -4,11 +4,16 @@ import asyncio
 import hashlib
 import json
 import logging
+import re
+from typing import TYPE_CHECKING
 
 import httpx
 from pydantic import BaseModel, Field, ValidationError
 
 from src.domain.entities import CaseDecision, CaseOutcome
+
+if TYPE_CHECKING:
+    from src.domain.case_models import SearchParams
 
 
 class ClassifyResultItem(BaseModel):
@@ -18,8 +23,13 @@ class ClassifyResultItem(BaseModel):
     outcome: str = "NOT FOUND IN DOCUMENT"
 
 
+class PdfChoiceResult(BaseModel):
+    selected_index: int = 1
+    reason: str = ""
+
+
 class LLMReasonExtractor:
-    """Extracts legal grounds from Russian arbitration court events using an LLM.
+    """Extracts legal grounds from Russian court events using an LLM.
 
     Used as a fallback when regex-based ReasonExtractor returns the generic
     "оценка обстоятельств дела" label. Calls OpenRouter chat completions API
@@ -108,6 +118,10 @@ class LLMReasonExtractor:
             str, tuple[bool, tuple[str, ...], str, str | None]
         ] = {}
         self._outcome_cache: dict[str, tuple[tuple[str, ...], str | None]] = {}
+        self._pdf_choice_cache: dict[str, int] = {}
+        self._pdf_analysis_cache: dict[
+            str, tuple[bool, tuple[str, ...], str, str | None]
+        ] = {}
         self._MAX_CACHE_SIZE = 2000
         self._budget_remaining: int | None = None
         self._logger = logging.getLogger("llm_reason_extractor")
@@ -197,8 +211,8 @@ class LLMReasonExtractor:
                 headers={
                     "Authorization": f"Bearer {self._api_key}",
                     "Content-Type": "application/json",
-                    "HTTP-Referer": "https://github.com/kad-bot",
-                    "X-Title": "KAD Bot",
+                    "HTTP-Referer": "https://github.com/court-bot",
+                    "X-Title": "Court Bot",
                 },
                 json={
                     "model": self._fast_model,
@@ -294,8 +308,8 @@ class LLMReasonExtractor:
                 headers={
                     "Authorization": f"Bearer {self._api_key}",
                     "Content-Type": "application/json",
-                    "HTTP-Referer": "https://github.com/kad-bot",
-                    "X-Title": "KAD Bot",
+                    "HTTP-Referer": "https://github.com/court-bot",
+                    "X-Title": "Court Bot",
                 },
                 json={
                     "model": self._model,
@@ -308,22 +322,7 @@ class LLMReasonExtractor:
             response.raise_for_status()
             summary_text = response.json()["choices"][0]["message"]["content"].strip()
 
-            article_line = f"Статья: {article} | " if article else ""
-            satisfied_pct = round(satisfied / total * 100) if total > 0 else 0
-            denied_pct = round(denied / total * 100) if total > 0 else 0
-            unknown_pct = round(unknown / total * 100) if total > 0 else 0
-            quality_note = ""
-            if reason_confidence < 0.6:
-                quality_note = "⚠️ Низкая уверенность в основаниях: часть дел классифицирована без прямых цитат из судебных актов.\n\n"
-            header = (
-                f"СВОДКА ПО ЗАПРОСУ:\n"
-                f"Суд: {court} | Период: {period} | {article_line}Всего дел: {total}\n"
-                f"Статистика: Удовлетворено - {satisfied} ({satisfied_pct}%), "
-                f"Отказано - {denied} ({denied_pct}%), "
-                f"Не определено - {unknown} ({unknown_pct}%)\n"
-                f"{quality_note}\n"
-            )
-            return header + summary_text
+            return summary_text
         except Exception as exc:
             self._logger.warning(
                 "llm.generate_summary_failed", extra={"data": {"error": str(exc)}}
@@ -401,7 +400,7 @@ class LLMReasonExtractor:
         except Exception as exc:
             self._logger.warning(
                 "llm.extract_with_outcome_failed",
-                extra={"data": {"error": str(exc)}},
+                extra={"data": {"error": repr(exc)}},
             )
             return self._FALLBACK, None
 
@@ -425,8 +424,8 @@ class LLMReasonExtractor:
             headers={
                 "Authorization": f"Bearer {self._api_key}",
                 "Content-Type": "application/json",
-                "HTTP-Referer": "https://github.com/kad-bot",
-                "X-Title": "KAD Bot",
+                "HTTP-Referer": "https://github.com/court-bot",
+                "X-Title": "Court Bot",
             },
             json={
                 "model": self._model,
@@ -470,6 +469,194 @@ class LLMReasonExtractor:
         """Compatibility wrapper for classify_batch."""
         results = await self.classify_batch([decision], article, query_text)
         return results[0]
+
+    async def choose_decisive_pdf(
+        self,
+        decision: CaseDecision,
+        params: "SearchParams",
+        candidates: list[dict[str, str]],
+    ) -> dict[str, str] | None:
+        if not candidates:
+            return None
+        if len(candidates) == 1:
+            return candidates[0]
+
+        normalized_candidates = candidates[:8]
+        query_label = params.full_article or params.article or "запрошенной статье"
+        cache_key = hashlib.sha256(
+            json.dumps(
+                {
+                    "case_id": decision.case_id,
+                    "query": query_label,
+                    "law": params.law_display_name,
+                    "candidates": normalized_candidates,
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            ).encode()
+        ).hexdigest()
+        cached_index = self._pdf_choice_cache.get(cache_key)
+        if cached_index is not None and 0 <= cached_index < len(normalized_candidates):
+            return normalized_candidates[cached_index]
+
+        prompt_lines = [
+            "Ты выбираешь один PDF-документ, который лучше всего подходит для правового анализа по запросу.",
+            f"Запрос: {query_label}",
+        ]
+        if params.law_display_name:
+            prompt_lines.append(f"Закон/кодекс: {params.law_display_name}")
+        if params.issue_phrase:
+            prompt_lines.append(f"Суть запроса: {params.issue_phrase}")
+        prompt_lines.append(
+            "Выбери документ, который с наибольшей вероятностью является итоговым или решающим актом по существу спора в пределах запрошенного периода."
+        )
+        prompt_lines.append("Игнорируй заявления, протоколы, уведомления, возвраты и иные вспомогательные документы, если есть более сильный судебный акт.")
+        prompt_lines.append("Верни только JSON вида {\"selected_index\": 1, \"reason\": \"...\"}. Индексация начинается с 1.")
+        prompt_lines.append("Кандидаты:")
+        for idx, candidate in enumerate(normalized_candidates, start=1):
+            prompt_lines.append(
+                f"{idx}. {candidate.get('name', 'Документ')} | дата: {candidate.get('date', '') or 'не указана'} | тип: {candidate.get('category', '') or 'не указан'} | релевантность: {candidate.get('relevance', '') or '0'}"
+            )
+
+        try:
+            response = await self._http_client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self._api_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://github.com/court-bot",
+                    "X-Title": "Court Bot",
+                },
+                json={
+                    "model": self._fast_model,
+                    "messages": [{"role": "user", "content": "\n".join(prompt_lines)}],
+                    "temperature": 0,
+                    "max_tokens": 200,
+                    "response_format": {"type": "json_object"},
+                },
+                timeout=self._timeout,
+            )
+            response.raise_for_status()
+            raw = response.json()["choices"][0]["message"]["content"]
+            parsed = self._parse_pdf_choice_result(raw)
+            index = min(
+                max(parsed.selected_index - 1, 0),
+                len(normalized_candidates) - 1,
+            )
+            self._pdf_choice_cache[cache_key] = index
+            return normalized_candidates[index]
+        except Exception as exc:
+            self._logger.warning(
+                "llm.choose_decisive_pdf_failed",
+                extra={"data": {"error": repr(exc)}},
+            )
+            return normalized_candidates[0]
+
+    async def analyze_pdf_case(
+        self,
+        decision: CaseDecision,
+        params: "SearchParams",
+        pdf_text: str,
+    ) -> tuple[bool, tuple[str, ...], str, str | None]:
+        if not pdf_text or not pdf_text.strip():
+            return False, self._NOT_RELEVANT, "", None
+
+        query_label = params.full_article or params.article or "запрошенной статье"
+        cache_key = hashlib.sha256(
+            json.dumps(
+                {
+                    "case_id": decision.case_id,
+                    "query": query_label,
+                    "law": params.law_display_name,
+                    "text": pdf_text[:8000],
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            ).encode()
+        ).hexdigest()
+        if cache_key in self._pdf_analysis_cache:
+            return self._pdf_analysis_cache[cache_key]
+
+        prompt = (
+            "Ты анализируешь текст судебного акта арбитражного суда.\n"
+            f"Целевая статья: {query_label}\n"
+            f"Закон/кодекс: {params.law_display_name or 'не указан'}\n"
+            f"Суть запроса: {params.issue_phrase or 'не указана'}\n"
+            "Определи, относится ли этот акт по существу к запрошенной статье и закону.\n"
+            "Документ считается релевантным только если из текста прямо видно, что именно эта статья и этот закон применяются к существу спора.\n"
+            "Процедурные документы, заявления, возвраты, определения без разрешения спора по существу считай нерелевантными.\n"
+            "Если relevant=true, обязательно верни короткую дословную цитату из текста акта, подтверждающую релевантность или исход.\n"
+            'Верни только JSON: {"relevant": true/false, "reasons": ["..."], "proof_quote": "цитата", "outcome": "satisfied|denied|NOT FOUND IN DOCUMENT"}\n\n'
+            f"Текст акта:\n{pdf_text}"
+        )
+        try:
+            response = await self._http_client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self._api_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://github.com/court-bot",
+                    "X-Title": "Court Bot",
+                },
+                json={
+                    "model": self._model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0,
+                    "max_tokens": 500,
+                    "response_format": {"type": "json_object"},
+                },
+                timeout=self._timeout * 2,
+            )
+            response.raise_for_status()
+            raw = response.json()["choices"][0]["message"]["content"]
+            parsed = ClassifyResultItem.model_validate(
+                json.loads(self._clean_llm_json(raw))
+            )
+
+            llm_outcome: str | None = None
+            normalized_outcome = parsed.outcome.strip().lower()
+            if normalized_outcome == "satisfied":
+                llm_outcome = "satisfied"
+            elif normalized_outcome == "denied":
+                llm_outcome = "denied"
+
+            reasons = tuple(r for r in parsed.reasons if isinstance(r, str) and r.strip())
+            if parsed.relevant and not parsed.proof_quote.strip():
+                result = (False, self._missing_proof_reasons(list(reasons)), "", None)
+            elif not parsed.relevant:
+                result = (
+                    False,
+                    reasons if reasons else self._NOT_RELEVANT,
+                    "",
+                    None,
+                )
+            else:
+                result = (
+                    True,
+                    reasons if reasons else self._FALLBACK,
+                    parsed.proof_quote.strip(),
+                    llm_outcome,
+                )
+            self._pdf_analysis_cache[cache_key] = result
+            return result
+        except Exception as exc:
+            self._logger.warning(
+                "llm.analyze_pdf_case_failed",
+                extra={"data": {"error": repr(exc)}},
+            )
+            return False, self._missing_proof_reasons(list(self._FALLBACK)), "", None
+
+    def _parse_pdf_choice_result(self, raw: str) -> PdfChoiceResult:
+        cleaned = self._clean_llm_json(raw)
+        try:
+            return PdfChoiceResult.model_validate(json.loads(cleaned))
+        except Exception:
+            match = re.search(r"selected_index[^0-9]*(\d+)", cleaned, re.IGNORECASE)
+            if not match:
+                match = re.search(r"\b(\d+)\b", cleaned)
+            if match:
+                return PdfChoiceResult(selected_index=int(match.group(1)), reason="")
+            raise
 
     async def classify_batch(
         self,
@@ -601,8 +788,8 @@ class LLMReasonExtractor:
             headers={
                 "Authorization": f"Bearer {self._api_key}",
                 "Content-Type": "application/json",
-                "HTTP-Referer": "https://github.com/kad-bot",
-                "X-Title": "KAD Bot",
+                "HTTP-Referer": "https://github.com/court-bot",
+                "X-Title": "Court Bot",
             },
             json={
                 "model": self._model,
@@ -676,11 +863,14 @@ class LLMReasonExtractor:
                     llm_outcome = "denied"
                 # Else: NOT FOUND IN DOCUMENT implies None
 
-                # Relaxed Logic: If relevant but absolutely no quote or rationale is provided, 
-                # we no longer reject it. Instead, we use a fallback and flag it.
                 if is_relevant and not proof_quote:
-                    # Upgrade to a "Weak" match downstream but don't drop the case
-                    proof_quote = "Прямая цитата не найдена в доступных фрагментах (LLM подтвердила релевантность без цитаты)"
+                    results.append((
+                        False,
+                        self._missing_proof_reasons(reasons),
+                        "",
+                        None,
+                    ))
+                    continue
 
                 if not reasons:
                     reasons = [self._FALLBACK[0]]
@@ -808,8 +998,8 @@ class LLMReasonExtractor:
             headers={
                 "Authorization": f"Bearer {self._api_key}",
                 "Content-Type": "application/json",
-                "HTTP-Referer": "https://github.com/kad-bot",
-                "X-Title": "KAD Bot",
+                "HTTP-Referer": "https://github.com/court-bot",
+                "X-Title": "Court Bot",
             },
             json={
                 "model": self._model,
@@ -842,11 +1032,12 @@ class LLMReasonExtractor:
         if not isinstance(reasons, list) or not reasons:
             reasons = [self._FALLBACK[0]]
 
-        # Relaxed Logic: If relevant but absolutely no quote or rationale is provided, 
-        # we no longer reject it. Instead, we use a fallback and flag it.
         if is_relevant and not proof_quote:
-            # Upgrade to a "Weak" match downstream but don't drop the case
-            proof_quote = "Прямая цитата не найдена в доступных фрагментах (LLM подтвердила релевантность без цитаты)"
+            return (
+                False,
+                self._missing_proof_reasons(reasons),
+                "",
+            )
 
         valid_reasons = tuple(r for r in reasons if isinstance(r, str) and r.strip())
 
@@ -855,6 +1046,11 @@ class LLMReasonExtractor:
             valid_reasons if valid_reasons else self._FALLBACK,
             proof_quote,
         )
+
+    def _missing_proof_reasons(self, reasons: list[str] | tuple[str, ...]) -> tuple[str, ...]:
+        cleaned = [r.strip() for r in reasons if isinstance(r, str) and r.strip()]
+        basis = cleaned[0] if cleaned else self._FALLBACK[0]
+        return (f"Отклонено: нет доказательной цитаты ({basis})",)
 
     async def _call_with_retry(
         self, text: str, outcome: CaseOutcome
@@ -895,8 +1091,8 @@ class LLMReasonExtractor:
             headers={
                 "Authorization": f"Bearer {self._api_key}",
                 "Content-Type": "application/json",
-                "HTTP-Referer": "https://github.com/kad-bot",
-                "X-Title": "KAD Bot",
+                "HTTP-Referer": "https://github.com/court-bot",
+                "X-Title": "Court Bot",
             },
             json={
                 "model": self._model,

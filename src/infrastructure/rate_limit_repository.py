@@ -25,9 +25,3 @@ class LoginRateLimitRepository:
                 (ip_address, since),
             ).fetchone()
             return row[0] if row else 0
-
-    def cleanup(self) -> None:
-        # Generic cleanup of old attempts to prevent table bloat
-        expired = time.time() - (24 * 3600)  # 24 hours
-        with self._connection.connect() as conn:
-            conn.execute("DELETE FROM login_attempts WHERE attempt_at < ?", (expired,))

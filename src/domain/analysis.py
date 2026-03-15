@@ -49,10 +49,8 @@ class AnalysisService:
         verifiable_decisions = []
         review_decisions = []
 
-        article_requested = bool(article)
-
         for decision in decisions:
-            if self._is_verifiable(decision, article_requested):
+            if self._is_verifiable(decision):
                 verifiable_decisions.append(decision)
                 outcome = self.normalize_outcome(decision)
                 meaningful_reasons = self._meaningful_reasons(decision.reasons)
@@ -68,7 +66,6 @@ class AnalysisService:
             else:
                 review_decisions.append(decision)
 
-        total_all = len(decisions)
         total_verifiable = len(verifiable_decisions)
         satisfied_pct = self._percentage(satisfied, total_verifiable)
         denied_pct = self._percentage(denied, total_verifiable)
@@ -118,7 +115,7 @@ class AnalysisService:
         article_line = f" | Статья: {article}" if article else ""
         header = (
             "СВОДКА ПО ЗАПРОСУ:\n"
-            f"Суд: {court} | Период: {period}{article_line} | Всего дел: {total_verifiable}\n"
+            f"Суд: {court} | Период: {period}{article_line} | Всего найдено: {total_cases_found} | Проверено: {total_verifiable}\n"
             f"Статистика: {stats}\n\n"
         )
         summary = header + summary
@@ -184,59 +181,66 @@ class AnalysisService:
             filtered.append(reason)
         return tuple(filtered)
 
-    def _is_verifiable(self, decision: CaseDecision, article_requested: bool = False) -> bool:
+    def _is_verifiable(self, decision: CaseDecision) -> bool:
         has_validation_metadata = (
             bool(decision.matched_article)
             or bool(decision.evidence_quote)
             or decision.evidence_tier != EvidenceTier.TIER_D_NO_MATCH
         )
         if has_validation_metadata:
-            allowed = [ConfidenceScore.CONFIRMED, ConfidenceScore.PROBABLE]
-            if article_requested:
-                allowed.append(ConfidenceScore.WEAK)
+            allowed = [
+                ConfidenceScore.CONFIRMED,
+                ConfidenceScore.PROBABLE,
+                ConfidenceScore.WEAK,
+            ]
             return decision.validation_confidence in allowed
         return decision.confidence_score >= 0.98
 
     def _format_case(self, decision: CaseDecision) -> str:
-        case_label = decision.case_number or (
-            f"ID:{decision.case_id}" if decision.case_id else "Номер дела не указан"
-        )
-        court = decision.court_name or "Суд не указан"
-        reason = self._format_reason(decision)
-        link = decision.case_link or "https://kad.arbitr.ru/"
+        case_label = (decision.case_number or (f"ID:{decision.case_id}" if decision.case_id else "Номер дела не указан")).replace("|", "/")
+        court = (decision.court_name or "Суд не указан").replace("|", "/")
+        reason = self._format_reason(decision).replace("|", "/").replace("\n", " ").replace("\r", " ")
+        link = (decision.case_link or "https://sudact.ru/").replace("|", "/")
+        outcome = self._format_outcome(decision)
+        d_date = self._format_date(decision.decision_date)
 
-        quote_text = ""
-        if decision.proof_quote:
-            quote_text = f" | Цитата: {decision.proof_quote}"
+        parts = [
+            f"{case_label}",
+            f"{d_date}",
+            f"{outcome}",
+            f"Суд: {court}",
+            f"Основание: {reason}",
+            f"Ссылка: {link}",
+        ]
+
+        quote = ""
         if decision.evidence_quote and decision.evidence_quote != "N/A":
-            quote_text = f" | Цитата: {decision.evidence_quote}"
+            quote = decision.evidence_quote
+        elif decision.proof_quote:
+            quote = decision.proof_quote
+        
+        if quote:
+            parts.append(f"Цитата: {quote.replace('|', '/').replace(chr(10), ' ').replace(chr(13), ' ')}")
+        
+        if decision.decisive_act_title:
+            parts.append(f"Акт: {decision.decisive_act_title.replace('|', '/')}")
+        if decision.decisive_act_type:
+            parts.append(f"Тип акта: {decision.decisive_act_type.replace('|', '/')}")
+        if decision.pdf_status and decision.pdf_status != "not_requested":
+            parts.append(f"PDF: {decision.pdf_status.replace('|', '/')}")
+        if decision.verification_failure_code:
+            parts.append(f"Проверка: {decision.verification_failure_code.replace('|', '/')}")
+        
+        confidence_display = decision.validation_confidence.value
+        article_display = decision.matched_article or "N/A"
+        tier_display = decision.evidence_tier.name
+        parts.append(f"Анализ: Уверенность: {confidence_display}, Статья: {article_display} ({tier_display})")
 
-        confidence_display = (
-            decision.validation_confidence.value
-            if hasattr(decision, "validation_confidence")
-            else "Unknown"
-        )
-        article_display = (
-            decision.matched_article
-            if hasattr(decision, "matched_article") and decision.matched_article
-            else "N/A"
-        )
-        tier_display = (
-            decision.evidence_tier.name if hasattr(decision, "evidence_tier") else "N/A"
-        )
-
-        validation_text = f" | Анализ: Уверенность: {confidence_display}, Статья: {article_display} ({tier_display})"
-
-        docs_text = ""
         if decision.document_links:
-            doc_links = [f"[{d['name']}]({d['url']})" for d in decision.document_links]
-            docs_text = " | Документы: " + ", ".join(doc_links)
+            doc_links = [f"[{d['name']}]({d['url']})".replace("|", "/") for d in decision.document_links]
+            parts.append("Документы: " + ", ".join(doc_links))
 
-        return (
-            f"{case_label} | {self._format_date(decision.decision_date)} | "
-            f"{self._format_outcome(decision)} | Суд: {court} | Основание: {reason} | "
-            f"Ссылка: {link}{quote_text}{validation_text}{docs_text}"
-        )
+        return " | ".join(parts).replace("\n", " ").replace("\r", " ")
 
     def _format_date(self, value: date) -> str:
         return value.strftime("%d.%m.%Y")
@@ -250,6 +254,8 @@ class AnalysisService:
         return "Не определено"
 
     def normalize_outcome(self, decision: CaseDecision) -> CaseOutcome:
+        if decision.decisive_act_type and decision.decisive_act_type != "merits_act":
+            return CaseOutcome.UNKNOWN
         outcome = decision.outcome
         if isinstance(outcome, CaseOutcome):
             return outcome

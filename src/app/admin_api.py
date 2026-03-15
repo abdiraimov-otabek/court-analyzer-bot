@@ -17,7 +17,7 @@ from src.app.bot_logging import (
     new_request_id,
     set_request_context,
 )
-from src.app.config import load_config
+from src.app.config import initialize_db, load_config
 from src.app.container import Container
 
 configure_logging("admin-api")
@@ -25,9 +25,10 @@ logger = logging.getLogger("admin_api.routes")
 db_logger = logging.getLogger("admin_api.db")
 auth_logger = logging.getLogger("admin_api.auth")
 
-app = FastAPI(title="KAD Bot Admin API")
+app = FastAPI(title="Court Bot Admin API")
 
 config = load_config()
+initialize_db(config)
 container = Container(config)
 
 
@@ -74,6 +75,8 @@ class SettingsModel(BaseModel):
     max_cases: int
     max_documents_per_case: int
     max_pages: int
+    max_llm_calls_per_request: int
+    max_analysis_text_length: int
     fetch_concurrency_min: int
     fetch_concurrency_max: int
     slow_alert_minutes: int
@@ -83,6 +86,12 @@ class SettingsModel(BaseModel):
     court_mismatch_threshold_percent: int
     min_known_outcomes: int
     send_partial_file_on_quality_fail: bool
+    pdf_required_for_article_queries: bool
+    enable_ocr_fallback: bool
+    candidate_pool_multiplier: int
+    max_pdf_pages_per_case: int
+    pdf_fetch_timeout_seconds: int
+    allow_law_inference: bool
     analysis_prompt: str
 
 
@@ -92,6 +101,7 @@ class AllowedUserModel(BaseModel):
 
 class ActiveRequestModel(BaseModel):
     telegram_id: str
+    request_id: str
     phase: str
     total_cases: int
     collected_cases: int
@@ -101,15 +111,38 @@ class ActiveRequestModel(BaseModel):
     retry_count: int
 
 
+def _build_settings_model(settings) -> SettingsModel:
+    return SettingsModel(
+        max_cases=settings.max_cases,
+        max_documents_per_case=settings.max_documents_per_case,
+        max_pages=settings.max_pages,
+        max_llm_calls_per_request=settings.max_llm_calls_per_request,
+        max_analysis_text_length=settings.max_analysis_text_length,
+        fetch_concurrency_min=settings.fetch_concurrency_min,
+        fetch_concurrency_max=settings.fetch_concurrency_max,
+        slow_alert_minutes=settings.slow_alert_minutes,
+        details_cache_ttl_seconds=settings.details_cache_ttl_seconds,
+        allow_all_users=settings.allow_all_users,
+        unknown_outcome_threshold_percent=settings.unknown_outcome_threshold_percent,
+        court_mismatch_threshold_percent=settings.court_mismatch_threshold_percent,
+        min_known_outcomes=settings.min_known_outcomes,
+        send_partial_file_on_quality_fail=settings.send_partial_file_on_quality_fail,
+        pdf_required_for_article_queries=settings.pdf_required_for_article_queries,
+        enable_ocr_fallback=settings.enable_ocr_fallback,
+        candidate_pool_multiplier=settings.candidate_pool_multiplier,
+        max_pdf_pages_per_case=settings.max_pdf_pages_per_case,
+        pdf_fetch_timeout_seconds=settings.pdf_fetch_timeout_seconds,
+        allow_law_inference=settings.allow_law_inference,
+        analysis_prompt=settings.analysis_prompt,
+    )
+
+
 def require_auth(
     authorization: str | None = Header(default=None),
     x_admin_token: str | None = Header(default=None),
 ) -> None:
     token = config.admin_auth_token
-    if not token:
-        raise HTTPException(
-            status_code=500, detail="ADMIN_AUTH_TOKEN is not configured"
-        )
+    provided = ""
     if x_admin_token:
         provided = x_admin_token
     elif authorization:
@@ -182,11 +215,7 @@ def health() -> dict:
     # 2. Check Critical Config
     config_status = "ok"
     missing_keys = []
-    if (
-        not container.config.kad_api_key
-        or "your_key_here" in container.config.kad_api_key
-    ):
-        missing_keys.append("KAD_API_KEY")
+    # KAD_API_KEY check removed
     if not container.config.telegram_bot_token:
         missing_keys.append("TELEGRAM_BOT_TOKEN")
 
@@ -205,8 +234,13 @@ def health() -> dict:
             "status": config_status,
             "missing_keys": missing_keys,
             "llm_enabled": bool(container.config.openrouter_api_key),
+            "decision_source_mode": container.config.decision_source_mode,
+            "shadow_mode_enabled": container.config.shadow_mode_enabled,
         },
-        "metrics": {"active_requests": active_count},
+        "metrics": {
+            "active_requests": active_count,
+            "queue_depth": container.task_queue.size(),
+        },
     }
 
 
@@ -230,8 +264,6 @@ async def login(request: Request, token: str = Form(...)):
         return HTMLResponse(
             "Too many login attempts. Try again later.", status_code=429
         )
-    if not config.admin_auth_token:
-        return HTMLResponse("Admin token is not configured.", status_code=500)
     if not hmac.compare_digest(token, config.admin_auth_token):
         auth_logger.warning("admin.login_failed", extra={"data": {"ip": client_ip}})
         return HTMLResponse("Invalid token", status_code=401)
@@ -277,8 +309,6 @@ async def logout(request: Request):
     "/admin", response_class=HTMLResponse, dependencies=[Depends(require_admin_session)]
 )
 def admin_ui(request: Request) -> Response:
-    if not _validate_session(request.cookies.get("admin_session")):
-        return RedirectResponse(url="/admin/login", status_code=303)
     settings = container.settings_service.get_settings()
     users = container.allowed_users_repository.list_all()
     users_html = (
@@ -290,7 +320,7 @@ def admin_ui(request: Request) -> Response:
     html = f"""
     <html>
       <head>
-        <title>KAD Bot Admin</title>
+        <title>Court Bot Admin</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <style>
           :root {{
@@ -417,7 +447,7 @@ def admin_ui(request: Request) -> Response:
       </head>
       <body>
         <div class="wrap">
-          <h1 class="title">Панель управления ботом КАД</h1>
+          <h1 class="title">Панель управления судебным ботом</h1>
           <div style="text-align:right;margin-bottom:8px"><a href="/admin/logout">Выйти</a></div>
           <div class="grid">
             <section class="card">
@@ -433,6 +463,10 @@ def admin_ui(request: Request) -> Response:
                   <div><label>Через сколько минут показать сообщение «анализ еще идет»</label><input name="slow_alert_minutes" value="{_html.escape(str(settings.slow_alert_minutes))}" /></div>
                 </div>
                 <div class="row">
+                  <div><label>Лимит вызовов LLM на один запрос</label><input name="max_llm_calls_per_request" value="{_html.escape(str(settings.max_llm_calls_per_request))}" /></div>
+                  <div><label>Максимальная длина текста для анализа по одному документу</label><input name="max_analysis_text_length" value="{_html.escape(str(settings.max_analysis_text_length))}" /></div>
+                </div>
+                <div class="row">
                   <div><label>Минимальная скорость загрузки данных (тех. параметр)</label><input name="fetch_concurrency_min" value="{_html.escape(str(settings.fetch_concurrency_min))}" /></div>
                   <div><label>Максимальная скорость загрузки данных (тех. параметр)</label><input name="fetch_concurrency_max" value="{_html.escape(str(settings.fetch_concurrency_max))}" /></div>
                 </div>
@@ -446,6 +480,27 @@ def admin_ui(request: Request) -> Response:
                   <div class="checkbox" style="align-items: center;">
                     <input id="send_partial_file_on_quality_fail" type="checkbox" name="send_partial_file_on_quality_fail" value="true" {"checked" if settings.send_partial_file_on_quality_fail else ""} />
                     <label for="send_partial_file_on_quality_fail">Отправлять частичную выгрузку при низком качестве данных</label>
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="checkbox" style="align-items: center;">
+                    <input id="pdf_required_for_article_queries" type="checkbox" name="pdf_required_for_article_queries" value="true" {"checked" if settings.pdf_required_for_article_queries else ""} />
+                    <label for="pdf_required_for_article_queries">Для запросов по статьям учитывать только дела с подтверждением по PDF акта</label>
+                  </div>
+                  <div class="checkbox" style="align-items: center;">
+                    <input id="enable_ocr_fallback" type="checkbox" name="enable_ocr_fallback" value="true" {"checked" if settings.enable_ocr_fallback else ""} />
+                    <label for="enable_ocr_fallback">Использовать OCR, если PDF не содержит нормального текста</label>
+                  </div>
+                </div>
+                <div class="row">
+                  <div><label>Во сколько раз расширять пул кандидатов перед строгой проверкой</label><input name="candidate_pool_multiplier" value="{_html.escape(str(settings.candidate_pool_multiplier))}" /></div>
+                  <div><label>Максимум страниц PDF на одно дело</label><input name="max_pdf_pages_per_case" value="{_html.escape(str(settings.max_pdf_pages_per_case))}" /></div>
+                </div>
+                <div class="row">
+                  <div><label>Таймаут загрузки PDF, секунд</label><input name="pdf_fetch_timeout_seconds" value="{_html.escape(str(settings.pdf_fetch_timeout_seconds))}" /></div>
+                  <div class="checkbox" style="align-items: center;">
+                    <input id="allow_law_inference" type="checkbox" name="allow_law_inference" value="true" {"checked" if settings.allow_law_inference else ""} />
+                    <label for="allow_law_inference">Разрешать боту аккуратно определять закон, если он однозначно понятен из запроса</label>
                   </div>
                 </div>
                 <div class="checkbox">
@@ -488,10 +543,11 @@ def admin_ui(request: Request) -> Response:
 
 @app.post("/admin/settings", dependencies=[Depends(require_admin_session)])
 def admin_update_settings(
-    request: Request,
     max_cases: int = Form(...),
     max_documents_per_case: int = Form(...),
     max_pages: int = Form(...),
+    max_llm_calls_per_request: int = Form(...),
+    max_analysis_text_length: int = Form(...),
     fetch_concurrency_min: int = Form(...),
     fetch_concurrency_max: int = Form(...),
     slow_alert_minutes: int = Form(...),
@@ -501,6 +557,12 @@ def admin_update_settings(
     court_mismatch_threshold_percent: int = Form(...),
     min_known_outcomes: int = Form(...),
     send_partial_file_on_quality_fail: bool = Form(False),
+    pdf_required_for_article_queries: bool = Form(False),
+    enable_ocr_fallback: bool = Form(False),
+    candidate_pool_multiplier: int = Form(...),
+    max_pdf_pages_per_case: int = Form(...),
+    pdf_fetch_timeout_seconds: int = Form(...),
+    allow_law_inference: bool = Form(False),
     analysis_prompt: str = Form(...),
 ) -> RedirectResponse:
     try:
@@ -508,6 +570,8 @@ def admin_update_settings(
             max_cases=max_cases,
             max_documents_per_case=max_documents_per_case,
             max_pages=max_pages,
+            max_llm_calls_per_request=max_llm_calls_per_request,
+            max_analysis_text_length=max_analysis_text_length,
             fetch_concurrency_min=fetch_concurrency_min,
             fetch_concurrency_max=fetch_concurrency_max,
             slow_alert_minutes=slow_alert_minutes,
@@ -517,6 +581,12 @@ def admin_update_settings(
             court_mismatch_threshold_percent=court_mismatch_threshold_percent,
             min_known_outcomes=min_known_outcomes,
             send_partial_file_on_quality_fail=send_partial_file_on_quality_fail,
+            pdf_required_for_article_queries=pdf_required_for_article_queries,
+            enable_ocr_fallback=enable_ocr_fallback,
+            candidate_pool_multiplier=candidate_pool_multiplier,
+            max_pdf_pages_per_case=max_pdf_pages_per_case,
+            pdf_fetch_timeout_seconds=pdf_fetch_timeout_seconds,
+            allow_law_inference=allow_law_inference,
             analysis_prompt=analysis_prompt,
         )
     except ValueError as exc:
@@ -526,7 +596,7 @@ def admin_update_settings(
 
 @app.post("/admin/users/grant", dependencies=[Depends(require_admin_session)])
 def admin_grant_user(
-    request: Request, telegram_id: str = Form(...)
+    telegram_id: str = Form(...)
 ) -> RedirectResponse:
     container.allowed_users_repository.grant(telegram_id)
     return RedirectResponse(url="/admin/", status_code=303)
@@ -534,7 +604,7 @@ def admin_grant_user(
 
 @app.post("/admin/users/revoke", dependencies=[Depends(require_admin_session)])
 def admin_revoke_user(
-    request: Request, telegram_id: str = Form(...)
+    telegram_id: str = Form(...)
 ) -> RedirectResponse:
     container.allowed_users_repository.revoke(telegram_id)
     return RedirectResponse(url="/admin/", status_code=303)
@@ -543,21 +613,7 @@ def admin_revoke_user(
 @app.get("/settings", dependencies=[Depends(require_auth)])
 def get_settings() -> SettingsModel:
     settings = container.settings_service.get_settings()
-    return SettingsModel(
-        max_cases=settings.max_cases,
-        max_documents_per_case=settings.max_documents_per_case,
-        max_pages=settings.max_pages,
-        fetch_concurrency_min=settings.fetch_concurrency_min,
-        fetch_concurrency_max=settings.fetch_concurrency_max,
-        slow_alert_minutes=settings.slow_alert_minutes,
-        details_cache_ttl_seconds=settings.details_cache_ttl_seconds,
-        allow_all_users=settings.allow_all_users,
-        unknown_outcome_threshold_percent=settings.unknown_outcome_threshold_percent,
-        court_mismatch_threshold_percent=settings.court_mismatch_threshold_percent,
-        min_known_outcomes=settings.min_known_outcomes,
-        send_partial_file_on_quality_fail=settings.send_partial_file_on_quality_fail,
-        analysis_prompt=settings.analysis_prompt,
-    )
+    return _build_settings_model(settings)
 
 
 @app.put("/settings", dependencies=[Depends(require_auth)])
@@ -567,6 +623,8 @@ def update_settings(payload: SettingsModel) -> SettingsModel:
             max_cases=payload.max_cases,
             max_documents_per_case=payload.max_documents_per_case,
             max_pages=payload.max_pages,
+            max_llm_calls_per_request=payload.max_llm_calls_per_request,
+            max_analysis_text_length=payload.max_analysis_text_length,
             fetch_concurrency_min=payload.fetch_concurrency_min,
             fetch_concurrency_max=payload.fetch_concurrency_max,
             slow_alert_minutes=payload.slow_alert_minutes,
@@ -576,25 +634,17 @@ def update_settings(payload: SettingsModel) -> SettingsModel:
             court_mismatch_threshold_percent=payload.court_mismatch_threshold_percent,
             min_known_outcomes=payload.min_known_outcomes,
             send_partial_file_on_quality_fail=payload.send_partial_file_on_quality_fail,
+            pdf_required_for_article_queries=payload.pdf_required_for_article_queries,
+            enable_ocr_fallback=payload.enable_ocr_fallback,
+            candidate_pool_multiplier=payload.candidate_pool_multiplier,
+            max_pdf_pages_per_case=payload.max_pdf_pages_per_case,
+            pdf_fetch_timeout_seconds=payload.pdf_fetch_timeout_seconds,
+            allow_law_inference=payload.allow_law_inference,
             analysis_prompt=payload.analysis_prompt,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return SettingsModel(
-        max_cases=settings.max_cases,
-        max_documents_per_case=settings.max_documents_per_case,
-        max_pages=settings.max_pages,
-        fetch_concurrency_min=settings.fetch_concurrency_min,
-        fetch_concurrency_max=settings.fetch_concurrency_max,
-        slow_alert_minutes=settings.slow_alert_minutes,
-        details_cache_ttl_seconds=settings.details_cache_ttl_seconds,
-        allow_all_users=settings.allow_all_users,
-        unknown_outcome_threshold_percent=settings.unknown_outcome_threshold_percent,
-        court_mismatch_threshold_percent=settings.court_mismatch_threshold_percent,
-        min_known_outcomes=settings.min_known_outcomes,
-        send_partial_file_on_quality_fail=settings.send_partial_file_on_quality_fail,
-        analysis_prompt=settings.analysis_prompt,
-    )
+    return _build_settings_model(settings)
 
 
 @app.get("/access/users", dependencies=[Depends(require_auth)])
@@ -627,6 +677,7 @@ def active_requests() -> dict:
         "requests": [
             ActiveRequestModel(
                 telegram_id=request.user_id.value,
+                request_id=request.request_id,
                 phase=request.phase,
                 total_cases=request.total_cases,
                 collected_cases=request.collected_cases,

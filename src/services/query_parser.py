@@ -2,46 +2,119 @@ from __future__ import annotations
 
 import re
 
-from src.domain.kad_models import SearchParams
+from src.domain.case_models import SearchParams
 
-# Abbreviations that must stay ALL-CAPS inside court name fragments.
 _COURT_CAPS = frozenset({"АО", "НАО", "ХМАО", "ЯНАО", "ЧАО", "ЕАО", "ЛО", "МО"})
-
-# Articles that belong to Закон о банкротстве (127-ФЗ) — always triggers case_type=B.
-# Includes both ст.61.x series and other key bankruptcy articles.
-_BANKRUPTCY_LAW_ARTICLES = frozenset({
-    "61.1", "61.2", "61.3", "61.4", "61.6", "61.7", "61.8", "61.9",
-    "10",    # злоупотребление в банкротстве
-    "100",   # установление требований
-    "134",   # очерёдность удовлетворения требований
-    "138",   # требования залогодержателей
-    "142",   # расчёты с кредиторами
-    "213.11",
-    "213.32",
-})
-
-# Generic geographic nouns that are lowercase in Russian court names.
-_COURT_LOWERCASE_WORDS = frozenset({
-    "и",
-    "области",
-    "область",
-    "края",
-    "край",
-    "округа",
-    "округ",
-    "автономного",
-    "автономной",
-    "города",
-    "город",
-})
-
-
-
-# Tokens that can follow a court mention in NL queries, but are not part of court name.
+_COURT_LOWERCASE_WORDS = frozenset(
+    {
+        "и",
+        "области",
+        "область",
+        "края",
+        "край",
+        "округа",
+        "округ",
+        "автономного",
+        "автономной",
+        "города",
+        "город",
+    }
+)
 _COURT_STOP_WORDS = frozenset({"за", "по", "на", "с", "к", "о", "об", "для"})
 
+_BANKRUPTCY_LAW_ARTICLES = frozenset(
+    {
+        "61.1",
+        "61.2",
+        "61.3",
+        "61.4",
+        "61.6",
+        "61.7",
+        "61.8",
+        "61.9",
+        "100",
+        "134",
+        "138",
+        "142",
+        "213.11",
+        "213.32",
+    }
+)
+
+_KNOWN_LAW_PATTERNS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    (
+        "127-ФЗ",
+        "Закона о банкротстве",
+        (
+            r"\b127\s*[-–]?\s*фз\b",
+            r"закона?\s+о\s+банкротств[аеоуы]",
+            r"закона?\s+о\s+несостоятельност[ии]",
+            r"\bбанкротств[аоеу]\b",
+            r"\bнесостоятельност[ьи]\b",
+        ),
+    ),
+    (
+        "ГК РФ",
+        "ГК РФ",
+        (
+            r"\bгк\s*рф\b",
+            r"гражданск\w*\s+кодекс\w*",
+        ),
+    ),
+    (
+        "АПК РФ",
+        "АПК РФ",
+        (
+            r"\bапк\b",
+            r"\bапк\s*рф\b",
+            r"арбитражн\w*\s+процессуальн\w*\s+кодекс\w*",
+        ),
+    ),
+    (
+        "ГПК РФ",
+        "ГПК РФ",
+        (
+            r"\bгпк\s*рф\b",
+            r"гражданск\w*\s+процессуальн\w*\s+кодекс\w*",
+        ),
+    ),
+    (
+        "НК РФ",
+        "НК РФ",
+        (
+            r"\bнк\s*рф\b",
+            r"налогов\w*\s+кодекс\w*",
+        ),
+    ),
+    (
+        "УК РФ",
+        "УК РФ",
+        (
+            r"\bук\s*рф\b",
+            r"уголовн\w*\s+кодекс\w*",
+        ),
+    ),
+    (
+        "КоАП РФ",
+        "КоАП РФ",
+        (
+            r"\bкоап\s*рф\b",
+            r"\bкоап\b",
+            r"кодекс\w*\s+об\s+административн\w*\s+правонарушен\w*",
+        ),
+    ),
+    (
+        "ТК РФ",
+        "ТК РФ",
+        (
+            r"\bтк\s*рф\b",
+            r"трудов\w*\s+кодекс\w*",
+        ),
+    ),
+)
+
+
 def _court_fragment_to_title(fragment: str) -> str:
-    """Convert ALL-CAPS court name fragment to proper Russian casing."""
     return " ".join(
         word
         if word in _COURT_CAPS
@@ -57,6 +130,19 @@ class QueryParser:
     _inn_pattern = re.compile(r"\b\d{10,12}\b")
     _case_number_pattern = re.compile(r"[АA]\d{2}-\d+/\d{4}")
     _quoted_pattern = re.compile(r"[«\"]([^»\"]{3,100})[»\"]")
+    _article_pattern = re.compile(r"\b(?:ст\.?|стать[яьеёи])\s*(\d+(?:\.\d+)?)\b", re.I)
+    _part_pattern = re.compile(r"\bч\.?\s*(\d+)\b", re.I)
+    _paragraph_pattern = re.compile(r"\bп\.?\s*(\d+)\b", re.I)
+    _subparagraph_pattern = re.compile(r"\bподп?\.?\s*[«\"]?([a-zа-яё0-9]+)[»\"]?\b", re.I)
+    _custom_law_pattern = re.compile(
+        r"(закона?\s+о\s+[а-яё0-9\s\-]+?)(?=(?:\s+(?:в|за|по|на|при)\b)|$|,)",
+        re.I,
+    )
+    _law_number_pattern = re.compile(r"\b(\d{1,4}\s*[-–]?\s*фз)\b", re.I)
+    _cleanup_pattern = re.compile(
+        r"\b(?:практика|анализ|обзор|судебных|актов|решений|дел|споров|по|о|об|в|за|на|и|из|для|год|года|квартал|квартала|квартале|ст\.?|статья|статье|ч\.?|часть|п\.?|пункт|подп\.?|подпункт|ас)\b",
+        re.I,
+    )
 
     def parse(self, text: str) -> SearchParams:
         year = self._extract_year(text)
@@ -64,16 +150,36 @@ class QueryParser:
         date_from, date_to = self._build_period(year, quarter)
 
         article = self._extract_article(text)
+        part = self._extract_part(text)
+        paragraph = self._extract_paragraph(text)
+        subparagraph = self._extract_subparagraph(text)
+        law_family, law_display_name, law_inferred = self._extract_law_reference(
+            text, article
+        )
+
         return SearchParams(
             inn_or_name=self._extract_inn(text) or self._extract_quoted_name(text),
             inn_type="Any",
             date_from=date_from,
             date_to=date_to,
             court=self._extract_court(text),
-            case_type=self._extract_case_type(text, article),
+            case_type=self._extract_case_type(text, law_family),
             case_number=self._extract_case_number(text),
             article=article,
-            paragraph=self._extract_paragraph(text),
+            full_article=self._build_full_article(
+                article=article,
+                part=part,
+                paragraph=paragraph,
+                subparagraph=subparagraph,
+                law_display_name=law_display_name,
+            ),
+            law_family=law_family,
+            law_display_name=law_display_name,
+            law_inferred=law_inferred,
+            part=part,
+            paragraph=paragraph,
+            subparagraph=subparagraph,
+            issue_phrase=self._extract_issue_phrase(text),
             _regex_quarter=quarter if isinstance(quarter, int) else None,
         )
 
@@ -108,7 +214,6 @@ class QueryParser:
             return f"{y}-07-01", f"{y}-09-30"
         if quarter == 4:
             return f"{y}-10-01", f"{y}-12-31"
-
         return f"{y}-01-01", f"{y}-12-31"
 
     def _extract_inn(self, text: str) -> str | None:
@@ -154,21 +259,107 @@ class QueryParser:
 
         return None
 
-    def _extract_case_type(self, text: str, article: str | None = None) -> str | None:
+    def _extract_case_type(self, text: str, law_family: str | None) -> str | None:
         text_lower = text.lower()
-        # Articles from Закон о банкротстве (127-ФЗ) always mean bankruptcy proceedings
-        if article and (article in _BANKRUPTCY_LAW_ARTICLES or str(article).startswith("61.")):
+        if law_family == "127-ФЗ" or "банкрот" in text_lower or "несостоятельност" in text_lower:
             return "B"
-        if "банкрот" in text_lower or "несостоятельност" in text_lower:
-            return "B"
-        if "административ" in text_lower:
+        if law_family == "КоАП РФ" or "административ" in text_lower:
             return "A"
         return None
 
     def _extract_article(self, text: str) -> str | None:
-        matches = re.findall(r"\b(?:ст\.?|стать[яьеи])\s?(\d+(?:\.\d+)?)\b", text, re.I)
-        return " ".join(matches) if matches else None
+        match = self._article_pattern.search(text)
+        return match.group(1).replace(",", ".") if match else None
+
+    def _extract_part(self, text: str) -> str | None:
+        match = self._part_pattern.search(text)
+        return match.group(1) if match else None
 
     def _extract_paragraph(self, text: str) -> str | None:
-        match = re.search(r"\bп\.?\s?(\d+)\b", text, re.I)
+        match = self._paragraph_pattern.search(text)
         return match.group(1) if match else None
+
+    def _extract_subparagraph(self, text: str) -> str | None:
+        match = self._subparagraph_pattern.search(text)
+        return match.group(1) if match else None
+
+    def _extract_law_reference(
+        self, text: str, article: str | None
+    ) -> tuple[str | None, str | None, bool]:
+        lowered = text.lower()
+        for law_family, display_name, patterns in _KNOWN_LAW_PATTERNS:
+            if any(re.search(pattern, lowered, re.I) for pattern in patterns):
+                return law_family, display_name, False
+
+        custom_number = self._law_number_pattern.search(text)
+        custom_named = self._custom_law_pattern.search(text)
+        if custom_number or custom_named:
+            number = (
+                custom_number.group(1).upper().replace(" ", "")
+                if custom_number
+                else None
+            )
+            named = custom_named.group(1).strip() if custom_named else None
+            display = named or (f"Федеральный закон № {number}" if number else None)
+            if display:
+                return number or "CUSTOM_LAW", self._normalize_custom_law_display(display), False
+
+        if article and (
+            article in _BANKRUPTCY_LAW_ARTICLES
+            or article.startswith("61.")
+            or "банкрот" in lowered
+            or "несостоятельност" in lowered
+        ):
+            return "127-ФЗ", "Закона о банкротстве", True
+
+        return None, None, False
+
+    def _normalize_custom_law_display(self, display: str) -> str:
+        cleaned = " ".join(display.split())
+        if not cleaned:
+            return cleaned
+        return cleaned[0].upper() + cleaned[1:]
+
+    def _build_full_article(
+        self,
+        article: str | None,
+        part: str | None,
+        paragraph: str | None,
+        subparagraph: str | None,
+        law_display_name: str | None,
+    ) -> str | None:
+        if not article:
+            return None
+        prefix: list[str] = []
+        if subparagraph:
+            prefix.append(f"подп. {subparagraph}")
+        if paragraph:
+            prefix.append(f"п. {paragraph}")
+        if part:
+            prefix.append(f"ч. {part}")
+        base = " ".join(prefix + [f"ст. {article}"]).strip()
+        if law_display_name:
+            return f"{base} {law_display_name}".strip()
+        return base
+
+    def _extract_issue_phrase(self, text: str) -> str | None:
+        stripped = text
+        stripped = self._article_pattern.sub(" ", stripped)
+        stripped = self._part_pattern.sub(" ", stripped)
+        stripped = self._paragraph_pattern.sub(" ", stripped)
+        stripped = self._subparagraph_pattern.sub(" ", stripped)
+        stripped = self._case_number_pattern.sub(" ", stripped)
+        stripped = self._quoted_pattern.sub(" ", stripped)
+        stripped = self._year_pattern.sub(" ", stripped)
+        for _, _, patterns in _KNOWN_LAW_PATTERNS:
+            for pattern in patterns:
+                stripped = re.sub(pattern, " ", stripped, flags=re.I)
+        stripped = re.sub(r"\d+\s*квартал", " ", stripped, flags=re.I)
+        stripped = re.sub(r"\d+\s*кв", " ", stripped, flags=re.I)
+        stripped = re.sub(r"(\d+)\s*(?:аас|арбитражный апелляционный суд)", " ", stripped, flags=re.I)
+        stripped = re.sub(r"ас\s+[а-я-]+(?:\s+[а-я-]+){0,2}", " ", stripped, flags=re.I)
+        stripped = self._cleanup_pattern.sub(" ", stripped)
+        words = [word for word in re.findall(r"[а-яёa-z0-9-]{4,}", stripped, re.I) if word]
+        if not words:
+            return None
+        return " ".join(words[:8])

@@ -45,6 +45,8 @@ class SqliteConnection:
                     max_cases integer not null,
                     max_documents_per_case integer not null,
                     max_pages integer not null,
+                    max_llm_calls_per_request integer not null default 50,
+                    max_analysis_text_length integer not null default 50000,
                     fetch_concurrency_min integer not null default 6,
                     fetch_concurrency_max integer not null default 10,
                     slow_alert_minutes integer not null default 5,
@@ -54,6 +56,12 @@ class SqliteConnection:
                     court_mismatch_threshold_percent integer not null default 20,
                     min_known_outcomes integer not null default 50,
                     send_partial_file_on_quality_fail integer not null default 1,
+                    pdf_required_for_article_queries integer not null default 1,
+                    enable_ocr_fallback integer not null default 1,
+                    candidate_pool_multiplier integer not null default 4,
+                    max_pdf_pages_per_case integer not null default 20,
+                    pdf_fetch_timeout_seconds integer not null default 45,
+                    allow_law_inference integer not null default 1,
                     analysis_prompt text not null,
                     updated_at text not null
                 );
@@ -92,6 +100,7 @@ class SqliteConnection:
                 create index if not exists idx_login_attempts_ip on login_attempts(ip_address);
                 create table if not exists active_requests (
                     user_id text primary key,
+                    request_id text not null default '',
                     query_text text not null,
                     phase text not null default 'counting',
                     total_cases integer not null default 0,
@@ -120,6 +129,14 @@ class SqliteConnection:
         if "fetch_concurrency_min" not in columns:
             conn.execute(
                 "alter table settings add column fetch_concurrency_min integer not null default 6"
+            )
+        if "max_llm_calls_per_request" not in columns:
+            conn.execute(
+                "alter table settings add column max_llm_calls_per_request integer not null default 50"
+            )
+        if "max_analysis_text_length" not in columns:
+            conn.execute(
+                "alter table settings add column max_analysis_text_length integer not null default 50000"
             )
         if "fetch_concurrency_max" not in columns:
             conn.execute(
@@ -153,12 +170,40 @@ class SqliteConnection:
             conn.execute(
                 "alter table settings add column send_partial_file_on_quality_fail integer not null default 1"
             )
+        if "pdf_required_for_article_queries" not in columns:
+            conn.execute(
+                "alter table settings add column pdf_required_for_article_queries integer not null default 1"
+            )
+        if "enable_ocr_fallback" not in columns:
+            conn.execute(
+                "alter table settings add column enable_ocr_fallback integer not null default 1"
+            )
+        if "candidate_pool_multiplier" not in columns:
+            conn.execute(
+                "alter table settings add column candidate_pool_multiplier integer not null default 4"
+            )
+        if "max_pdf_pages_per_case" not in columns:
+            conn.execute(
+                "alter table settings add column max_pdf_pages_per_case integer not null default 20"
+            )
+        if "pdf_fetch_timeout_seconds" not in columns:
+            conn.execute(
+                "alter table settings add column pdf_fetch_timeout_seconds integer not null default 45"
+            )
+        if "allow_law_inference" not in columns:
+            conn.execute(
+                "alter table settings add column allow_law_inference integer not null default 1"
+            )
 
     def _ensure_active_requests_columns(self, conn: sqlite3.Connection) -> None:
         columns = {
             row["name"]
             for row in conn.execute("pragma table_info(active_requests)").fetchall()
         }
+        if "request_id" not in columns:
+            conn.execute(
+                "alter table active_requests add column request_id text not null default ''"
+            )
         if "cancelled" not in columns:
             conn.execute(
                 "alter table active_requests add column cancelled integer not null default 0"

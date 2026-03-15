@@ -47,6 +47,16 @@ class CaseDecision:
     evidence_quote: str = ""
     evidence_tier: EvidenceTier = EvidenceTier.TIER_D_NO_MATCH
     validation_confidence: ConfidenceScore = ConfidenceScore.REJECTED
+    decisive_act_title: str = ""
+    decisive_act_url: str = ""
+    decisive_act_type: str = ""
+    pdf_status: str = "not_requested"
+    verification_failure_code: str = ""
+    law_display_name: str = ""
+    source_system: str = "parser"
+    source_quality_score: float = 1.0
+    source_quality_reasons: tuple[str, ...] = ()
+    extraction_confidence: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -55,3 +65,8 @@ class AnalysisResult:
     case_list: str
     total_pages: int = 0
     total_cases_found: int = 0
+    primary_source: str = "parser"
+    fallback_used: bool = False
+    fallback_reason: str = ""
+    version_bundle: str = ""
+    confidence_score: float = 1.0

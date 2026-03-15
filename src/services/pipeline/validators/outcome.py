@@ -24,6 +24,16 @@ class IssueOutcomeExtractor:
         """
         current_outcome = decision.outcome
 
+        if (
+            decision.pdf_status in {"pdf_text", "ocr_text"}
+            and decision.proof_quote
+            and current_outcome != CaseOutcome.UNKNOWN
+        ):
+            return current_outcome, decision.reasons
+
+        if decision.pdf_status not in {"pdf_text", "ocr_text"}:
+            return current_outcome, decision.reasons
+
         # If rule-engine already found a solid SATISFIED/DENIED, trust it for now unless
         # it conflicts heavily with the LLM later, but for speed, we accept rule-based.
         if current_outcome != CaseOutcome.UNKNOWN and not self._llm:

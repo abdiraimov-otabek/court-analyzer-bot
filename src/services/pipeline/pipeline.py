@@ -1,13 +1,13 @@
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Callable, List, Optional
 
 from src.domain.entities import CaseDecision, CaseOutcome, ConfidenceScore, EvidenceTier
-from src.domain.kad_models import FetchStats, SearchParams
-from src.services.kad.validators.article import ArticleValidator
-from src.services.kad.validators.court import JurisdictionValidator
-from src.services.kad.validators.outcome import IssueOutcomeExtractor
-from src.services.kad.validators.scorer import EvidenceScorer
+from src.domain.case_models import FetchStats, SearchParams
+from src.services.pipeline.validators.article import ArticleValidator
+from src.services.pipeline.validators.court import JurisdictionValidator
+from src.services.pipeline.validators.outcome import IssueOutcomeExtractor
+from src.services.pipeline.validators.scorer import EvidenceScorer
 
 
 @dataclass
@@ -28,17 +28,17 @@ class PipelineResult:
     params: SearchParams
 
 
-class KadPipeline:
+class CasePipeline:
     """
-    Two-Stage KAD Pipeline.
-    Stage A (Retrieval): Use KadClient to gather candidate case events.
+    Two-Stage Case Pipeline.
+    Stage A (Retrieval): Use CaseClient to gather candidate case events.
     Stage B (Validation): Run strict validations and assign a Confidence Score.
     """
 
-    def __init__(self, kad_client, llm_reason_extractor=None):
-        self.kad_client = kad_client
+    def __init__(self, case_client, llm_reason_extractor=None):
+        self.case_client = case_client
         self.outcome_extractor = IssueOutcomeExtractor(llm_reason_extractor)
-        self.logger = logging.getLogger("kad_pipeline")
+        self.logger = logging.getLogger("case_pipeline")
 
     @staticmethod
     def _legacy_confidence(confidence: ConfidenceScore) -> float:
@@ -65,7 +65,7 @@ class KadPipeline:
         # We tell the client to collect cases. It returns FetchDecisionsResult
         # It should no longer run the LLM classification natively.
         self.logger.info("Starting Pipeline Stage A: Retrieval")
-        retrieval_result = await self.kad_client.fetch_decisions(
+        retrieval_result = await self.case_client.fetch_decisions(
             query_text=query_text,
             settings=settings,
             on_progress=on_progress,
@@ -90,7 +90,15 @@ class KadPipeline:
         if on_stage_change:
             on_stage_change("validating")
 
-        article_validator = ArticleValidator(params.article, params.paragraph)
+        article_validator = ArticleValidator(
+            params.article,
+            target_paragraph=params.paragraph,
+            target_part=getattr(params, "part", None),
+            target_subparagraph=getattr(params, "subparagraph", None),
+            law_family=getattr(params, "law_family", None),
+            law_display_name=getattr(params, "law_display_name", None),
+            issue_phrase=getattr(params, "issue_phrase", None),
+        )
         validated_records = []
 
         validated_count = 0
@@ -104,7 +112,7 @@ class KadPipeline:
             court_match = JurisdictionValidator.validate(requested_court, actual_court)
 
             # 2. Article Validation
-            # Since KadClient doesn't do LLM reason extraction anymore, we just use analysis_text
+            # Since CaseClient doesn't do LLM reason extraction anymore, we just use analysis_text
             text_to_scan = decision.analysis_text or ""
             if params.article:
                 tier, matched_art, evidence_quote = article_validator.validate(
@@ -123,19 +131,28 @@ class KadPipeline:
             # 4. Confidence Scoring
             confidence = EvidenceScorer.score(tier, court_match, final_outcome)
 
-            # Apply updates back to the decision for downstream
-            decision_kwargs = {**decision.__dict__}
-            if final_reasons:
-                decision_kwargs["reasons"] = final_reasons
-                decision_kwargs["outcome"] = final_outcome
+            decision_copy = replace(
+                decision,
+                matched_article=matched_art,
+                evidence_tier=tier,
+                validation_confidence=confidence,
+                evidence_quote=evidence_quote,
+                confidence_score=self._legacy_confidence(confidence),
+                outcome=final_outcome,
+                reasons=final_reasons or decision.reasons
+            )
 
-            decision_kwargs["matched_article"] = matched_art
-            decision_kwargs["evidence_tier"] = tier
-            decision_kwargs["validation_confidence"] = confidence
-            decision_kwargs["evidence_quote"] = evidence_quote
-            decision_kwargs["confidence_score"] = self._legacy_confidence(confidence)
-
-            decision_copy = decision.__class__(**decision_kwargs)
+            if params.article and confidence == ConfidenceScore.REJECTED:
+                failure_code = decision.verification_failure_code or "article_not_confirmed"
+                if decision.pdf_status == "pdf_access_blocked":
+                    failure_code = "pdf_access_blocked"
+                elif decision.pdf_status in {"pdf_unreadable", "pdf_missing"}:
+                    failure_code = "pdf_unreadable"
+                elif final_outcome == CaseOutcome.UNKNOWN and tier != EvidenceTier.TIER_D_NO_MATCH:
+                    failure_code = "outcome_unclear"
+                elif decision.decisive_act_type != "merits_act":
+                    failure_code = "procedural_only"
+                decision_copy = replace(decision_copy, verification_failure_code=failure_code)
 
             record = ValidationResultRecord(
                 decision=decision_copy,
@@ -149,14 +166,12 @@ class KadPipeline:
             validated_records.append(record)
 
             # Only count 'Confirmed' and 'Probable' as totally successful for the UI progress
-            # If an article is requested, we also count 'Weak' matches because they come from KAD search
+            # If an article is requested, we also count 'Weak' matches because they come from search
             success_thresholds = [ConfidenceScore.CONFIRMED, ConfidenceScore.PROBABLE]
-            if params.article:
-                success_thresholds.append(ConfidenceScore.WEAK)
 
             if confidence in success_thresholds:
                 validated_count += 1
-                if on_successful:
+                if callable(on_successful):
                     on_successful(validated_count)
 
         self.logger.info(

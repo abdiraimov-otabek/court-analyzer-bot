@@ -6,14 +6,14 @@ import pytest
 
 from src.domain.analysis import AnalysisService
 from src.domain.entities import CaseDecision, CaseOutcome
-from src.domain.kad_models import SearchParams
+from src.domain.case_models import SearchParams
 from src.domain.settings import Settings
 from src.domain.value_objects import UserId
 from src.infrastructure.cache_repository import AnalysisCacheRepository
 from src.infrastructure.sqlite import SqliteConnection
 from src.services.active_requests import ActiveRequestRegistry
 from src.services.hashing import HashingService
-from src.services.kad_client import FetchDecisionsResult, FetchStats, KadClient
+from src.services.database_case_client import FetchDecisionsResult, FetchStats, CaseClient
 from src.services.request_processor import (
     InsufficientQualityError,
     NoRelevantCasesError,
@@ -22,7 +22,7 @@ from src.services.request_processor import (
 )
 
 
-class FakeKadClient(KadClient):
+class FakeCaseClient(CaseClient):
     def count_cases(self, query_text: str, settings: Settings) -> int:
         return 5
 
@@ -109,6 +109,69 @@ class FakeKadClient(KadClient):
         )
 
 
+class OverflowProgressCaseClient(CaseClient):
+    def count_cases(self, query_text: str, settings: Settings) -> int:
+        return 1020
+
+    async def fetch_decisions(
+        self,
+        query_text: str,
+        settings: Settings,
+        on_progress=None,
+        on_successful=None,
+        on_retry=None,
+        on_collection_progress=None,
+        on_stage_change=None,
+        should_cancel=None,
+    ) -> FetchDecisionsResult:
+        if on_stage_change:
+            on_stage_change("collecting")
+        if on_collection_progress:
+            on_collection_progress(758)
+            on_collection_progress(1020)
+        if on_stage_change:
+            on_stage_change("analyzing")
+        decisions = [
+            CaseDecision(
+                case_number=f"A40-{index}/2023",
+                decision_date=date(2023, 3, 15),
+                outcome=CaseOutcome.SATISFIED if index % 2 == 0 else CaseOutcome.DENIED,
+                reasons=("доказан вред",),
+                court_name="АС города Москвы",
+                evidence_quote="Суд пришел к выводу о наличии оснований.",
+            )
+            for index in range(settings.max_cases)
+        ]
+        if on_progress:
+            on_progress(settings.max_cases)
+        if on_successful:
+            on_successful(settings.max_cases)
+        return FetchDecisionsResult(
+            decisions=decisions,
+            stats=FetchStats(
+                attempted_cases=1020,
+                successful_cases=settings.max_cases,
+                retry_count=0,
+                effective_concurrency=8,
+                case_id_collection_ms=10,
+                details_fetch_ms=20,
+                filtered_by_court=0,
+                court_compared_cases=settings.max_cases,
+                total_cases_found=1020,
+            ),
+            params=SearchParams(
+                None,
+                None,
+                None,
+                None,
+                "АС города Москвы",
+                None,
+                None,
+                None,
+            ),
+        )
+
+
 class InMemoryLogRepository:
     def __init__(self) -> None:
         self.entries: list[tuple[str, str, str]] = []
@@ -152,7 +215,7 @@ def test_request_processor_caches_and_logs(tmp_path):
     )
 
     processor = RequestProcessor(
-        kad_client=FakeKadClient(),
+        case_client=FakeCaseClient(),
         analysis_service=AnalysisService(),
         active_requests=registry,
         cache_repository=cache_repo,
@@ -162,9 +225,54 @@ def test_request_processor_caches_and_logs(tmp_path):
 
     result = asyncio.run(processor.process(user_id, "query 2023", settings))
 
-    assert "Всего верифицировано: 5" in result.summary
+    assert "Проверено: 5" in result.summary
     assert "Суд: АС города Москвы" in result.summary
+    assert result.primary_source == "parser"
+    assert result.fallback_used is False
+    assert result.version_bundle
+    assert 0.0 <= result.confidence_score <= 1.0
     assert registry.get(user_id).processed_cases == 5
+
+
+def test_request_processor_keeps_progress_capped_to_requested_max_cases(tmp_path):
+    settings = Settings(
+        max_cases=50,
+        max_documents_per_case=5,
+        max_pages=20,
+        fetch_concurrency_min=6,
+        fetch_concurrency_max=10,
+        slow_alert_minutes=5,
+        details_cache_ttl_seconds=24 * 60 * 60,
+        min_known_outcomes=5,
+        analysis_prompt="test",
+        updated_at=datetime(2026, 2, 11, 12, 0, 0),
+    )
+    registry = ActiveRequestRegistry()
+    user_id = UserId("123")
+    registry.start(user_id, query_text="query 2023", total_cases=50)
+
+    cache_repo = AnalysisCacheRepository(
+        SqliteConnection(str(tmp_path / "app.db")), ttl_seconds=60
+    )
+
+    processor = RequestProcessor(
+        case_client=OverflowProgressCaseClient(),
+        analysis_service=AnalysisService(),
+        active_requests=registry,
+        cache_repository=cache_repo,
+        log_repository=InMemoryLogRepository(),
+        hashing_service=HashingService(salt="pepper"),
+    )
+
+    result = asyncio.run(processor.process(user_id, "query 2023", settings))
+    active = registry.get(user_id)
+
+    assert result is not None
+    assert active is not None
+    assert active.total_cases == 50
+    assert active.collected_cases == 50
+    assert active.processed_cases == 50
+    assert active.successful_cases == 50
 
 
 def test_request_processor_returns_result_even_if_cache_and_log_write_fail():
@@ -185,7 +293,7 @@ def test_request_processor_returns_result_even_if_cache_and_log_write_fail():
     registry.start(user_id, query_text="query 2023", total_cases=5)
 
     processor = RequestProcessor(
-        kad_client=FakeKadClient(),
+        case_client=FakeCaseClient(),
         analysis_service=AnalysisService(),
         active_requests=registry,
         cache_repository=FailingAnalysisCacheRepository(),  # type: ignore[arg-type]
@@ -195,10 +303,10 @@ def test_request_processor_returns_result_even_if_cache_and_log_write_fail():
 
     result = asyncio.run(processor.process(user_id, "query 2023", settings))
 
-    assert "Всего верифицировано: 5" in result.summary
+    assert "Проверено: 5" in result.summary
 
 
-class MostlyUnknownKadClient(KadClient):
+class MostlyUnknownCaseClient(CaseClient):
     def count_cases(self, query_text: str, settings: Settings) -> int:
         return 60
 
@@ -276,7 +384,7 @@ def test_request_processor_blocks_final_summary_on_quality_gate(tmp_path):
     )
 
     processor = RequestProcessor(
-        kad_client=MostlyUnknownKadClient(),
+        case_client=MostlyUnknownCaseClient(),
         analysis_service=AnalysisService(),
         active_requests=registry,
         cache_repository=cache_repo,
@@ -293,7 +401,7 @@ def test_request_processor_blocks_final_summary_on_quality_gate(tmp_path):
     assert exc.value.case_list
 
 
-class WeakEvidenceArticleKadClient(KadClient):
+class WeakEvidenceArticleCaseClient(CaseClient):
     def count_cases(self, query_text: str, settings: Settings) -> int:
         return 80
 
@@ -348,7 +456,7 @@ class WeakEvidenceArticleKadClient(KadClient):
         )
 
 
-def test_request_processor_accepts_search_engine_article_matches(tmp_path):
+def test_request_processor_rejects_unverified_search_engine_article_matches(tmp_path):
     settings = Settings(
         max_cases=80,
         max_documents_per_case=5,
@@ -369,7 +477,7 @@ def test_request_processor_accepts_search_engine_article_matches(tmp_path):
     )
 
     processor = RequestProcessor(
-        kad_client=WeakEvidenceArticleKadClient(),
+        case_client=WeakEvidenceArticleCaseClient(),
         analysis_service=AnalysisService(),
         active_requests=registry,
         cache_repository=cache_repo,
@@ -377,14 +485,14 @@ def test_request_processor_accepts_search_engine_article_matches(tmp_path):
         hashing_service=HashingService(salt="pepper"),
     )
 
-    # With the new behavior, we trust the KAD API search engine, so we expect SUCCESS,
-    # as the fallback tier in ArticleValidator is now TIER_B_PROBABLE_MATCH.
-    result = asyncio.run(processor.process(user_id, "ст 61.2 2025", settings))
-    assert result is not None
-    assert "Всего верифицировано: 80" in result.summary
+    with pytest.raises(InsufficientQualityError) as exc_info:
+        asyncio.run(processor.process(user_id, "ст 61.2 2025", settings))
+
+    assert exc_info.value.reason_code == "no_verified_cases"
+    assert exc_info.value.verified_cases == 0
 
 
-class EmptyResultKadClient(KadClient):
+class EmptyResultCaseClient(CaseClient):
     def count_cases(self, query_text: str, settings: Settings) -> int:
         return 50
 
@@ -448,7 +556,7 @@ def test_request_processor_raises_not_enough_data_when_no_decisions(tmp_path):
     )
 
     processor = RequestProcessor(
-        kad_client=EmptyResultKadClient(),
+        case_client=EmptyResultCaseClient(),
         analysis_service=AnalysisService(),
         active_requests=registry,
         cache_repository=cache_repo,
@@ -460,7 +568,7 @@ def test_request_processor_raises_not_enough_data_when_no_decisions(tmp_path):
         asyncio.run(processor.process(user_id, "query 2024", settings))
 
 
-class ArticleFilteredOutKadClient(KadClient):
+class ArticleFilteredOutCaseClient(CaseClient):
     def count_cases(self, query_text: str, settings: Settings) -> int:
         return 50
 
@@ -527,7 +635,7 @@ def test_request_processor_raises_no_relevant_cases_after_article_filter(tmp_pat
     )
 
     processor = RequestProcessor(
-        kad_client=ArticleFilteredOutKadClient(),
+        case_client=ArticleFilteredOutCaseClient(),
         analysis_service=AnalysisService(),
         active_requests=registry,
         cache_repository=cache_repo,

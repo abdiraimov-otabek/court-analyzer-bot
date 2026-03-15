@@ -40,13 +40,13 @@ def _make_decision(i: int) -> CaseDecision:
 
 
 @pytest.mark.asyncio
-async def test_lenient_verification_accepts_empty_proof_quote():
+async def test_strict_verification_rejects_empty_proof_quote():
     """
-    Ensure the new lenient rule works:
+    Ensure the strict rule works:
     - 10 cases sent to classify_batch
     - LLM returns "relevant": true for all
     - Only case 0 provides a real proof_quote
-    - result: ALL cases survive because LLM confirmed relevance.
+    - result: only the quote-backed case survives
     """
     http = AsyncMock()
     extractor = LLMReasonExtractor(api_key="test", http_client=http)
@@ -68,18 +68,16 @@ async def test_lenient_verification_accepts_empty_proof_quote():
 
     results = await extractor.classify_batch(decisions, "61.2", "ст. 61.2 банкротство")
 
-    # Count how many survived as relevant
     relevant_count = sum(1 for is_rel, _, _, _ in results if is_rel)
-
-    # NEW BEHAVIOR: All should survive
-    assert relevant_count == 10, f"Expected all 10 cases to be relevant, but got {relevant_count}."
+    assert relevant_count == 1
 
     assert results[0][0] is True
     assert "Суд установил" in results[0][2]
 
     for i in range(1, 10):
-        assert results[i][0] is True
-        assert "Прямая цитата не найдена" in results[i][2]
+        assert results[i][0] is False
+        assert "Отклонено:" in results[i][1][0]
+        assert results[i][2] == ""
 
 
 @pytest.mark.asyncio
@@ -103,15 +101,16 @@ async def test_irrelevant_cases_are_still_rejected():
     results = await extractor.classify_batch(decisions, "61.2", "ст. 61.2")
 
     relevant_count = sum(1 for is_rel, _, _, _ in results if is_rel)
-    assert relevant_count == 2, "Cases 0 and 1 should be relevant (1 survives via fallback quote)"
+    assert relevant_count == 1
 
     # Case 0: relevant with real quote
     assert results[0][0] is True
     assert results[0][2] == "цитата"
 
-    # Case 1: relevant without quote → survives via fallback
-    assert results[1][0] is True
-    assert "Прямая цитата не найдена" in results[1][2]
+    # Case 1: relevant without quote → rejected under strict mode
+    assert results[1][0] is False
+    assert "Отклонено:" in results[1][1][0]
+    assert results[1][2] == ""
 
     # Cases 2-4: irrelevant (LLM said so)
     for i in range(2, 5):
@@ -119,8 +118,8 @@ async def test_irrelevant_cases_are_still_rejected():
 
 
 @pytest.mark.asyncio
-async def test_single_case_classify_api_accepts_empty_quote():
-    """Test the single-case _call_classify_api path accepts empty proofs with fallback."""
+async def test_single_case_classify_api_rejects_empty_quote():
+    """Test the single-case _call_classify_api path rejects missing proof quotes."""
     http = AsyncMock()
     extractor = LLMReasonExtractor(api_key="test", http_client=http)
 
@@ -136,5 +135,6 @@ async def test_single_case_classify_api_accepts_empty_quote():
         "Контекст дела...", CaseOutcome.DENIED, "61.2", "ст. 61.2"
     )
 
-    assert is_relevant is True, "Should be accepted even with missing quote"
-    assert "Прямая цитата не найдена" in quote
+    assert is_relevant is False
+    assert "Отклонено:" in reasons[0]
+    assert quote == ""

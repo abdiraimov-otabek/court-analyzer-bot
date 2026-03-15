@@ -4,13 +4,11 @@ import asyncio
 import re
 import time
 import logging
-from typing import Callable, Any
-from datetime import date
+from typing import Callable, Any, Protocol
 from dataclasses import replace, asdict
-
 from src.infrastructure.models import Decision
-from src.domain.entities import CaseDecision, CaseOutcome, ConfidenceScore
-from src.domain.kad_models import (
+from src.domain.entities import CaseDecision, CaseOutcome
+from src.domain.case_models import (
     FetchDecisionsResult,
     FetchStats,
     SearchParams,
@@ -20,11 +18,29 @@ from src.domain.settings import Settings
 from src.app.bot_logging import log_event
 
 
-class PostgresKadClient:
+class CaseClient(Protocol):
+    def count_cases(self, query_text: str, settings: Settings) -> int: ...
+
+    async def count_cases_async(self, query_text: str, settings: Settings) -> int: ...
+
+    async def fetch_decisions(
+        self,
+        query_text: str,
+        settings: Settings,
+        on_progress: Callable[[int], None] | None = None,
+        on_successful: Callable[[int], None] | None = None,
+        on_retry: Callable[[int], None] | None = None,
+        on_collection_progress: Callable[[int], None] | None = None,
+        on_stage_change: Callable[[str], None] | None = None,
+        should_cancel: Callable[[], bool] | None = None,
+    ) -> FetchDecisionsResult: ...
+
+
+class DatabaseCaseClient:
     def __init__(self, llm_reason_extractor=None) -> None:
         self._parser = QueryParser()
         self._llm_reason_extractor = llm_reason_extractor
-        self._logger = logging.getLogger("postgres_kad_client")
+        self._logger = logging.getLogger("db_case_client")
 
     def count_cases(self, query_text: str, settings: Settings) -> int:
         params = self._parser.parse(query_text)
@@ -38,7 +54,7 @@ class PostgresKadClient:
         params = await self._refine_params_with_llm(query_text, params)
         query = self._build_query(params)
         count = query.count()
-        log_event(self._logger, "postgres.count_cases", count=count, params=asdict(params))
+        log_event(self._logger, "db.count_cases", count=count, params=asdict(params))
         return count
 
     async def fetch_decisions(
@@ -72,16 +88,16 @@ class PostgresKadClient:
         fetched_decisions: list[CaseDecision] = []
 
         for i, row in enumerate(results):
-            if should_cancel and should_cancel():
+            if callable(should_cancel) and should_cancel():
                 break
 
             decision = self._map_to_case_decision(row)
             fetched_decisions.append(decision)
 
-            if on_progress:
+            if callable(on_progress):
                 on_progress(i + 1)
             # Pipeline will handle 'on_successful' if we return it here, 
-            # but PostgresKadClient should stick to Stage A responsibilities.
+            # but DatabaseCaseClient should stick to Stage A responsibilities.
 
         details_fetch_ms = int((time.perf_counter() - details_start) * 1000)
 
@@ -117,18 +133,20 @@ class PostgresKadClient:
 
         if params.court:
             # Flexible court/place matching
-            # Extract main city name: "АС города Москвы" -> "Москв"
-            # "АС Московской области" -> "Московск"
-            court_clean = params.court.replace("АС ", "").replace("города ", "").strip()
-            # If it's a long name, take the first word or part of it
+            court_clean = params.court.replace("АС ", "").replace("города ", "").replace("области", "").strip()
             city_hint = court_clean.split()[0] if court_clean else ""
             if len(city_hint) > 4:
-                city_hint = city_hint[:5] # e.g. "Москв", "Санкт"
+                city_hint = city_hint[:5]
             
             if city_hint:
-                query = query.where(Decision.place.ilike(f"%{city_hint}%"))
+                # Search in place OR in text to catch city/region mismatches
+                query = query.where(
+                    (Decision.place.ilike(f"%{city_hint}%")) | 
+                    (Decision.text.ilike(f"%Арбитражный суд {city_hint}%")) |
+                    (Decision.text.ilike(f"%АС {city_hint}%"))
+                )
             else:
-                query = query.where(Decision.place.ilike(f"%{court_clean}%"))
+                query = query.where(Decision.place.ilike(f"%{params.court}%"))
 
         if params.article:
             query = query.where(Decision.text.ilike(f"%{params.article}%"))
@@ -197,21 +215,41 @@ class PostgresKadClient:
             date_to=date_to or params.date_to,
         )
 
-        log_event(self._logger, "postgres.llm_query_parsed", params=asdict(refined))
+        log_event(self._logger, "db.llm_query_parsed", params=asdict(refined))
         return refined
 
     def _map_to_case_decision(self, row: Decision) -> CaseDecision:
         outcome = self._map_outcome(row.text)
+        court_name = self._extract_court_from_text(row.text) or row.place or ""
+        
+        # Extract act title: "Решение от ..." -> "Решение"
+        act_title = ""
+        first_line = row.text.split("\n")[0] if row.text else ""
+        act_match = re.match(r"^(Решение|Постановление|Определение)", first_line)
+        if act_match:
+            act_title = act_match.group(1)
+
         return CaseDecision(
             case_number=row.case_number,
             decision_date=row.date,
             outcome=outcome,
             reasons=("оценка обстоятельств дела",),
             case_id=row.number,
-            court_name=row.place or "",
+            court_name=court_name,
             case_link=f"https://sudact.ru{row.url}" if row.url else "",
             analysis_text=row.text,
+            decisive_act_title=act_title or first_line[:50].strip(),
+            decisive_act_type="merits_act" if act_title in ("Решение", "Постановление") else "other",
         )
+
+    def _extract_court_from_text(self, text: str) -> str | None:
+        # Pattern: Арбитражный суд ... (АС ...)
+        match = re.search(r"Арбитражный суд\s+([А-Яа-яЁё\s-]+)\s*(?:\(АС\s+([А-Яа-яЁё\s-]+)\))?", text)
+        if match:
+            base = match.group(1).strip()
+            # If (АС ...) is present and has shorter/better name, use it or combine
+            return f"Арбитражный суд {base}"
+        return None
 
     def _map_outcome(self, text: str) -> CaseOutcome:
         lower = text.lower()

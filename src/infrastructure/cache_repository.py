@@ -70,7 +70,6 @@ class AnalysisCacheRepository:
                         expires_at.isoformat(),
                     ),
                 )
-                conn.commit()
         except sqlite3.DatabaseError as exc:
             if self._disable_on_corruption(exc):
                 return
@@ -84,7 +83,6 @@ class AnalysisCacheRepository:
                 conn.execute(
                     "delete from analysis_cache where cache_key = ?", (cache_key,)
                 )
-                conn.commit()
         except sqlite3.DatabaseError as exc:
             if self._disable_on_corruption(exc):
                 return
@@ -99,7 +97,6 @@ class AnalysisCacheRepository:
                     "delete from analysis_cache where expires_at <= ?",
                     (now.isoformat(),),
                 )
-                conn.commit()
         except sqlite3.DatabaseError as exc:
             if self._disable_on_corruption(exc):
                 return

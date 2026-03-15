@@ -17,5 +17,5 @@ RUN uv pip install --system --no-cache -r pyproject.toml
 # Copy the rest of the application
 COPY . .
 
-# Default command (can be overridden in docker-compose)
-CMD ["python", "-m", "src.app.run_bot"]
+# Default command. Use APP_ROLE=admin for the FastAPI admin service.
+CMD ["python", "-m", "src.app.run_service"]

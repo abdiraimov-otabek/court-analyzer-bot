@@ -9,6 +9,7 @@ class JurisdictionValidator:
         "АС",
         "АРБИТРАЖНЫЙ",
         "СУД",
+        "Г",
         "ГОРОДА",
         "ГОРОД",
         "ОБЛАСТИ",
@@ -51,7 +52,7 @@ class JurisdictionValidator:
 
         # Require a high degree of overlap to prevent false positives between regions
         min_size = min(len(req_tokens), len(act_tokens))
-        return (len(overlap) / min_size) >= 0.8  # Stricter than previous 0.6
+        return (len(overlap) / min_size) > 0.5  # Loosened from 0.8 for city/region variations
 
     @classmethod
     def _tokenize(cls, court_name: str) -> set[str]:

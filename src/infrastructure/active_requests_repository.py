@@ -20,21 +20,27 @@ class ActiveRequestsRepository:
         self._connection = connection
 
     def upsert(
-        self, user_id: str, query_text: str, phase: str, total_cases: int
+        self,
+        user_id: str,
+        request_id: str,
+        query_text: str,
+        phase: str,
+        total_cases: int,
     ) -> None:
         try:
             with self._connection.connect() as conn:
                 conn.execute(
                     """
-                    INSERT INTO active_requests (user_id, query_text, phase, total_cases, cancelled, started_at, updated_at)
-                    VALUES (?, ?, ?, ?, 0, strftime('%s','now'), strftime('%s','now'))
+                    INSERT INTO active_requests (user_id, request_id, query_text, phase, total_cases, cancelled, started_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, 0, strftime('%s','now'), strftime('%s','now'))
                     ON CONFLICT(user_id) DO UPDATE SET
+                        request_id=excluded.request_id,
                         query_text=excluded.query_text,
                         phase=excluded.phase,
                         total_cases=excluded.total_cases,
                         updated_at=excluded.updated_at
                     """,
-                    (user_id, query_text, phase, total_cases),
+                    (user_id, request_id, query_text, phase, total_cases),
                 )
         except Exception as exc:
             logger.warning("active_requests upsert failed: %s", exc)
@@ -71,6 +77,33 @@ class ActiveRequestsRepository:
             logger.warning("active_requests is_cancelled failed: %s", exc)
             return False
 
+    def get(self, user_id: str) -> dict[str, Any] | None:
+        try:
+            with self._connection.connect() as conn:
+                row = conn.execute(
+                    """
+                    SELECT user_id, request_id, query_text, phase, total_cases, cancelled, started_at, updated_at
+                    FROM active_requests
+                    WHERE user_id=?
+                    """,
+                    (user_id,),
+                ).fetchone()
+                if row is None:
+                    return None
+                return {
+                    "user_id": row["user_id"],
+                    "request_id": row["request_id"],
+                    "query_text": row["query_text"],
+                    "phase": row["phase"],
+                    "total_cases": row["total_cases"],
+                    "cancelled": bool(row["cancelled"]),
+                    "started_at": row["started_at"],
+                    "updated_at": row["updated_at"],
+                }
+        except Exception as exc:
+            logger.warning("active_requests get failed: %s", exc)
+            return None
+
     def delete(self, user_id: str) -> None:
         try:
             with self._connection.connect() as conn:
@@ -82,16 +115,21 @@ class ActiveRequestsRepository:
         try:
             with self._connection.connect() as conn:
                 rows = conn.execute(
-                    "SELECT user_id, query_text, phase, total_cases, cancelled, updated_at FROM active_requests"
+                    """
+                    SELECT user_id, request_id, query_text, phase, total_cases, cancelled, started_at, updated_at
+                    FROM active_requests
+                    """
                 ).fetchall()
                 return [
                     {
-                        "user_id": row[0],
-                        "query_text": row[1],
-                        "phase": row[2],
-                        "total_cases": row[3],
-                        "cancelled": bool(row[4]),
-                        "updated_at": row[5],
+                        "user_id": row["user_id"],
+                        "request_id": row["request_id"],
+                        "query_text": row["query_text"],
+                        "phase": row["phase"],
+                        "total_cases": row["total_cases"],
+                        "cancelled": bool(row["cancelled"]),
+                        "started_at": row["started_at"],
+                        "updated_at": row["updated_at"],
                     }
                     for row in rows
                 ]

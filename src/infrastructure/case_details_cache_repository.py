@@ -11,7 +11,7 @@ from src.infrastructure.sqlite import SqliteConnection
 
 
 class CaseDetailsCacheRepository:
-    _SCHEMA_VERSION = "v10"
+    _SCHEMA_VERSION = "v12"
 
     def __init__(
         self, connection: SqliteConnection, ttl_seconds: int = 24 * 60 * 60
@@ -77,7 +77,6 @@ class CaseDetailsCacheRepository:
                     """,
                     (case_id, payload, now.isoformat(), expires_at.isoformat()),
                 )
-                conn.commit()
         except sqlite3.DatabaseError as exc:
             if self._disable_on_corruption(exc):
                 return
@@ -91,7 +90,6 @@ class CaseDetailsCacheRepository:
                 conn.execute(
                     "delete from case_details_cache where case_id = ?", (case_id,)
                 )
-                conn.commit()
         except sqlite3.DatabaseError as exc:
             if self._disable_on_corruption(exc):
                 return
@@ -106,7 +104,6 @@ class CaseDetailsCacheRepository:
                     "delete from case_details_cache where expires_at <= ?",
                     (now.isoformat(),),
                 )
-                conn.commit()
         except sqlite3.DatabaseError as exc:
             if self._disable_on_corruption(exc):
                 return
@@ -142,7 +139,17 @@ class CaseDetailsCacheRepository:
                 "case_link": decision.case_link,
                 "analysis_text": decision.analysis_text,
                 "case_category": decision.case_category,
+                "document_links": decision.document_links,
+                "proof_quote": decision.proof_quote,
                 "reason_confidence": decision.reason_confidence,
+                "matched_article": decision.matched_article,
+                "evidence_quote": decision.evidence_quote,
+                "decisive_act_title": decision.decisive_act_title,
+                "decisive_act_url": decision.decisive_act_url,
+                "decisive_act_type": decision.decisive_act_type,
+                "pdf_status": decision.pdf_status,
+                "verification_failure_code": decision.verification_failure_code,
+                "law_display_name": decision.law_display_name,
             },
             ensure_ascii=False,
         )
@@ -161,5 +168,15 @@ class CaseDetailsCacheRepository:
             case_link=str(data.get("case_link", "") or ""),
             analysis_text=str(data.get("analysis_text", "") or ""),
             case_category=str(data.get("case_category", "") or ""),
+            document_links=tuple(data.get("document_links", []) or []),
+            proof_quote=str(data.get("proof_quote", "") or ""),
             reason_confidence=float(data.get("reason_confidence", 1.0)),
+            matched_article=str(data.get("matched_article", "") or ""),
+            evidence_quote=str(data.get("evidence_quote", "") or ""),
+            decisive_act_title=str(data.get("decisive_act_title", "") or ""),
+            decisive_act_url=str(data.get("decisive_act_url", "") or ""),
+            decisive_act_type=str(data.get("decisive_act_type", "") or ""),
+            pdf_status=str(data.get("pdf_status", "not_requested") or "not_requested"),
+            verification_failure_code=str(data.get("verification_failure_code", "") or ""),
+            law_display_name=str(data.get("law_display_name", "") or ""),
         )

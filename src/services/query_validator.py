@@ -9,10 +9,11 @@ from src.services.query_parser import QueryParser
 class QueryValidationResult:
     missing_court: bool
     missing_period: bool
+    missing_law: bool
 
     @property
     def is_valid(self) -> bool:
-        return not self.missing_court and not self.missing_period
+        return not self.missing_court and not self.missing_period and not self.missing_law
 
 
 class QueryValidator:
@@ -24,10 +25,11 @@ class QueryValidator:
 
         # Obvious junk (no letters/digits) should always fail
         if not any(c.isalnum() for c in clean_text):
-            return QueryValidationResult(missing_court=True, missing_period=True)
+            return QueryValidationResult(missing_court=True, missing_period=True, missing_law=False)
 
         params = self._parser.parse(query_text)
         return QueryValidationResult(
             missing_court=not bool(params.court),
             missing_period=not bool(params.date_from and params.date_to),
+            missing_law=bool(params.article) and not bool(params.law_display_name),
         )

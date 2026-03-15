@@ -4,7 +4,7 @@ import hashlib
 import logging
 import sqlite3
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
 from src.app.bot_logging import log_event
@@ -15,15 +15,16 @@ from src.domain.entities import (
     CaseOutcome,
     ConfidenceScore,
 )
-from src.domain.kad_models import KadUnavailableError
+from src.domain.case_models import SourceUnavailableError
 from src.domain.settings import Settings
 from src.domain.value_objects import UserId
+from src.domain.versioning import current_version_bundle
 from src.infrastructure.cache_repository import AnalysisCacheRepository
 from src.infrastructure.log_repository import LogRepository
 from src.services.active_requests import ActiveRequestRegistry
 from src.services.hashing import HashingService
-from src.services.kad.pipeline import KadPipeline
-from src.services.kad_client import KadClient
+from src.services.pipeline.pipeline import CasePipeline
+from src.services.database_case_client import CaseClient
 from src.services.query_parser import QueryParser
 
 
@@ -43,7 +44,7 @@ class QueryMetadataExtractor:
         quarter = self._find_quarter(text)
         parsed = self._parser.parse(text)
         court = parsed.court
-        article = parsed.article
+        article = parsed.full_article or parsed.article
         if year and quarter:
             period = f"{quarter} квартал {year} года"
         elif year:
@@ -74,11 +75,11 @@ class QueryMetadataExtractor:
 
 
 class RequestProcessor:
-    _CACHE_SCHEMA_VERSION = "v22"
+    _CACHE_SCHEMA_VERSION = "v24"
 
     def __init__(
         self,
-        kad_client: KadClient,
+        case_client: CaseClient,
         analysis_service: AnalysisService,
         active_requests: ActiveRequestRegistry,
         cache_repository: AnalysisCacheRepository,
@@ -86,7 +87,7 @@ class RequestProcessor:
         hashing_service: HashingService,
         metadata_extractor: QueryMetadataExtractor | None = None,
     ) -> None:
-        self._kad_client = kad_client
+        self._case_client = case_client
         self._analysis_service = analysis_service
         self._active_requests = active_requests
         self._cache_repository = cache_repository
@@ -117,37 +118,34 @@ class RequestProcessor:
             self._active_requests.update_attempted(user_id, total_lines)
             self._active_requests.update_successful(user_id, total_lines)
             log_event(self._logger, "analysis.cache_hit", cache_key=cache_key)
-            return cached
+            return replace(cached, version_bundle=current_version_bundle())
 
         metadata = self._metadata_extractor.extract(query_text)
-        self._active_requests.set_phase(user_id, "collecting")
+        self._active_requests.set_phase(user_id, "fetching_cases")
 
         _last_collected: list[int] = [0]
 
         def on_collection_progress(count: int) -> None:
-            _last_collected[0] = count
-            self._active_requests.update_collected(user_id, count)
+            capped_count = min(count, settings.max_cases)
+            _last_collected[0] = capped_count
+            self._active_requests.update_collected(user_id, capped_count)
 
         def on_stage_change(phase: str) -> None:
-            if phase == "analyzing":
-                # Correct the total_cases estimate to the actual collected count
-                # so the status message shows "X из X" instead of "X из 500".
-                self._active_requests.update_total_cases(user_id, _last_collected[0])
             self._active_requests.set_phase(user_id, phase)
             log_event(self._logger, "analysis.phase", phase=phase)
 
-        pipeline = KadPipeline(
-            self._kad_client, self._analysis_service._llm_reason_extractor
+        pipeline = CasePipeline(
+            self._case_client, self._analysis_service._llm_reason_extractor
         )
         fetch_start = datetime.now()
         pipeline_result = await pipeline.run(
             query_text,
             settings,
             on_progress=lambda count: self._active_requests.update_attempted(
-                user_id, count
+                user_id, min(count, settings.max_cases)
             ),
             on_successful=lambda count: self._active_requests.update_successful(
-                user_id, count
+                user_id, min(count, settings.max_cases)
             ),
             on_retry=lambda count: self._active_requests.update_retry_count(
                 user_id, count
@@ -158,22 +156,27 @@ class RequestProcessor:
         )
         fetch_duration_ms = int((datetime.now() - fetch_start).total_seconds() * 1000)
         validated_records = pipeline_result.validated_records
-        decisions = [record.decision for record in validated_records]
+        decisions = [
+            self._truncate_analysis_text(record.decision, settings.max_analysis_text_length)
+            for record in validated_records
+        ]
         fetch_result_stats = pipeline_result.stats
 
         self._active_requests.update_attempted(
-            user_id, fetch_result_stats.attempted_cases
+            user_id, min(fetch_result_stats.attempted_cases, settings.max_cases)
         )
         self._active_requests.update_successful(
-            user_id, fetch_result_stats.successful_cases
+            user_id, min(fetch_result_stats.successful_cases, settings.max_cases)
         )
         self._active_requests.update_retry_count(
             user_id, fetch_result_stats.retry_count
         )
         if self._active_requests.is_cancelled(user_id):
             raise RequestCancelled()
+
+        quality_reason: str | None = None
         if fetch_result_stats.court_filter_removed:
-            raise CourtNotFoundError()
+            quality_reason = "court_not_found"
 
         # Determine how many cases were dropped during Stage B Validation
         validated_count = len(decisions)
@@ -183,27 +186,19 @@ class RequestProcessor:
         params = pipeline_result.params
         article_filtered = bool(params and params.article and dropped_in_validation > 0)
 
-        min_decisions = 1 if article_filtered else 5
-        if validated_count < min_decisions:
+        min_decisions = 1 if article_filtered else settings.min_known_outcomes
+        if not quality_reason and validated_count < min_decisions:
             if article_filtered:
-                raise NoRelevantCasesError(
-                    total_processed=fetch_result_stats.successful_cases,
-                    filtered_by_article=fetch_result_stats.filtered_by_article,
-                )
-            if fetch_result_stats.attempted_cases >= 20:
-                # Most cases fetched but filtered by court → court unrecognised by API.
-                if (
-                    fetch_result_stats.filtered_by_court
-                    >= fetch_result_stats.attempted_cases // 2
-                ):
-                    raise CourtNotFoundError()
-                # Many attempted but almost none returned data → transient API outage.
-                raise KadUnavailableError(
-                    "KAD returned no case data despite large result set"
-                )
-            raise NotEnoughData()
+                quality_reason = "no_relevant_cases"
+            elif fetch_result_stats.attempted_cases >= 20:
+                if fetch_result_stats.filtered_by_court >= fetch_result_stats.attempted_cases // 2:
+                    quality_reason = "court_not_found"
+                else:
+                    quality_reason = "source_unavailable"
+            else:
+                quality_reason = "not_enough_data"
         article_requested = bool((params.article if params else None) or metadata.article)
-        verifiable_records = self._select_verifiable_records(validated_records, article_requested)
+        verifiable_records = self._select_verifiable_records(validated_records)
         verifiable_decisions = [record.decision for record in verifiable_records]
         satisfied_cases = self._count_outcomes(
             verifiable_decisions, CaseOutcome.SATISFIED
@@ -221,16 +216,6 @@ class RequestProcessor:
         quote_backed_cases = sum(
             1 for record in verifiable_records if self._has_evidence_quote(record.decision)
         )
-        court_for_summary = metadata.court
-        if court_for_summary == "суд не указан":
-            known_courts = [
-                decision.court_name
-                for decision in decisions
-                if decision.court_name and decision.court_name != "Суд не указан"
-            ]
-            if known_courts:
-                court_for_summary = Counter(known_courts).most_common(1)[0][0]
-
         params = pipeline_result.params
         if params:
             p = params
@@ -260,27 +245,21 @@ class RequestProcessor:
                     court=metadata.court, period=dp, article=metadata.article
                 )
 
-        court_for_summary = metadata.court
-        if court_for_summary == "суд не указан" or not court_for_summary:
-            known_courts = [
-                d.court_name
-                for d in decisions
-                if d.court_name and d.court_name != "Суд не указан"
-            ]
-            if known_courts:
-                court_for_summary = Counter(known_courts).most_common(1)[0][0]
+        court_for_summary = self._resolve_court_for_summary(metadata.court, decisions)
 
         # article_requested already calculated above
-        quality_reason = self._get_quality_reason(
-            known_cases=known_cases,
-            unknown_share=unknown_share,
-            court_mismatch_share=court_mismatch_share,
-            verified_cases=len(verifiable_decisions),
-            quote_backed_cases=quote_backed_cases,
-            article_requested=article_requested,
-            settings=settings,
-        )
+        if quality_reason is None:
+            quality_reason = self._get_quality_reason(
+                known_cases=known_cases,
+                unknown_share=unknown_share,
+                court_mismatch_share=court_mismatch_share,
+                verified_cases=len(verifiable_decisions),
+                quote_backed_cases=quote_backed_cases,
+                article_requested=article_requested,
+                settings=settings,
+            )
 
+        self._active_requests.set_phase(user_id, "analyzing")
         build_start = datetime.now()
         result = await self._analysis_service.build_result(
             court=court_for_summary,
@@ -292,15 +271,50 @@ class RequestProcessor:
             include_narrative_summary=True,
         )
         build_duration_ms = int((datetime.now() - build_start).total_seconds() * 1000)
-        # Quality check logging remains for internal monitoring, but we no longer block the response
         if quality_reason is not None:
-            log_event(
-                self._logger,
-                "analysis.quality_note",
+            raise InsufficientQualityError(
                 reason_code=quality_reason,
                 total_cases=len(decisions),
                 verified_cases=len(verifiable_decisions),
+                known_cases=known_cases,
+                unknown_cases=unknown_cases,
+                quote_backed_cases=quote_backed_cases,
+                unknown_share=unknown_share,
+                court_mismatch_share=court_mismatch_share,
+                summary=self._build_quality_warning(
+                    reason_code=quality_reason,
+                    total_cases=len(decisions),
+                    verified_cases=len(verifiable_decisions),
+                    known_cases=known_cases,
+                    unknown_cases=unknown_cases,
+                    quote_backed_cases=quote_backed_cases,
+                    article_requested=article_requested,
+                ),
+                case_list=result.case_list,
             )
+
+        self._active_requests.set_phase(user_id, "aggregating")
+        primary_source, fallback_used, fallback_reason = self._summarize_sources(
+            decisions
+        )
+        confidence_score = self._compute_request_confidence(
+            decisions=decisions,
+            verified_cases=len(verifiable_decisions),
+            article_requested=article_requested,
+        )
+        result = replace(
+            result,
+            summary=self._append_reliability_note(
+                result.summary,
+                fallback_used=fallback_used,
+                fallback_reason=fallback_reason,
+            ),
+            primary_source=primary_source,
+            fallback_used=fallback_used,
+            fallback_reason=fallback_reason,
+            version_bundle=current_version_bundle(),
+            confidence_score=confidence_score,
+        )
 
         try:
             self._cache_repository.set(cache_key, result, now)
@@ -337,13 +351,19 @@ class RequestProcessor:
             fetch_total_ms=fetch_duration_ms,
             result_build_ms=build_duration_ms,
             total_duration_ms=total_duration_ms,
+            primary_source=primary_source,
+            fallback_used=fallback_used,
+            fallback_reason=fallback_reason,
+            confidence_score=round(confidence_score, 4),
         )
         return result
 
     def _build_cache_key(self, query_text: str, settings: Settings) -> str:
         raw_key = (
             f"{self._CACHE_SCHEMA_VERSION}|{query_text}|{settings.max_cases}|{settings.max_documents_per_case}|"
-            f"{settings.max_pages}|{settings.fetch_concurrency_min}|{settings.fetch_concurrency_max}|"
+            f"{settings.max_pages}|{settings.max_llm_calls_per_request}|{settings.max_analysis_text_length}|"
+            f"{settings.fetch_concurrency_min}|{settings.fetch_concurrency_max}|"
+            f"{current_version_bundle()}|"
             f"{settings.analysis_prompt}"
         )
         return hashlib.sha256(raw_key.encode()).hexdigest()
@@ -371,12 +391,8 @@ class RequestProcessor:
         if verified_cases == 0:
             return "no_verified_cases"
         if article_requested:
-            # If an article is specifically requested, we trust KAD's search engine hits
-            # and our LLM classification more. We allow summaries even with low 
-            # quote-backed percentage, as long as we have at least SOME verified cases.
-            if verified_cases > 0:
-                return None
-            return "no_verified_cases"
+            if quote_backed_cases == 0:
+                return "no_direct_quotes"
 
         if known_cases < settings.min_known_outcomes:
             return "known_below_threshold"
@@ -387,16 +403,31 @@ class RequestProcessor:
             return "court_mismatch_high"
         return None
 
-    def _select_verifiable_records(self, validated_records, article_requested: bool):
-        allowed_scores = [ConfidenceScore.CONFIRMED, ConfidenceScore.PROBABLE]
-        if article_requested:
-            allowed_scores.append(ConfidenceScore.WEAK)
-            
+    def _select_verifiable_records(self, validated_records):
+        allowed_scores = [
+            ConfidenceScore.CONFIRMED,
+            ConfidenceScore.PROBABLE,
+            ConfidenceScore.WEAK,
+        ]
         return [
             record
             for record in validated_records
             if record.confidence in allowed_scores
         ]
+
+    def _resolve_court_for_summary(
+        self, extracted_court: str, decisions: list[CaseDecision]
+    ) -> str:
+        if extracted_court and extracted_court != "суд не указан":
+            return extracted_court
+        known_courts = [
+            decision.court_name
+            for decision in decisions
+            if decision.court_name and decision.court_name != "Суд не указан"
+        ]
+        if not known_courts:
+            return extracted_court
+        return Counter(known_courts).most_common(1)[0][0]
 
     def _has_evidence_quote(self, decision: CaseDecision) -> bool:
         quote = (decision.evidence_quote or decision.proof_quote).strip()
@@ -425,6 +456,10 @@ class RequestProcessor:
             "known_below_threshold": "Подтвержденных исходов слишком мало для надежной итоговой статистики.",
             "unknown_share_high": "Среди подтвержденных дел слишком велика доля актов без ясного исхода по существу спора.",
             "court_mismatch_high": "Слишком большая доля карточек не совпала с указанным судом.",
+            "court_not_found": "По вашему запросу не найдено дел в указанном суде. Возможно, название указано неточно или суд не поддерживается.",
+            "no_relevant_cases": "По выбранной статье/тематике в указанном периоде не найдено релевантных судебных актов.",
+            "not_enough_data": "Найдено слишком мало дел (менее 5). Недостаточно данных для статистического анализа.",
+            "source_unavailable": "Источник данных вернул пустой результат при большом объеме найденных дел. Возможен временный сбой.",
         }
         lines = [
             "Качество данных недостаточно для надежной итоговой сводки.",
@@ -435,13 +470,81 @@ class RequestProcessor:
         ]
         if article_requested:
             lines.append(f"Карточек с цитатой из акта: {quote_backed_cases}.")
-        lines.append(
-            f"Причина остановки: {reason_messages.get(reason_code, 'данных недостаточно для надежной сводки')}."
-        )
-        lines.append(
-            "Отправляю частичную выгрузку для ручной проверки, но итоговую сводку не формирую."
-        )
+        
+        reason_msg = reason_messages.get(reason_code, "данных недостаточно для надежной сводки")
+        lines.append(f"Причина остановки: {reason_msg.rstrip('.')}")
+        
+        if total_cases > 0:
+            lines.append("Отправляю частичную выгрузку для ручной проверки, но итоговую сводку не формирую.")
+        else:
+            lines.append("Итоговая сводка и выгрузка не сформированы.")
+            
         return "\n".join(lines)
+
+    def _summarize_sources(
+        self, decisions: list[CaseDecision]
+    ) -> tuple[str, bool, str]:
+        if not decisions:
+            return "parser", False, ""
+        sources = Counter(
+            (decision.source_system or "parser") for decision in decisions
+        )
+        primary_source = sources.most_common(1)[0][0]
+        fallback_used = len(sources) > 1 or any(
+            "fallback" in reason.lower()
+            for decision in decisions
+            for reason in decision.source_quality_reasons
+        )
+        fallback_reason = "mixed_sources" if fallback_used else ""
+        return primary_source, fallback_used, fallback_reason
+
+    def _compute_request_confidence(
+        self,
+        decisions: list[CaseDecision],
+        verified_cases: int,
+        article_requested: bool,
+    ) -> float:
+        if not decisions:
+            return 0.0
+        source_quality = sum(d.source_quality_score for d in decisions) / len(decisions)
+        document_count_score = min(len(decisions) / max(verified_cases, 1), 1.0)
+        article_match_rate = (
+            verified_cases / len(decisions) if article_requested else 1.0
+        )
+        extraction_confidence = (
+            sum(d.extraction_confidence for d in decisions) / len(decisions)
+        )
+        fallback_ratio = sum(
+            1 for d in decisions if (d.source_system or "parser") != "ras"
+        ) / len(decisions)
+        confidence = (
+            0.3 * source_quality
+            + 0.2 * document_count_score
+            + 0.2 * article_match_rate
+            + 0.2 * extraction_confidence
+            + 0.1 * (1.0 - fallback_ratio)
+        )
+        return max(0.0, min(confidence, 1.0))
+
+    def _append_reliability_note(
+        self, summary: str, fallback_used: bool, fallback_reason: str
+    ) -> str:
+        if not fallback_used:
+            return summary
+        note = "Часть результата построена с использованием резервного источника."
+        if fallback_reason == "semantic_fallback":
+            note = (
+                "Часть результата построена с использованием резервного источника "
+                "из-за недостаточного качества исходного текста."
+            )
+        return f"{summary}\n\nПримечание: {note}"
+
+    def _truncate_analysis_text(
+        self, decision: CaseDecision, max_length: int
+    ) -> CaseDecision:
+        if len(decision.analysis_text) <= max_length:
+            return decision
+        return replace(decision, analysis_text=decision.analysis_text[:max_length])
 
 
 class RequestCancelled(RuntimeError):

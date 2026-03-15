@@ -228,3 +228,16 @@ def test_bot_logic_requires_court_and_period_before_counting():
 
     assert len(m2) == 1
     assert "Уточните период" in m2[0]
+
+
+def test_pre_validate_returns_existing_status_for_duplicate_running_request():
+    logic = build_logic(mapping={VALID_QUERY: 42})
+    user_id = UserId("123")
+    now = datetime(2026, 2, 11, 12, 0, 0)
+
+    first = logic.pre_validate(user_id, VALID_QUERY, now)
+    second = logic.pre_validate(user_id, VALID_QUERY, now)
+
+    assert not isinstance(first, list)
+    assert isinstance(second, list)
+    assert "Идентичный запрос уже выполняется" in second[0]

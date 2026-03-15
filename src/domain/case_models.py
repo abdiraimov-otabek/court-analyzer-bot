@@ -5,19 +5,19 @@ from dataclasses import dataclass
 from src.domain.entities import CaseDecision
 
 
-class KadRateLimitError(RuntimeError):
+class SourceRateLimitError(RuntimeError):
     pass
 
 
-class KadUnavailableError(RuntimeError):
+class SourceUnavailableError(RuntimeError):
     pass
 
 
-class KadInvalidResponseError(RuntimeError):
+class SourceInvalidResponseError(RuntimeError):
     pass
 
 
-class KadAccessError(RuntimeError):
+class SourceAccessError(RuntimeError):
     pass
 
 
@@ -32,7 +32,13 @@ class SearchParams:
     case_number: str | None
     article: str | None = None
     full_article: str | None = None
+    law_family: str | None = None
+    law_display_name: str | None = None
+    law_inferred: bool = False
+    part: str | None = None
     paragraph: str | None = None
+    subparagraph: str | None = None
+    issue_phrase: str | None = None
     use_court_filter: bool = True
     # Internal fields for validation
     _regex_quarter: int | None = None

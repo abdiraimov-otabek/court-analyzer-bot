@@ -19,19 +19,18 @@ from src.infrastructure.sqlite import SqliteConnection
 from src.services.access_control import AccessControlList
 from src.services.active_requests import ActiveRequestRegistry
 from src.services.hashing import HashingService
-from src.services.postgres_kad_client import PostgresKadClient
+from src.services.database_case_client import DatabaseCaseClient
 from src.services.llm_reason_extractor import LLMReasonExtractor
 from src.services.quarter_selection import QuarterSelectionRegistry
 from src.services.rate_limit import HourlyRateLimiter
 from src.services.request_processor import RequestProcessor
 from src.services.settings_service import SettingsService
+from src.services.task_queue import AsyncTaskQueue
 
 
 class Container:
     def __init__(self, config: AppConfig) -> None:
         self.config = config
-        from src.app.config import initialize_db
-        initialize_db(config)
         self.connection = SqliteConnection(config.database_path)
         self.settings_repository = SettingsRepository(self.connection)
         self.settings_service = SettingsService(self.settings_repository)
@@ -43,6 +42,7 @@ class Container:
         self.active_requests = ActiveRequestRegistry(db_repo=db_repo)
         self.quarter_selections = QuarterSelectionRegistry()
         self.rate_limiter = HourlyRateLimiter(limit=10)
+        self.task_queue = AsyncTaskQueue(worker_count=4)
         self.cache_repository = AnalysisCacheRepository(
             self.connection, ttl_seconds=24 * 60 * 60
         )
@@ -55,7 +55,7 @@ class Container:
         limits = httpx.Limits(max_connections=100, max_keepalive_connections=50)
         self.sync_http_client = httpx.Client(timeout=30, limits=limits)
         self.async_http_client = httpx.AsyncClient(timeout=30, limits=limits)
-        self._kad_client: PostgresKadClient | None = None
+        self._case_client: DatabaseCaseClient | None = None
         self._llm_extractor: LLMReasonExtractor | None = None
 
     def build_bot_logic(self) -> BotLogic:
@@ -64,7 +64,7 @@ class Container:
             rate_limiter=self.rate_limiter,
             active_requests=self.active_requests,
             quarter_selections=self.quarter_selections,
-            count_provider=self._get_kad_client(),
+            count_provider=self._get_case_client(),
             settings_provider=self.settings_service,
             estimate_minutes=estimate_minutes,
         )
@@ -72,7 +72,7 @@ class Container:
     def build_request_processor(self) -> RequestProcessor:
         llm_extractor = self._get_llm_reason_extractor()
         return RequestProcessor(
-            kad_client=self._get_kad_client(),
+            case_client=self._get_case_client(),
             analysis_service=AnalysisService(llm_reason_extractor=llm_extractor),
             active_requests=self.active_requests,
             cache_repository=self.cache_repository,
@@ -80,13 +80,13 @@ class Container:
             hashing_service=self._build_hashing_service(),
         )
 
-    def _get_kad_client(self) -> PostgresKadClient:
-        if self._kad_client is None:
-            self._kad_client = self._build_kad_client()
-        return self._kad_client
+    def _get_case_client(self) -> DatabaseCaseClient:
+        if self._case_client is None:
+            self._case_client = self._build_case_client()
+        return self._case_client
 
-    def _build_kad_client(self) -> PostgresKadClient:
-        return PostgresKadClient(
+    def _build_case_client(self) -> DatabaseCaseClient:
+        return DatabaseCaseClient(
             llm_reason_extractor=self._get_llm_reason_extractor(),
         )
 
@@ -107,7 +107,8 @@ class Container:
         return HashingService(self.config.hash_salt)
 
     async def aclose(self) -> None:
-        if self._kad_client is not None:
-            await self._kad_client.aclose()
+        await self.task_queue.aclose()
+        if self._case_client is not None:
+            await self._case_client.aclose()
         await self.async_http_client.aclose()
         self.sync_http_client.close()
