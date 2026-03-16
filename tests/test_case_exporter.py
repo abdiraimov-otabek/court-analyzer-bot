@@ -44,3 +44,6 @@ def test_build_cases_excel_contains_link_and_fields():
     assert sheet["F2"].value == "https://kad.arbitr.ru/Card/case-1"
     assert sheet["G2"].value == "статья 61.2"
     assert sheet["H2"].value == "Полный текст решения..."
+    assert sheet.freeze_panes == "A2"
+    assert sheet.auto_filter.ref is not None
+    assert sheet["A2"].border.left.style == "thin"

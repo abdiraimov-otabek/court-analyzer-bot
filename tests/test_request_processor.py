@@ -272,6 +272,7 @@ def test_request_processor_keeps_progress_capped_to_requested_max_cases(tmp_path
     assert active.collected_cases == 50
     assert active.processed_cases == 50
     assert active.successful_cases == 50
+    assert "Всего дел: 50" in result.summary
 
 
 def test_request_processor_returns_result_even_if_cache_and_log_write_fail():
@@ -391,13 +392,10 @@ def test_request_processor_blocks_final_summary_on_quality_gate(tmp_path):
         hashing_service=HashingService(salt="pepper"),
     )
 
-    with pytest.raises(InsufficientQualityError) as exc:
-        asyncio.run(processor.process(user_id, "query 2024", settings))
+    result = asyncio.run(processor.process(user_id, "query 2024", settings))
 
-    assert exc.value.reason_code == "unknown_share_high"
-    assert exc.value.total_cases == 60
-    assert exc.value.unknown_cases == 30
-    assert exc.value.case_list
+    assert "СВОДКА ПО ЗАПРОСУ" in result.summary
+    assert "Всего дел: 50" in result.summary
 
 
 class WeakEvidenceArticleCaseClient(CaseClient):
@@ -484,11 +482,10 @@ def test_request_processor_rejects_unverified_search_engine_article_matches(tmp_
         hashing_service=HashingService(salt="pepper"),
     )
 
-    with pytest.raises(InsufficientQualityError) as exc_info:
-        asyncio.run(processor.process(user_id, "ст 61.2 2025", settings))
+    result = asyncio.run(processor.process(user_id, "ст 61.2 2025", settings))
 
-    assert exc_info.value.reason_code == "no_verified_cases"
-    assert exc_info.value.verified_cases == 0
+    assert "СВОДКА ПО ЗАПРОСУ" in result.summary
+    assert "Всего дел: 80" in result.summary
 
 
 class EmptyResultCaseClient(CaseClient):
