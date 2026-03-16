@@ -243,8 +243,15 @@ class AnalysisService:
 
         return " | ".join(parts).replace("\n", " ").replace("\r", " ")
 
-    def _format_date(self, value: date) -> str:
-        return value.strftime("%d.%m.%Y")
+    def _format_date(self, value: date | str | None) -> str:
+        if not value:
+            return "не указано"
+        if isinstance(value, str):
+            return value
+        try:
+            return value.strftime("%d.%m.%Y")
+        except (AttributeError, TypeError):
+            return str(value)
 
     def _format_outcome(self, decision: CaseDecision) -> str:
         normalized = self.normalize_outcome(decision)

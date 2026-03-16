@@ -479,7 +479,7 @@ class SudactClient:
 
         return CaseDecision(
             case_number=case_number,
-            decision_date=str(decision_date),
+            decision_date=decision_date,
             outcome=outcome,
             reasons=("оценка обстоятельств дела",),
             case_id=url,
