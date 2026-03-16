@@ -154,7 +154,7 @@ class RequestProcessor:
             should_cancel=lambda: self._active_requests.is_cancelled(user_id),
         )
         fetch_duration_ms = int((datetime.now() - fetch_start).total_seconds() * 1000)
-        validated_records = pipeline_result.validated_records
+        validated_records = pipeline_result.validated_records[: settings.max_cases]
         decisions = [
             self._truncate_analysis_text(record.decision, settings.max_analysis_text_length)
             for record in validated_records
@@ -199,10 +199,8 @@ class RequestProcessor:
         article_requested = bool((params.article if params else None) or metadata.article)
         verifiable_records = self._select_verifiable_records(validated_records)
         verifiable_decisions = [record.decision for record in verifiable_records]
-        satisfied_cases = self._count_outcomes(
-            verifiable_decisions, CaseOutcome.SATISFIED
-        )
-        denied_cases = self._count_outcomes(verifiable_decisions, CaseOutcome.DENIED)
+        satisfied_cases = self._count_outcomes(decisions, CaseOutcome.SATISFIED)
+        denied_cases = self._count_outcomes(decisions, CaseOutcome.DENIED)
         known_cases = satisfied_cases + denied_cases
         unknown_cases = max(0, len(decisions) - known_cases)
         unknown_share = (unknown_cases / len(decisions)) if decisions else 1.0
@@ -260,48 +258,40 @@ class RequestProcessor:
 
         self._active_requests.set_phase(user_id, "analyzing")
         build_start = datetime.now()
+        visible_total_cases_found = min(
+            fetch_result_stats.total_cases_found or len(decisions),
+            settings.max_cases,
+        )
         result = await self._analysis_service.build_result(
             court=court_for_summary,
             period=metadata.period,
             decisions=decisions,
             article=metadata.article,
             total_pages=fetch_result_stats.total_pages,
-            total_cases_found=fetch_result_stats.total_cases_found,
+            total_cases_found=visible_total_cases_found,
             include_narrative_summary=True,
         )
         build_duration_ms = int((datetime.now() - build_start).total_seconds() * 1000)
 
-        if quality_reason == "no_relevant_cases":
-            raise NoRelevantCasesError(
-                total_processed=fetch_result_stats.attempted_cases,
-                filtered_by_article=fetch_result_stats.filtered_by_article or 0,
-            )
-        if quality_reason == "court_not_found":
-            raise CourtNotFoundError()
-        if quality_reason in ("not_enough_data", "source_unavailable"):
-            raise NotEnoughData()
-        
+        if not decisions:
+            if quality_reason == "no_relevant_cases":
+                raise NoRelevantCasesError(
+                    total_processed=fetch_result_stats.attempted_cases,
+                    filtered_by_article=fetch_result_stats.filtered_by_article or 0,
+                )
+            if quality_reason == "court_not_found":
+                raise CourtNotFoundError()
+            if quality_reason in ("not_enough_data", "source_unavailable"):
+                raise NotEnoughData()
+
         if quality_reason is not None:
-            raise InsufficientQualityError(
+            log_event(
+                self._logger,
+                "analysis.quality_warning_ignored",
                 reason_code=quality_reason,
                 total_cases=len(decisions),
                 verified_cases=len(verifiable_decisions),
                 known_cases=known_cases,
-                unknown_cases=unknown_cases,
-                quote_backed_cases=quote_backed_cases,
-                unknown_share=unknown_share,
-                court_mismatch_share=court_mismatch_share,
-                summary=self._build_quality_warning(
-                    reason_code=quality_reason,
-                    total_cases=len(decisions),
-                    verified_cases=len(verifiable_decisions),
-                    known_cases=known_cases,
-                    unknown_cases=unknown_cases,
-                    quote_backed_cases=quote_backed_cases,
-                    article_requested=article_requested,
-                ),
-                case_list=result.case_list,
-                decisions=result.decisions,
             )
 
         self._active_requests.set_phase(user_id, "aggregating")

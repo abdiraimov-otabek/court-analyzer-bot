@@ -115,7 +115,7 @@ class AnalysisService:
         article_line = f" | Статья: {article}" if article else ""
         header = (
             "СВОДКА ПО ЗАПРОСУ:\n"
-            f"Суд: {court} | Период: {period}{article_line} | Всего найдено: {total_cases_found} | Проверено: {total_verifiable}\n"
+            f"Суд: {court} | Период: {period}{article_line} | Всего дел: {total_cases_found} | Проверено: {total_verifiable}\n"
             f"Статистика: {stats}\n\n"
         )
         summary = header + summary

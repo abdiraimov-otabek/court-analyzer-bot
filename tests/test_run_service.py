@@ -76,3 +76,42 @@ def test_run_service_rejects_unknown_role(monkeypatch):
 
     with pytest.raises(RuntimeError, match="Unsupported APP_ROLE"):
         run_service.main()
+
+
+
+def test_run_service_retries_bot_on_transient_timeout(monkeypatch):
+    fake_module = ModuleType("src.app.run_bot")
+    calls = {"count": 0}
+
+    async def fake_main():
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise TimeoutError("temporary timeout")
+
+    fake_module.main = fake_main
+
+    monkeypatch.setitem(sys.modules, "src.app.run_bot", fake_module)
+    monkeypatch.setenv("BOT_RESTART_DELAY_SECONDS", "0")
+
+    import asyncio
+
+    asyncio.run(run_service._run_bot())
+
+    assert calls["count"] == 2
+
+
+def test_run_service_does_not_retry_bot_on_non_transient_error(monkeypatch):
+    fake_module = ModuleType("src.app.run_bot")
+
+    async def fake_main():
+        raise RuntimeError("fatal")
+
+    fake_module.main = fake_main
+
+    monkeypatch.setitem(sys.modules, "src.app.run_bot", fake_module)
+    monkeypatch.setenv("BOT_RESTART_DELAY_SECONDS", "0")
+
+    import asyncio
+
+    with pytest.raises(RuntimeError, match="fatal"):
+        asyncio.run(run_service._run_bot())
