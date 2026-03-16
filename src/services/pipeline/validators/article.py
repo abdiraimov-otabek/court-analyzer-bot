@@ -120,9 +120,8 @@ class ArticleValidator:
     def _has_exact_article_match(self, text: str) -> bool:
         compact = re.escape((self.target_article or "").replace(",", "."))
         patterns = [
-            rf"ст\.?\s*{compact}",
-            rf"стать[ьяеи]\s*{compact}",
-            rf"\b{compact}\b",
+            rf"ст\.?\s*{compact}(?![\d.])",
+            rf"стать[ьяеи]\s*{compact}(?![\d.])",
         ]
         return any(re.search(pattern, text) for pattern in patterns)
 
@@ -175,8 +174,7 @@ class ArticleValidator:
     def _extract_snippet(self, text: str) -> str:
         compact = re.escape((self.target_article or "").replace(",", "."))
         patterns = [
-            rf".{{0,120}}(?:ст\.?|стать[ьяеи])\s*{compact}.{{0,160}}",
-            rf".{{0,120}}\b{compact}\b.{{0,160}}",
+            rf".{{0,120}}(?:ст\.?|стать[ьяеи])\s*{compact}(?![\d.]).{{0,160}}",
         ]
         for pattern in patterns:
             match = re.search(pattern, text, re.I | re.S)
