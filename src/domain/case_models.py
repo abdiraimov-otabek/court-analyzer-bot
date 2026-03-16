@@ -1,8 +1,10 @@
 from __future__ import annotations
+from typing import Callable, Protocol
 
 from dataclasses import dataclass
 
 from src.domain.entities import CaseDecision
+from src.domain.settings import Settings
 
 
 class SourceRateLimitError(RuntimeError):
@@ -19,6 +21,24 @@ class SourceInvalidResponseError(RuntimeError):
 
 class SourceAccessError(RuntimeError):
     pass
+
+
+class CaseClient(Protocol):
+    def count_cases(self, query_text: str, settings: Settings) -> int: ...
+
+    async def count_cases_async(self, query_text: str, settings: Settings) -> int: ...
+
+    async def fetch_decisions(
+        self,
+        query_text: str,
+        settings: Settings,
+        on_progress: Callable[[int], None] | None = None,
+        on_successful: Callable[[int], None] | None = None,
+        on_retry: Callable[[int], None] | None = None,
+        on_collection_progress: Callable[[int], None] | None = None,
+        on_stage_change: Callable[[str], None] | None = None,
+        should_cancel: Callable[[], bool] | None = None,
+    ) -> FetchDecisionsResult: ...
 
 
 # Aliases for backward compatibility with kad_client.py

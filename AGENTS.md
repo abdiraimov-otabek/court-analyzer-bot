@@ -46,14 +46,14 @@ The project follows a layered structure with framework adapters at the edge and 
   - `estimation.py` estimates analysis duration.
 - `src/domain/` - pure domain types and logic
   - `entities.py` contains analysis and case outcome entities.
-  - `kad_models.py` contains KAD transport and pipeline result models.
+  - `case_models.py` defines the `CaseClient` protocol and shared data models.
+  - `outcome_mapper.py` contains rule-based logic for mapping decision text to outcomes.
   - `settings.py` defines `Settings` and defaults.
   - `value_objects.py` defines validated immutable inputs such as `UserId` and `QueryText`.
   - `analysis.py` builds the summary and case-list text.
-  - `reason_extractor.py` contains rule-based outcome/reason extraction.
+  - `reason_extractor.py` contains rule-based reason extraction.
 - `src/services/` - application services and business workflows
-  - `kad_client.py` is the main adapter for the external KAD API. It supports sync counting and async fetching, integrates case-details caching, and includes PDF/OCR helpers.
-  - `kad/` contains the multi-stage fetch pipeline and validators.
+  - `sudact_client.py` is the main adapter for fetching decisions. It scrapes `sudact.ru` directly.
   - `request_processor.py` orchestrates cache lookup, collection, validation, analysis, and logging.
   - `query_parser.py` and `query_validator.py` parse and validate natural-language requests.
   - `quarter_selection.py`, `active_requests.py`, `access_control.py`, and `rate_limit.py` implement per-user guards and state.

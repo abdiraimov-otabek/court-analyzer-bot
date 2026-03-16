@@ -6,14 +6,13 @@ import pytest
 
 from src.domain.analysis import AnalysisService
 from src.domain.entities import CaseDecision, CaseOutcome
-from src.domain.case_models import SearchParams
+from src.domain.case_models import FetchDecisionsResult, FetchStats, CaseClient, SearchParams
 from src.domain.settings import Settings
 from src.domain.value_objects import UserId
 from src.infrastructure.cache_repository import AnalysisCacheRepository
 from src.infrastructure.sqlite import SqliteConnection
 from src.services.active_requests import ActiveRequestRegistry
 from src.services.hashing import HashingService
-from src.services.database_case_client import FetchDecisionsResult, FetchStats, CaseClient
 from src.services.request_processor import (
     InsufficientQualityError,
     NoRelevantCasesError,

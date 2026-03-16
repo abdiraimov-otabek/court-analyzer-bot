@@ -1,4 +1,4 @@
-from src.services.database_case_client import QueryParser
+from src.services.query_parser import QueryParser
 
 
 def test_query_parser_extracts_year_and_quarter():

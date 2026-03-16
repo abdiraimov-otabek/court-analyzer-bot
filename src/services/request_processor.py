@@ -15,7 +15,7 @@ from src.domain.entities import (
     CaseOutcome,
     ConfidenceScore,
 )
-from src.domain.case_models import SourceUnavailableError
+from src.domain.case_models import SourceUnavailableError, CaseClient
 from src.domain.settings import Settings
 from src.domain.value_objects import UserId
 from src.domain.versioning import current_version_bundle
@@ -24,7 +24,6 @@ from src.infrastructure.log_repository import LogRepository
 from src.services.active_requests import ActiveRequestRegistry
 from src.services.hashing import HashingService
 from src.services.pipeline.pipeline import CasePipeline
-from src.services.database_case_client import CaseClient
 from src.services.query_parser import QueryParser
 
 

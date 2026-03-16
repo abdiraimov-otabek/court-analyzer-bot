@@ -21,6 +21,7 @@ from src.domain.case_models import (
 )
 from src.domain.entities import CaseDecision, CaseOutcome
 from src.domain.settings import Settings
+from src.domain.outcome_mapper import OutcomeMapper
 from src.services.query_parser import QueryParser
 
 logger = logging.getLogger("sudact_client")
@@ -108,35 +109,7 @@ def _extract_article(html_container) -> str | None:
     return None
 
 
-def _extract_outcome(text: str) -> CaseOutcome:
-    lower = text.lower()
-    denied_patterns = [
-        r"отказа\w*\s+(?:в\s+)?удовлетворени\w*",
-        r"в\s+удовлетворени\w*(?:\s+\w+){0,8}\s+отказа\w*",
-        r"остави\w*(?:\s+\w+)?\s+без\s+удовлетворени\w*",
-        r"отказа\w*\s+в\s+иске",
-        r"в\s+иске\s+отказа\w*",
-        r"отказа\w*\s+в\s+признании",
-        r"без\s+(?:удовлетвор|рассмотрения)\w*",
-        r"прекратить\s+производство",
-    ]
-    for p in denied_patterns:
-        if re.search(p, lower):
-            return CaseOutcome.DENIED
-
-    satisfied_keywords = [
-        "удовлетвор",
-        "признать недействит",
-        "признано незаконным",
-        "признать незаконн",
-        "взыскать",
-        "привлечь к административной ответственности",
-    ]
-    for k in satisfied_keywords:
-        if k in lower:
-            return CaseOutcome.SATISFIED
-
-    return CaseOutcome.UNKNOWN
+# Local outcome extraction removed, using OutcomeMapper instead.
 
 
 class SudactClient:
@@ -166,6 +139,7 @@ class SudactClient:
     ) -> None:
         self._parser = QueryParser()
         self._llm_reason_extractor = llm_reason_extractor
+        self._outcome_mapper = OutcomeMapper()
         self._concurrency = concurrency
         self._page_concurrency = page_concurrency
         self._owns_client = async_http_client is None
@@ -495,7 +469,7 @@ class SudactClient:
         judge = _extract_judge(full_text)
         place = _extract_place(full_text)
         article = _extract_article(container)
-        outcome = _extract_outcome(full_text)
+        outcome = self._outcome_mapper.map_outcome(full_text)
         decision_date = _parse_date_from_title(title)
 
         # Extract act title from first line

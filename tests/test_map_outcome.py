@@ -12,18 +12,18 @@ from __future__ import annotations
 import pytest
 
 from src.domain.entities import CaseOutcome
-from src.services.database_case_client import DatabaseCaseClient
+from src.domain.outcome_mapper import OutcomeMapper
 
 
 @pytest.fixture()
-def client() -> DatabaseCaseClient:
-    return DatabaseCaseClient()
+def mapper() -> OutcomeMapper:
+    return OutcomeMapper()
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
-def outcome(client: DatabaseCaseClient, text: str) -> CaseOutcome:
-    return client._map_outcome(text)
+def outcome(mapper: OutcomeMapper, text: str) -> CaseOutcome:
+    return mapper.map_outcome(text)
 
 
 # ── DENIED: original _DENIED_COMBINED patterns ───────────────────────────────
