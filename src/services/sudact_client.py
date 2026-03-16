@@ -272,24 +272,39 @@ class SudactClient:
 
         # Fetch remaining pages in batches until we hit max_cases or max_pages
         page = 2
+        empty_streak = 0
+        max_empty_retries = 5  # Give it 5 batches (e.g., 15 empty pages) before quitting
+
         while len(case_links) < max_cases and page <= max_pages:
             if should_cancel and should_cancel():
                 break
+                
             batch_end = min(page + self._page_concurrency, max_pages + 1)
             tasks = [fetch_list_page(p) for p in range(page, batch_end)]
             batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+            
             any_results = False
             for res in batch_results:
                 if isinstance(res, Exception) or not res:
                     continue
                 case_links.extend(res)
                 any_results = True
+                
+            if any_results:
+                empty_streak = 0
                 if on_collection_progress:
                     on_collection_progress(len(case_links))
-                if len(case_links) >= max_cases:
+            else:
+                empty_streak += 1
+                if empty_streak >= max_empty_retries:
+                    logger.warning(
+                        "sudact.pagination_stopped: %d empty batches in a row at page %d",
+                        empty_streak, page
+                    )
                     break
-            if not any_results:
-                break
+                # Back off before retrying
+                await asyncio.sleep(1.0)
+                
             page = batch_end
 
         # Deduplicate links to prevent redundant fetching and duplication in Excel

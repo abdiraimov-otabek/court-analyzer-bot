@@ -213,6 +213,12 @@ async def _run_analysis(message: Message, user_id: UserId, query_text: str) -> N
     set_request_context(request_id, user_hash, "telegram_bot")
     settings = container.settings_service.get_settings()
     processor = container.build_request_processor()
+    parser = container.build_query_parser()
+    
+    # Extract target article explicitly to pass to Excel builder
+    parsed_query = parser.parse(query_text)
+    target_article = parsed_query.article
+
 
     async def _send_answer(text: str) -> None:
         await message.answer(text)
@@ -228,7 +234,7 @@ async def _run_analysis(message: Message, user_id: UserId, query_text: str) -> N
         slow_alert_task.cancel()
         container.active_requests.set_phase(user_id, "completed")
         await message.answer(result.summary, reply_markup=_help_kb())
-        excel_bytes = build_cases_excel(result.decisions)
+        excel_bytes = build_cases_excel(result.decisions, target_article=target_article)
         file = BufferedInputFile(excel_bytes, filename="cases.xlsx")
         await message.answer_document(file)
         log_event(
@@ -258,7 +264,7 @@ async def _run_analysis(message: Message, user_id: UserId, query_text: str) -> N
         container.active_requests.set_phase(user_id, "failed")
         await message.answer(exc.summary, reply_markup=_help_kb())
         if settings.send_partial_file_on_quality_fail and exc.decisions:
-            excel_bytes = build_cases_excel(exc.decisions)
+            excel_bytes = build_cases_excel(exc.decisions, target_article=target_article)
             file = BufferedInputFile(excel_bytes, filename="cases.xlsx")
             await message.answer_document(file)
     except Exception as exc:

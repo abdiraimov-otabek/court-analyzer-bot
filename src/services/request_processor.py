@@ -258,8 +258,9 @@ class RequestProcessor:
 
         self._active_requests.set_phase(user_id, "analyzing")
         build_start = datetime.now()
+        # Use attempted_cases for total_cases_found so the summary exactly matches the progress counter
         visible_total_cases_found = min(
-            fetch_result_stats.total_cases_found or len(decisions),
+            fetch_result_stats.attempted_cases or fetch_result_stats.total_cases_found or len(decisions),
             settings.max_cases,
         )
         result = await self._analysis_service.build_result(
