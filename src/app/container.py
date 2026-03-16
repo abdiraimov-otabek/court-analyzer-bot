@@ -24,6 +24,7 @@ from src.services.llm_reason_extractor import LLMReasonExtractor
 from src.services.quarter_selection import QuarterSelectionRegistry
 from src.services.rate_limit import HourlyRateLimiter
 from src.services.request_processor import RequestProcessor
+from src.services.query_parser import QueryParser
 from src.services.settings_service import SettingsService
 from src.services.task_queue import AsyncTaskQueue
 
@@ -68,6 +69,9 @@ class Container:
             settings_provider=self.settings_service,
             estimate_minutes=estimate_minutes,
         )
+
+    def build_query_parser(self) -> QueryParser:
+        return QueryParser()
 
     def build_request_processor(self) -> RequestProcessor:
         llm_extractor = self._get_llm_reason_extractor()

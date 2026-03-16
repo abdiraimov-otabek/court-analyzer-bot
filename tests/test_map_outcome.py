@@ -28,135 +28,135 @@ def outcome(mapper: OutcomeMapper, text: str) -> CaseOutcome:
 
 # ── DENIED: original _DENIED_COMBINED patterns ───────────────────────────────
 
-def test_denied_otkazat_v_udovletvorenii(client):
-    assert outcome(client, "Отказать в удовлетворении требования") == CaseOutcome.DENIED
+def test_denied_otkazat_v_udovletvorenii(mapper):
+    assert outcome(mapper, "Отказать в удовлетворении требования") == CaseOutcome.DENIED
 
 
-def test_denied_v_udovletvorenii_otkaz_short(client):
+def test_denied_v_udovletvorenii_otkaz_short(mapper):
     """Pattern index 1 — short gap (0 words)."""
-    assert outcome(client, "В удовлетворении отказано") == CaseOutcome.DENIED
+    assert outcome(mapper, "В удовлетворении отказано") == CaseOutcome.DENIED
 
 
-def test_denied_v_udovletvorenii_otkaz_long(client):
+def test_denied_v_udovletvorenii_otkaz_long(mapper):
     """Pattern index 1 — long gap (6 words), previously failing with {0,5}."""
-    assert outcome(client, "В удовлетворении требования о признании сделки недействительной отказано") == CaseOutcome.DENIED
+    assert outcome(mapper, "В удовлетворении требования о признании сделки недействительной отказано") == CaseOutcome.DENIED
 
 
-def test_denied_v_udovletvorenii_otkaz_very_long(client):
+def test_denied_v_udovletvorenii_otkaz_very_long(mapper):
     """Pattern index 1 — 8-word gap."""
-    assert outcome(client, "В удовлетворении заявления конкурсного управляющего о признании недействительной сделки отказано") == CaseOutcome.DENIED
+    assert outcome(mapper, "В удовлетворении заявления конкурсного управляющего о признании недействительной сделки отказано") == CaseOutcome.DENIED
 
 
-def test_denied_bez_udovletvoreniya(client):
-    assert outcome(client, "Оставить без удовлетворения апелляционную жалобу") == CaseOutcome.DENIED
+def test_denied_bez_udovletvoreniya(mapper):
+    assert outcome(mapper, "Оставить без удовлетворения апелляционную жалобу") == CaseOutcome.DENIED
 
 
-def test_denied_otkazat_v_iske(client):
-    assert outcome(client, "Отказать в иске") == CaseOutcome.DENIED
+def test_denied_otkazat_v_iske(mapper):
+    assert outcome(mapper, "Отказать в иске") == CaseOutcome.DENIED
 
 
-def test_denied_v_iske_otkazano(client):
-    assert outcome(client, "В иске отказано") == CaseOutcome.DENIED
+def test_denied_v_iske_otkazano(mapper):
+    assert outcome(mapper, "В иске отказано") == CaseOutcome.DENIED
 
 
-def test_denied_zhalobу_ostavit_bez(client):
-    assert outcome(client, "Жалобу оставить без рассмотрения") == CaseOutcome.DENIED
+def test_denied_zhalobу_ostavit_bez(mapper):
+    assert outcome(mapper, "Жалобу оставить без рассмотрения") == CaseOutcome.DENIED
 
 
-def test_denied_ostavit_zhalobu_bez(client):
-    assert outcome(client, "Оставить жалобу без удовлетворения") == CaseOutcome.DENIED
+def test_denied_ostavit_zhalobu_bez(mapper):
+    assert outcome(mapper, "Оставить жалобу без удовлетворения") == CaseOutcome.DENIED
 
 
-def test_denied_otkazat_v_priznanii(client):
-    assert outcome(client, "Отказать в признании сделки недействительной") == CaseOutcome.DENIED
+def test_denied_otkazat_v_priznanii(mapper):
+    assert outcome(mapper, "Отказать в признании сделки недействительной") == CaseOutcome.DENIED
 
 
 # ── DENIED: new patterns (Bug 1) ─────────────────────────────────────────────
 
-def test_denied_ne_podlezhit_priznaniyu(client):
-    assert outcome(client, "Сделка не подлежит признанию недействительной") == CaseOutcome.DENIED
+def test_denied_ne_podlezhit_priznaniyu(mapper):
+    assert outcome(mapper, "Сделка не подлежит признанию недействительной") == CaseOutcome.DENIED
 
 
-def test_denied_ne_mozhet_byt_priznana(client):
-    assert outcome(client, "Сделка не может быть признана недействительной") == CaseOutcome.DENIED
+def test_denied_ne_mozhet_byt_priznana(mapper):
+    assert outcome(mapper, "Сделка не может быть признана недействительной") == CaseOutcome.DENIED
 
 
-def test_denied_ne_mog_byt_priznan(client):
-    assert outcome(client, "Договор не мог быть признан ничтожным") == CaseOutcome.DENIED
+def test_denied_ne_mog_byt_priznan(mapper):
+    assert outcome(mapper, "Договор не мог быть признан ничтожным") == CaseOutcome.DENIED
 
 
-def test_denied_otsutstvuyut_osnovaniya_dlya_priznaniya(client):
-    assert outcome(client, "Отсутствуют основания для признания сделки недействительной") == CaseOutcome.DENIED
+def test_denied_otsutstvuyut_osnovaniya_dlya_priznaniya(mapper):
+    assert outcome(mapper, "Отсутствуют основания для признания сделки недействительной") == CaseOutcome.DENIED
 
 
-def test_denied_priznaki_ne_ustanovleny(client):
-    assert outcome(client, "Признаки злоупотребления правом не установлены судом") == CaseOutcome.DENIED
+def test_denied_priznaki_ne_ustanovleny(mapper):
+    assert outcome(mapper, "Признаки злоупотребления правом не установлены судом") == CaseOutcome.DENIED
 
 
-def test_denied_priznaki_otsutstvuyut(client):
-    assert outcome(client, "Признаки мнимости сделки отсутствуют") == CaseOutcome.DENIED
+def test_denied_priznaki_otsutstvuyut(mapper):
+    assert outcome(mapper, "Признаки мнимости сделки отсутствуют") == CaseOutcome.DENIED
 
 
 # ── DENIED: standalone "отказ" step-3 ────────────────────────────────────────
 
-def test_denied_standalone_otkaz(client):
-    assert outcome(client, "В удовлетворении жалобы отказ") == CaseOutcome.DENIED
+def test_denied_standalone_otkaz(mapper):
+    assert outcome(mapper, "В удовлетворении жалобы отказ") == CaseOutcome.DENIED
 
 
 # ── SATISFIED keywords ────────────────────────────────────────────────────────
 
-def test_satisfied_udovletvorit(client):
-    assert outcome(client, "Требования удовлетворены в полном объёме") == CaseOutcome.SATISFIED
+def test_satisfied_udovletvorit(mapper):
+    assert outcome(mapper, "Требования удовлетворены в полном объёме") == CaseOutcome.SATISFIED
 
 
-def test_satisfied_priznat_nedeystvitelnoj(client):
-    assert outcome(client, "Признать недействительной сделку должника") == CaseOutcome.SATISFIED
+def test_satisfied_priznat_nedeystvitelnoj(mapper):
+    assert outcome(mapper, "Признать недействительной сделку должника") == CaseOutcome.SATISFIED
 
 
-def test_satisfied_priznano_nezakonnym(client):
-    assert outcome(client, "Решение признано незаконным") == CaseOutcome.SATISFIED
+def test_satisfied_priznano_nezakonnym(mapper):
+    assert outcome(mapper, "Решение признано незаконным") == CaseOutcome.SATISFIED
 
 
-def test_satisfied_vzyskat(client):
-    assert outcome(client, "Взыскать с ответчика сумму убытков") == CaseOutcome.SATISFIED
+def test_satisfied_vzyskat(mapper):
+    assert outcome(mapper, "Взыскать с ответчика сумму убытков") == CaseOutcome.SATISFIED
 
 
 # ── Priority: DENIED beats SATISFIED ─────────────────────────────────────────
 
-def test_denied_beats_satisfied_keyword(client):
+def test_denied_beats_satisfied_keyword(mapper):
     """DENIED_COMBINED fires before 'признать недействит' keyword."""
     text = "Отказано в удовлетворении требования о признании сделки недействительной"
-    assert outcome(client, text) == CaseOutcome.DENIED
+    assert outcome(mapper, text) == CaseOutcome.DENIED
 
 
 # ── Bankruptcy / Article 60 specifics ───────────────────────────────
 
-def test_satisfied_nezakonnym_bezdeystviye(client):
-    assert outcome(client, "Признать незаконным бездействие арбитражного управляющего") == CaseOutcome.SATISFIED
+def test_satisfied_nezakonnym_bezdeystviye(mapper):
+    assert outcome(mapper, "Признать незаконным бездействие арбитражного управляющего") == CaseOutcome.SATISFIED
 
-def test_satisfied_nenadlezhashcheye_ispolneniye(client):
-    assert outcome(client, "Признать ненадлежащим исполнение обязанностей управляющим") == CaseOutcome.SATISFIED
+def test_satisfied_nenadlezhashcheye_ispolneniye(mapper):
+    assert outcome(mapper, "Признать ненадлежащим исполнение обязанностей управляющим") == CaseOutcome.SATISFIED
 
-def test_satisfied_privlech_k_otvetstvennosti(client):
-    assert outcome(client, "Привлечь к административной ответственности") == CaseOutcome.SATISFIED
+def test_satisfied_privlech_k_otvetstvennosti(mapper):
+    assert outcome(mapper, "Привлечь к административной ответственности") == CaseOutcome.SATISFIED
 
-def test_satisfied_zhaloba_obosnovanna(client):
-    assert outcome(client, "Жалоба признана обоснованной") == CaseOutcome.SATISFIED
+def test_satisfied_zhaloba_obosnovanna(mapper):
+    assert outcome(mapper, "Жалоба признана обоснованной") == CaseOutcome.SATISFIED
 
-def test_denied_proizvodstvo_prekratit(client):
-    assert outcome(client, "Производство по жалобе прекратить") == CaseOutcome.DENIED
+def test_denied_proizvodstvo_prekratit(mapper):
+    assert outcome(mapper, "Производство по жалобе прекратить") == CaseOutcome.DENIED
 
-def test_denied_bez_rassmotreniya_short(client):
-    assert outcome(client, "Оставить без рассмотрения") == CaseOutcome.DENIED
+def test_denied_bez_rassmotreniya_short(mapper):
+    assert outcome(mapper, "Оставить без рассмотрения") == CaseOutcome.DENIED
 
-def test_denied_neobosnovanna(client):
-    assert outcome(client, "Жалобу признать необоснованной") == CaseOutcome.DENIED
+def test_denied_neobosnovanna(mapper):
+    assert outcome(mapper, "Жалобу признать необоснованной") == CaseOutcome.DENIED
 
-def test_denied_otsutstvuyut_pravovye_osnovaniya(client):
-    assert outcome(client, "Правовые основания для удовлетворения жалобы отсутствуют") == CaseOutcome.DENIED
+def test_denied_otsutstvuyut_pravovye_osnovaniya(mapper):
+    assert outcome(mapper, "Правовые основания для удовлетворения жалобы отсутствуют") == CaseOutcome.DENIED
 
 
 # ── UNKNOWN ───────────────────────────────────────────────────────────────────
 
-def test_unknown_when_nothing_matches(client):
-    assert outcome(client, "Дело передано на новое рассмотрение") == CaseOutcome.UNKNOWN
+def test_unknown_when_nothing_matches(mapper):
+    assert outcome(mapper, "Дело передано на новое рассмотрение") == CaseOutcome.UNKNOWN
