@@ -131,6 +131,14 @@ class CasePipeline:
             # 4. Confidence Scoring
             confidence = EvidenceScorer.score(tier, court_match, final_outcome)
 
+            # Update stats for RequestProcessor reporting
+            stats = replace(
+                stats,
+                court_compared_cases=stats.court_compared_cases + 1,
+                filtered_by_court=stats.filtered_by_court + (0 if court_match else 1),
+                filtered_by_article=stats.filtered_by_article + (1 if tier == EvidenceTier.TIER_D_NO_MATCH else 0)
+            )
+
             decision_copy = replace(
                 decision,
                 matched_article=matched_art,

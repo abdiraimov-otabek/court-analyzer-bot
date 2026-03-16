@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date, datetime
 from io import BytesIO
 from typing import Sequence
 
@@ -43,9 +44,17 @@ def build_cases_excel(decisions: Sequence[CaseDecision]) -> bytes:
         cell.alignment = header_alignment
 
     for decision in decisions:
+        # Robust date formatting
+        d_date = ""
+        if decision.raw_date:
+            if isinstance(decision.raw_date, date):
+                d_date = decision.raw_date.strftime("%d.%m.%Y")
+            else:
+                d_date = str(decision.raw_date)
+
         sheet.append([
             decision.raw_number,
-            decision.raw_date.strftime("%d.%m.%Y") if decision.raw_date else "",
+            d_date,
             decision.raw_case_number,
             decision.raw_place,
             decision.raw_judge,

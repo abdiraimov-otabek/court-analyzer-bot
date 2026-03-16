@@ -42,6 +42,14 @@ def _month_to_str(month: int) -> str:
     return months.get(month, "???")
 
 
+# Canonical court name mapping for sudact.ru
+COURT_MAPPING = {
+    "АС города Москвы": "Арбитражный суд города Москвы",
+    "АС Московской области": "Арбитражный суд Московской области",
+    "АС города Санкт-Петербурга и Ленинградской области": "Арбитражный суд города Санкт-Петербурга и Ленинградской области",
+}
+
+
 def _normalize_date_str(date_str: str | None) -> str | None:
     """Convert YYYY-MM-DD to DD.MM.YYYY for sudact.ru query params."""
     if not date_str:
@@ -370,22 +378,34 @@ class SudactClient:
 
         # Build text search term from article and/or INN/name
         search_terms = []
-        if params.full_article:
-            search_terms.append(params.full_article)
-        elif params.article:
+        if params.article:
+            # We separate article number for better matching on Sudact
             search_terms.append(f"ст. {params.article}")
+            
+        if params.law_display_name:
+            search_terms.append(params.law_display_name)
+        elif params.law_family == "127-ФЗ":
+            search_terms.append("банкротство")
+            
         if params.inn_or_name and not params.inn_type:  # name, not numeric INN
             search_terms.append(params.inn_or_name)
         if params.issue_phrase:
             search_terms.append(params.issue_phrase)
+            
         if search_terms:
             import urllib.parse
-            base += f"&{prefix}-text={urllib.parse.quote(' '.join(search_terms))}"
+            # Filter unique terms and join
+            unique_terms = []
+            for t in search_terms:
+                if t not in unique_terms:
+                    unique_terms.append(t)
+            base += f"&{prefix}-text={urllib.parse.quote(' '.join(unique_terms))}"
 
         # Court name filter
         if params.court:
+            display_court = COURT_MAPPING.get(params.court, params.court)
             import urllib.parse
-            base += f"&{prefix}-court={urllib.parse.quote(params.court)}"
+            base += f"&{prefix}-court={urllib.parse.quote(display_court)}"
 
         return base
 
