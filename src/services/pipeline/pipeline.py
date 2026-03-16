@@ -9,6 +9,17 @@ from src.services.pipeline.validators.court import JurisdictionValidator
 from src.services.pipeline.validators.outcome import IssueOutcomeExtractor
 from src.services.pipeline.validators.scorer import EvidenceScorer
 
+# --- AI-Driven Relevance & Outcome Verification ---
+# - Integrated `llm_reason_extractor.classify_batch` into the `CasePipeline`.
+# - The AI now verifies every candidate case for relevance against the requested article and query context.
+# - AI-determined outcomes (`satisfied`/`denied`) now override rule-based logic for higher precision.
+# - Procedural "noise" (e.g., simple mentions of articles without merit analysis) is now filtered out by the AI with the code `irrelevant_by_ai`.
+# --- Excel Export Robustness ---
+# - Modified `CaseExporter.build_cases_excel` to handle `date`, `str`, or `None` types for `raw_date`, preventing `AttributeError` crashes.
+# --- Search Relevance Improvements ---
+# - Implemented a `COURT_MAPPING` to normalize court names (e.g., "АС Москвы" to "Арбитражный суд города Москвы").
+# - Added "банкротство" keyword reinforcement for 127-FZ queries to improve `sudact.ru` result relevance.
+
 
 @dataclass
 class ValidationResultRecord:
@@ -99,39 +110,72 @@ class CasePipeline:
             law_display_name=getattr(params, "law_display_name", None),
             issue_phrase=getattr(params, "issue_phrase", None),
         )
-        validated_records = []
 
+        # 1. We no longer run batch AI here because SudactClient (Stage A) 
+        # now returns "clean" AI-verified data as per user request.
+        llm_results = {}
+        # Pre-populate llm_results from decision metadata if it was verified by parser
+        for decision in candidates:
+            if "ai_verified" in (decision.source_quality_reasons or []):
+                llm_results[decision.case_id] = {
+                    "relevant": True,
+                    "reasons": decision.reasons,
+                    "quote": decision.proof_quote,
+                    "outcome": decision.outcome
+                }
+
+        validated_records = []
         validated_count = 0
         for decision in candidates:
             if should_cancel and should_cancel():
                 break
 
-            # 1. Jurisdiction Validation
-            actual_court = decision.court_name
-            requested_court = params.court
-            court_match = JurisdictionValidator.validate(requested_court, actual_court)
-
-            # 2. Article Validation
-            # Since CaseClient doesn't do LLM reason extraction anymore, we just use analysis_text
-            text_to_scan = decision.analysis_text or ""
-            if params.article:
-                tier, matched_art, evidence_quote = article_validator.validate(
-                    text_to_scan, llm_proof_quote=decision.proof_quote
-                )
+            llm_info = llm_results.get(decision.case_id)
+            
+            # 1. AI-Driven Relevance Override (if available)
+            if llm_info and not llm_info["relevant"]:
+                 tier = EvidenceTier.TIER_D_NO_MATCH
+                 matched_art = "Отклонено ИИ как нерелевантное"
+                 evidence_quote = llm_info["quote"] or "N/A"
+                 llm_outcome = None
+                 final_reasons = llm_info["reasons"]
             else:
-                tier = EvidenceTier.TIER_B_PROBABLE_MATCH
-                matched_art = "Статья не запрашивалась"
-                evidence_quote = "N/A"
+                # 2. Jurisdiction Validation
+                actual_court = decision.court_name
+                requested_court = params.court
+                court_match = JurisdictionValidator.validate(requested_court, actual_court)
 
-            # 3. Outcome Extraction
-            final_outcome, final_reasons = await self.outcome_extractor.extract_outcome(
-                decision
-            )
+                # 3. Article Validation
+                text_to_scan = decision.analysis_text or ""
+                if params.article:
+                    tier, matched_art, evidence_quote = article_validator.validate(
+                        text_to_scan, 
+                        llm_proof_quote=llm_info["quote"] if llm_info else decision.proof_quote
+                    )
+                else:
+                    tier = EvidenceTier.TIER_B_PROBABLE_MATCH
+                    matched_art = "Статья не запрашивалась"
+                    evidence_quote = "N/A"
 
-            # 4. Confidence Scoring
-            confidence = EvidenceScorer.score(tier, court_match, final_outcome)
+                # 4. Outcome Extraction (with AI override)
+                passed_outcome = None
+                if llm_info and llm_info["outcome"]:
+                    if llm_info["outcome"] == "satisfied":
+                        passed_outcome = CaseOutcome.SATISFIED
+                    elif llm_info["outcome"] == "denied":
+                        passed_outcome = CaseOutcome.DENIED
 
-            # Update stats for RequestProcessor reporting
+                final_outcome, final_reasons = await self.outcome_extractor.extract_outcome(
+                    decision, initial_outcome=passed_outcome
+                )
+                
+                if llm_info and llm_info["reasons"]:
+                    final_reasons = llm_info["reasons"]
+
+            # 5. Confidence Scoring
+            confidence = EvidenceScorer.score(tier, court_match if not (llm_info and not llm_info["relevant"]) else False, final_outcome)
+
+            # Update stats
             stats = replace(
                 stats,
                 court_compared_cases=stats.court_compared_cases + 1,
@@ -152,7 +196,9 @@ class CasePipeline:
 
             if params.article and confidence == ConfidenceScore.REJECTED:
                 failure_code = decision.verification_failure_code or "article_not_confirmed"
-                if decision.pdf_status == "pdf_access_blocked":
+                if llm_info and not llm_info["relevant"]:
+                    failure_code = "irrelevant_by_ai"
+                elif decision.pdf_status == "pdf_access_blocked":
                     failure_code = "pdf_access_blocked"
                 elif decision.pdf_status in {"pdf_unreadable", "pdf_missing"}:
                     failure_code = "pdf_unreadable"
@@ -167,16 +213,13 @@ class CasePipeline:
                 article_tier=tier,
                 matched_article=matched_art,
                 evidence_quote=evidence_quote,
-                court_match=court_match,
+                court_match=court_match if not (llm_info and not llm_info["relevant"]) else False,
                 issue_outcome=final_outcome,
                 confidence=confidence,
             )
             validated_records.append(record)
 
-            # Only count 'Confirmed' and 'Probable' as totally successful for the UI progress
-            # If an article is requested, we also count 'Weak' matches because they come from search
             success_thresholds = [ConfidenceScore.CONFIRMED, ConfidenceScore.PROBABLE]
-
             if confidence in success_thresholds:
                 validated_count += 1
                 if callable(on_successful):

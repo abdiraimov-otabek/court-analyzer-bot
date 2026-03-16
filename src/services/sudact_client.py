@@ -311,28 +311,55 @@ class SudactClient:
 
         details_fetch_ms = int((time.perf_counter() - details_start) * 1000)
 
-        # Optional LLM batch classification
-        if params.article and self._llm_reason_extractor is not None and decisions:
+        # Core AI Verification Stage: Identify truly relevant cases and extract clean data
+        if self._llm_reason_extractor is not None and decisions:
             if on_stage_change:
-                on_stage_change("classifying")
+                on_stage_change("verifying_results")
+            
             try:
+                # We use the article if parsed, otherwise the full query text for context
+                target_article = params.article or params.full_article or query_text
+                
                 classify_results = await self._llm_reason_extractor.classify_batch(
-                    decisions, params.article, query_text
+                    decisions, target_article, query_text
                 )
+                
                 relevant: list[CaseDecision] = []
                 for decision, (is_relevant, reasons, proof_quote, llm_outcome) in zip(
                     decisions, classify_results
                 ):
+                    # Only include cases the AI confirms as relevant to the query/article
                     if is_relevant:
-                        updated = replace(decision, reasons=reasons, proof_quote=proof_quote)
-                        if llm_outcome and decision.outcome == CaseOutcome.UNKNOWN:
+                        updated = replace(
+                            decision, 
+                            reasons=reasons, 
+                            proof_quote=proof_quote,
+                            matched_article=(params.article if params.article else ""),
+                            # Explicitly mark as verified by AI
+                            source_quality_reasons=(*decision.source_quality_reasons, "ai_verified")
+                        )
+                        
+                        # AI-determined outcome always overrides rules for higher precision
+                        if llm_outcome:
                             if llm_outcome == "satisfied":
                                 updated = replace(updated, outcome=CaseOutcome.SATISFIED)
                             elif llm_outcome == "denied":
                                 updated = replace(updated, outcome=CaseOutcome.DENIED)
+                        
                         relevant.append(updated)
+                    else:
+                        # Case is discarded or marked for pipeline to handle as rejected
+                        # For "clean data" request, we filter them out immediately
+                        pass
+                
                 decisions = relevant
                 successful = len(decisions)
+                
+                log_event(
+                    logger, "sudact.ai_cleaned", 
+                    count=len(decisions), 
+                    total_candidates=len(classify_results)
+                )
             except Exception as exc:
                 log_event(logger, "sudact.llm_classify_error", error=str(exc))
 

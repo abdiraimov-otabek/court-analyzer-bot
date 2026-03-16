@@ -16,13 +16,19 @@ class IssueOutcomeExtractor:
         self._logger = logging.getLogger("kad.outcome_extractor")
 
     async def extract_outcome(
-        self, decision: CaseDecision
+        self,
+        decision: CaseDecision,
+        initial_outcome: CaseOutcome | None = None,
     ) -> Tuple[CaseOutcome, Tuple[str, ...]]:
         """
         Takes a CaseDecision prepopulated by the retrieval engine (Stage A).
         Refines its outcome using the LLM if the outcome is unknown padding.
         """
-        current_outcome = decision.outcome
+        current_outcome = initial_outcome or decision.outcome
+        
+        # If we already have a definitive outcome from LLM Batch or initial assignment, trust it
+        if current_outcome in {CaseOutcome.SATISFIED, CaseOutcome.DENIED}:
+             return current_outcome, decision.reasons
 
         if (
             decision.pdf_status in {"pdf_text", "ocr_text"}
