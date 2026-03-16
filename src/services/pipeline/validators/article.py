@@ -122,6 +122,7 @@ class ArticleValidator:
         patterns = [
             rf"ст\.?\s*{compact}(?![\d.])",
             rf"стать[ьяеи]\s*{compact}(?![\d.])",
+            rf"(?<!\d){compact}(?!\d)",
         ]
         return any(re.search(pattern, text) for pattern in patterns)
 
@@ -175,6 +176,7 @@ class ArticleValidator:
         compact = re.escape((self.target_article or "").replace(",", "."))
         patterns = [
             rf".{{0,120}}(?:ст\.?|стать[ьяеи])\s*{compact}(?![\d.]).{{0,160}}",
+            rf".{{0,120}}(?<!\d){compact}(?!\d).{{0,160}}",
         ]
         for pattern in patterns:
             match = re.search(pattern, text, re.I | re.S)
