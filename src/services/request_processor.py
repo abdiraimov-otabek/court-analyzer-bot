@@ -260,13 +260,17 @@ class RequestProcessor:
 
         self._active_requests.set_phase(user_id, "analyzing")
         build_start = datetime.now()
+        visible_total_cases_found = min(
+            fetch_result_stats.total_cases_found,
+            settings.max_cases,
+        )
         result = await self._analysis_service.build_result(
             court=court_for_summary,
             period=metadata.period,
             decisions=decisions,
             article=metadata.article,
             total_pages=fetch_result_stats.total_pages,
-            total_cases_found=fetch_result_stats.total_cases_found,
+            total_cases_found=visible_total_cases_found,
             include_narrative_summary=True,
         )
         build_duration_ms = int((datetime.now() - build_start).total_seconds() * 1000)

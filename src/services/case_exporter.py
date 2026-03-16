@@ -5,6 +5,7 @@ from io import BytesIO
 from typing import Sequence
 
 from openpyxl import Workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
@@ -29,8 +30,6 @@ def build_cases_excel(decisions: Sequence[CaseDecision]) -> bytes:
         "Текст",
     ]
     sheet.append(headers)
-
-    from openpyxl.styles import Alignment, Font, PatternFill
 
     header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill(
@@ -63,10 +62,22 @@ def build_cases_excel(decisions: Sequence[CaseDecision]) -> bytes:
             decision.raw_text,
         ])
 
+    thin_border = Border(
+        left=Side(style="thin", color="D9D9D9"),
+        right=Side(style="thin", color="D9D9D9"),
+        top=Side(style="thin", color="D9D9D9"),
+        bottom=Side(style="thin", color="D9D9D9"),
+    )
+    zebra_fill = PatternFill(start_color="F7F9FC", end_color="F7F9FC", fill_type="solid")
+
     # Styling content
     for row in sheet.iter_rows(min_row=2):
+        is_even_row = row[0].row % 2 == 0
         for cell in row:
             cell.alignment = Alignment(vertical="top", wrap_text=True)
+            cell.border = thin_border
+            if is_even_row:
+                cell.fill = zebra_fill
             # Column 6 is "Ссылка"
             if (
                 cell.column == 6
@@ -76,8 +87,12 @@ def build_cases_excel(decisions: Sequence[CaseDecision]) -> bytes:
                 cell.hyperlink = cell.value
                 cell.style = "Hyperlink"
 
+    sheet.freeze_panes = "A2"
+    sheet.auto_filter.ref = sheet.dimensions
+    sheet.row_dimensions[1].height = 24
+
     # Column widths
-    column_widths = [16, 12, 20, 30, 20, 30, 20, 50]
+    column_widths = [16, 12, 22, 36, 22, 40, 24, 80]
     for i, width in enumerate(column_widths):
         col_letter = get_column_letter(i + 1)
         sheet.column_dimensions[col_letter].width = width
