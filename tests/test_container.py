@@ -10,8 +10,6 @@ def test_container_reuses_same_rate_limiter_instance():
             database_path=":memory:",
             hash_salt="salt",
             telegram_bot_token="token",
-            kad_api_base_url="https://example.com",
-            kad_api_key="key",
             admin_auth_token="admin",
         )
     )

@@ -58,6 +58,15 @@ class CaseDecision:
     source_quality_reasons: tuple[str, ...] = ()
     extraction_confidence: float = 1.0
 
+    raw_number: str = ""
+    raw_date: date | None = None
+    raw_case_number: str = ""
+    raw_place: str = ""
+    raw_judge: str = ""
+    raw_url: str = ""
+    raw_article: str = ""
+    raw_text: str = ""
+
 
 @dataclass(frozen=True)
 class AnalysisResult:
@@ -70,3 +79,4 @@ class AnalysisResult:
     fallback_reason: str = ""
     version_bundle: str = ""
     confidence_score: float = 1.0
+    decisions: tuple[CaseDecision, ...] = ()

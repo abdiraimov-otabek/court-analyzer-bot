@@ -228,7 +228,7 @@ async def _run_analysis(message: Message, user_id: UserId, query_text: str) -> N
         slow_alert_task.cancel()
         container.active_requests.set_phase(user_id, "completed")
         await message.answer(result.summary, reply_markup=_help_kb())
-        excel_bytes = build_cases_excel(result.case_list)
+        excel_bytes = build_cases_excel(result.decisions)
         file = BufferedInputFile(excel_bytes, filename="cases.xlsx")
         await message.answer_document(file)
         log_event(
@@ -257,8 +257,8 @@ async def _run_analysis(message: Message, user_id: UserId, query_text: str) -> N
         )
         container.active_requests.set_phase(user_id, "failed")
         await message.answer(exc.summary, reply_markup=_help_kb())
-        if settings.send_partial_file_on_quality_fail and exc.case_list.strip():
-            excel_bytes = build_cases_excel(exc.case_list)
+        if settings.send_partial_file_on_quality_fail and exc.decisions:
+            excel_bytes = build_cases_excel(exc.decisions)
             file = BufferedInputFile(excel_bytes, filename="cases.xlsx")
             await message.answer_document(file)
     except Exception as exc:

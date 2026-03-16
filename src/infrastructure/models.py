@@ -18,6 +18,7 @@ class Decision(Model):
     judge = pw.CharField(null=True)
     text = pw.TextField()
     url = pw.CharField(null=True)
+    article = pw.CharField(null=True)
 
     def __str__(self):
         return f"Решение {self.number} дела № {self.case_number} судьи {self.judge} от {self.date}, г. {self.place}"

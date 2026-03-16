@@ -149,7 +149,10 @@ class DatabaseCaseClient:
                 query = query.where(Decision.place.ilike(f"%{params.court}%"))
 
         if params.article:
-            query = query.where(Decision.text.ilike(f"%{params.article}%"))
+            query = query.where(
+                Decision.text.ilike(f"%{params.article}%") |
+                Decision.article.ilike(f"%{params.article}%")
+            )
 
         return query
 
@@ -240,6 +243,14 @@ class DatabaseCaseClient:
             analysis_text=row.text,
             decisive_act_title=act_title or first_line[:50].strip(),
             decisive_act_type="merits_act" if act_title in ("Решение", "Постановление") else "other",
+            raw_number=row.number,
+            raw_date=row.date,
+            raw_case_number=row.case_number,
+            raw_place=row.place or "",
+            raw_judge=row.judge or "",
+            raw_url=f"https://sudact.ru{row.url}" if row.url else "",
+            raw_article=row.article or "",
+            raw_text=row.text,
         )
 
     def _extract_court_from_text(self, text: str) -> str | None:
@@ -253,12 +264,33 @@ class DatabaseCaseClient:
 
     def _map_outcome(self, text: str) -> CaseOutcome:
         lower = text.lower()
-        # Replicating core logic from ParserApiKadClient
+        
+        # Original DENIED patterns
         denied_patterns = [
+            r"отказа\w*\s+(?:в\s+)?удовлетворени\w*",
+            r"в\s+удовлетворени\w*(?:\s+\w+){0,8}\s+отказа\w*",
+            r"остави\w*(?:\s+\w+)?\s+без\s+удовлетворени\w*",
+            r"отказа\w*\s+в\s+иске",
+            r"в\s+иске\s+отказа\w*",
+            r"жалоб[уа]\s+остави\w*(?:\s+\w+)?\s+без\s+рассмотрения",
+            r"остави\w*(?:\s+\w+)?\s+жалобу\s+без\s+удовлетворени\w*",
+            r"отказа\w*\s+в\s+признании",
+            r"не\s+подлежит\s+признанию",
+            r"не\s+может\s+быть\s+признан\w*",
+            r"не\s+мог(?:ла)?\s+быть\s+признан\w*",
+            r"отсутствуют\s+основания\s+для\s+признания",
+            r"признаки\s+.*не\s+установлены",
+            r"признаки\s+.*отсутствуют",
+            r"в\s+удовлетворении\s+жалобы\s+отказ",
+            r"производство\s+по\s+жалобе\s+прекратить",
+            r"оставить\s+без\s+рассмотрения",
+            r"жалобу\s+признать\s+необоснованной",
+            r"правовые\s+основания\s+для\s+удовлетворения\s+жалобы\s+отсутствуют",
             r"отказ\w*(?:\s+\w+){0,3}\s+в\s+(?:удовлетвор|признани|иске|заявлении|жалобе|требован|привлечении)\w*",
             r"без\s+(?:удовлетвор|рассмотрения)\w*",
             r"прекратить\s+производство",
         ]
+        
         for p in denied_patterns:
             if re.search(p, lower):
                 return CaseOutcome.DENIED
@@ -266,9 +298,14 @@ class DatabaseCaseClient:
         satisfied_keywords = [
             "удовлетвор",
             "признать недействит",
+            "признано незаконным",
             "признать незаконн",
             "взыскать",
+            "ненадлежащим исполнение",
+            "привлечь к административной ответственности",
+            "жалоба признана обоснованной",
         ]
+        
         for k in satisfied_keywords:
             if k in lower:
                 return CaseOutcome.SATISFIED

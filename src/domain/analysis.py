@@ -132,6 +132,7 @@ class AnalysisService:
             case_list=case_list,
             total_pages=total_pages,
             total_cases_found=total_cases_found,
+            decisions=tuple(verifiable_decisions + review_decisions)
         )
 
     def build_case_list(self, decisions: list[CaseDecision]) -> str:

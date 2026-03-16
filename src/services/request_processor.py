@@ -271,6 +271,17 @@ class RequestProcessor:
             include_narrative_summary=True,
         )
         build_duration_ms = int((datetime.now() - build_start).total_seconds() * 1000)
+
+        if quality_reason == "no_relevant_cases":
+            raise NoRelevantCasesError(
+                total_processed=fetch_result_stats.attempted_cases,
+                filtered_by_article=fetch_result_stats.filtered_by_article or 0,
+            )
+        if quality_reason == "court_not_found":
+            raise CourtNotFoundError()
+        if quality_reason in ("not_enough_data", "source_unavailable"):
+            raise NotEnoughData()
+        
         if quality_reason is not None:
             raise InsufficientQualityError(
                 reason_code=quality_reason,
@@ -291,6 +302,7 @@ class RequestProcessor:
                     article_requested=article_requested,
                 ),
                 case_list=result.case_list,
+                decisions=result.decisions,
             )
 
         self._active_requests.set_phase(user_id, "aggregating")
@@ -579,6 +591,7 @@ class InsufficientQualityError(RuntimeError):
         court_mismatch_share: float,
         summary: str,
         case_list: str,
+        decisions: tuple[CaseDecision, ...],
     ) -> None:
         super().__init__(reason_code)
         self.reason_code = reason_code
@@ -591,3 +604,4 @@ class InsufficientQualityError(RuntimeError):
         self.court_mismatch_share = court_mismatch_share
         self.summary = summary
         self.case_list = case_list
+        self.decisions = decisions

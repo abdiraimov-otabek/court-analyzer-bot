@@ -7,7 +7,6 @@ def _set_required_env(monkeypatch):
     monkeypatch.setattr(config_module, "load_dotenv", lambda *args, **kwargs: None)
     monkeypatch.setenv("HASH_SALT", "salt")
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "token")
-    monkeypatch.setenv("KAD_API_KEY", "key")
     monkeypatch.setenv("ADMIN_AUTH_TOKEN", "admin")
 
 
@@ -24,11 +23,3 @@ def test_load_config_does_not_require_openrouter_or_postgres(monkeypatch):
     assert config.pg_db_name is None
     assert config.pg_db_user is None
     assert config.pg_db_password is None
-
-
-def test_load_config_requires_kad_api_key(monkeypatch):
-    _set_required_env(monkeypatch)
-    monkeypatch.delenv("KAD_API_KEY", raising=False)
-
-    with pytest.raises(ValueError, match="KAD_API_KEY"):
-        config_module.load_config()

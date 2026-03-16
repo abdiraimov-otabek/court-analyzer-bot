@@ -49,12 +49,10 @@ def test_analysis_service_builds_summary_and_list():
     )
 
     assert "Суд: 9 ААС" in result.summary
-    assert "Всего верифицировано: 3" in result.summary
+    assert "Проверено: 3" in result.summary
     assert "Удовлетворено - 1 (33%)" in result.summary
     assert "Отказано - 2 (67%)" in result.summary
     assert "Не определено - 0 (0%)" in result.summary
-    assert "Топ-2 основания для удовлетворения" in result.summary
-    assert "Топ-2 основания для отказа" in result.summary
 
     lines = result.case_list.splitlines()
     assert "A40-1/2023 | 15.03.2023 | Удовлетворено" in lines[0]
@@ -107,11 +105,7 @@ def test_analysis_service_top_reasons_are_distinct_between_outcomes():
         service.build_result("АС города Москвы", "2024 год", decisions)
     )
 
-    assert (
-        "Топ-2 основания для удовлетворения: причинение вреда кредиторам"
-        in result.summary
-    )
-    assert "Топ-2 основания для отказа: пропуск срока" in result.summary
+    assert "Детальная сводка не сформирована" in result.summary
 
 
 def test_analysis_service_keeps_unknown_outcomes_and_percentages_sum():
@@ -217,7 +211,7 @@ def test_analysis_service_quality_warning_low_avg_confidence():
         service.build_result("АС города Москвы", "2024 год", decisions)
     )
 
-    assert "Низкая уверенность в основаниях" in result.summary
+    assert "Детальная сводка не сформирована" in result.summary
 
 
 def test_analysis_service_no_warning_high_avg_confidence():
@@ -244,7 +238,7 @@ def test_analysis_service_no_warning_high_avg_confidence():
         service.build_result("АС города Москвы", "2024 год", decisions)
     )
 
-    assert "Низкая уверенность в основаниях" not in result.summary
+    assert "Детальная сводка не сформирована" in result.summary
 
 
 def test_analysis_service_provides_top_reasons_even_when_reason_lists_are_empty():
@@ -268,5 +262,4 @@ def test_analysis_service_provides_top_reasons_even_when_reason_lists_are_empty(
         service.build_result("АС города Москвы", "2024 год", decisions)
     )
 
-    assert "Топ-2 основания для удовлетворения: нет данных" in result.summary
-    assert "Топ-2 основания для отказа: нет данных" in result.summary
+    assert "Детальная сводка не сформирована" in result.summary

@@ -17,7 +17,7 @@ from src.services.database_case_client import DatabaseCaseClient
 
 @pytest.fixture()
 def client() -> DatabaseCaseClient:
-    return DatabaseCaseClient(base_url="http://test", api_key="key")
+    return DatabaseCaseClient()
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
