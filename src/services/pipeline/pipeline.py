@@ -131,13 +131,14 @@ class CasePipeline:
                 break
 
             llm_info = llm_results.get(decision.case_id)
+            court_match = False
             
             # 1. AI-Driven Relevance Override (if available)
             if llm_info and not llm_info["relevant"]:
                  tier = EvidenceTier.TIER_D_NO_MATCH
                  matched_art = "Отклонено ИИ как нерелевантное"
                  evidence_quote = llm_info["quote"] or "N/A"
-                 llm_outcome = None
+                 final_outcome = CaseOutcome.UNKNOWN
                  final_reasons = llm_info["reasons"]
             else:
                 # 2. Jurisdiction Validation
@@ -173,7 +174,7 @@ class CasePipeline:
                     final_reasons = llm_info["reasons"]
 
             # 5. Confidence Scoring
-            confidence = EvidenceScorer.score(tier, court_match if not (llm_info and not llm_info["relevant"]) else False, final_outcome)
+            confidence = EvidenceScorer.score(tier, court_match, final_outcome)
 
             # Update stats
             stats = replace(
@@ -213,7 +214,7 @@ class CasePipeline:
                 article_tier=tier,
                 matched_article=matched_art,
                 evidence_quote=evidence_quote,
-                court_match=court_match if not (llm_info and not llm_info["relevant"]) else False,
+                court_match=court_match,
                 issue_outcome=final_outcome,
                 confidence=confidence,
             )

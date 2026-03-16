@@ -272,6 +272,7 @@ def test_request_processor_keeps_progress_capped_to_requested_max_cases(tmp_path
     assert active.collected_cases == 50
     assert active.processed_cases == 50
     assert active.successful_cases == 50
+    assert "Всего найдено: 50" in result.summary
 
 
 def test_request_processor_returns_result_even_if_cache_and_log_write_fail():
