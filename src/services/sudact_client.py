@@ -260,6 +260,15 @@ class SudactClient:
                 break
             page = batch_end
 
+        # Deduplicate links to prevent redundant fetching and duplication in Excel
+        seen_links = set()
+        unique_links = []
+        for link, title, case_number in case_links:
+            if link not in seen_links:
+                seen_links.add(link)
+                unique_links.append((link, title, case_number))
+        case_links = unique_links
+
         case_links = case_links[:max_cases]
         case_id_collection_ms = int((time.perf_counter() - collect_start) * 1000)
 

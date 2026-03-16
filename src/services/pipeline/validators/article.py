@@ -157,12 +157,38 @@ class ArticleValidator:
         return True
 
     def _is_context_dissonant(self, text: str) -> bool:
+        """
+        Heuristic to detect if the article is mentioned as background/procedural 'noise'
+        rather than being applied to the merits of the case.
+        Returns True if the context suggests it's NOT a merit-based application.
+        """
         article = re.escape((self.target_article or "").replace(",", "."))
-        contextual_patterns = [
+        
+        # 1. Positive patterns: phrases that indicate the article IS applied/decisive
+        application_patterns = [
             rf"руководствуясь\s+(?:ч\.?\s*\d+\s+)?ст\.?\s*{article}",
-            rf"в\s+соответствии\s+со?\s+ст\.?\s*{article}",
+            rf"в\s+соответствии\s+co?\s+ст\.?\s*{article}",
             rf"на\s+основании\s+ст\.?\s*{article}",
+            rf"применяя\s+ст\.?\s*{article}",
+            rf"предусмотренном?\s+ст\.?\s*{article}",
         ]
+        
+        # If we see a strong application phrase, it's NOT dissonant
+        if any(re.search(p, text, re.I) for p in application_patterns):
+            return False
+
+        # 2. Negative patterns: phrases that indicate procedural/technical context
+        dissonant_patterns = [
+            rf"в\s+силу\s+ст\.?\s*{article}\s+апк",  # procedural reference to APC
+            rf"ч\.?\s*\d+\s+ст\.?\s*\d+\s+и\s+ст\.?\s*{article}\s+апк",
+            rf"порядок,?\s+предусмотренный\s+ст\.?\s*{article}", # procedural order
+        ]
+
+        # If it's explicitly procedural noise, it IS dissonant
+        if any(re.search(p, text, re.I) for p in dissonant_patterns):
+            return True
+
+        # Check for issue phrase as an override
         issue_tokens = [
             token
             for token in (self.issue_phrase or "").lower().split()
@@ -170,7 +196,10 @@ class ArticleValidator:
         ]
         if issue_tokens and any(token in text for token in issue_tokens):
             return False
-        return any(re.search(pattern, text) for pattern in contextual_patterns)
+            
+        # Default for matches that don't hit strong indicators: 
+        # assume not dissonant for now to avoid false negatives.
+        return False
 
     def _extract_snippet(self, text: str) -> str:
         compact = re.escape((self.target_article or "").replace(",", "."))
