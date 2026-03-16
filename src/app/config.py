@@ -14,6 +14,8 @@ class AppConfig:
     telegram_bot_token: str | None
     admin_auth_token: str | None
     openrouter_api_key: str | None = None
+    decision_source_mode: str = "sudact"
+    shadow_mode_enabled: bool = False
 
 
 def load_config() -> AppConfig:
@@ -23,12 +25,15 @@ def load_config() -> AppConfig:
     database_path = Path(raw_database_path).expanduser()
     if not database_path.is_absolute():
         database_path = (env_path.parent / database_path).resolve()
+    
     config = AppConfig(
         database_path=str(database_path),
         hash_salt=os.getenv("HASH_SALT", ""),
         telegram_bot_token=os.getenv("TELEGRAM_BOT_TOKEN"),
         admin_auth_token=os.getenv("ADMIN_AUTH_TOKEN"),
         openrouter_api_key=os.getenv("OPENROUTER_API_KEY"),
+        decision_source_mode=os.getenv("DECISION_SOURCE_MODE", "sudact"),
+        shadow_mode_enabled=os.getenv("SHADOW_MODE_ENABLED", "false").lower() == "true",
     )
 
     # Validate mandatory environment variables used by the default runtime.
@@ -46,3 +51,12 @@ def load_config() -> AppConfig:
         )
 
     return config
+
+
+def initialize_db(config: AppConfig) -> None:
+    """
+    Ensures that the database and its schema are initialized.
+    """
+    from src.infrastructure.sqlite import SqliteConnection
+    # SqliteConnection constructor handles _ensure_schema
+    SqliteConnection(config.database_path)
