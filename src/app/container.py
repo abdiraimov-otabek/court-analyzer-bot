@@ -19,7 +19,7 @@ from src.infrastructure.sqlite import SqliteConnection
 from src.services.access_control import AccessControlList
 from src.services.active_requests import ActiveRequestRegistry
 from src.services.hashing import HashingService
-from src.services.database_case_client import DatabaseCaseClient
+from src.services.sudact_client import SudactClient
 from src.services.llm_reason_extractor import LLMReasonExtractor
 from src.services.quarter_selection import QuarterSelectionRegistry
 from src.services.rate_limit import HourlyRateLimiter
@@ -55,7 +55,7 @@ class Container:
         limits = httpx.Limits(max_connections=100, max_keepalive_connections=50)
         self.sync_http_client = httpx.Client(timeout=30, limits=limits)
         self.async_http_client = httpx.AsyncClient(timeout=30, limits=limits)
-        self._case_client: DatabaseCaseClient | None = None
+        self._case_client: SudactClient | None = None
         self._llm_extractor: LLMReasonExtractor | None = None
 
     def build_bot_logic(self) -> BotLogic:
@@ -80,13 +80,14 @@ class Container:
             hashing_service=self._build_hashing_service(),
         )
 
-    def _get_case_client(self) -> DatabaseCaseClient:
+    def _get_case_client(self) -> SudactClient:
         if self._case_client is None:
             self._case_client = self._build_case_client()
         return self._case_client
 
-    def _build_case_client(self) -> DatabaseCaseClient:
-        return DatabaseCaseClient(
+    def _build_case_client(self) -> SudactClient:
+        return SudactClient(
+            async_http_client=self.async_http_client,
             llm_reason_extractor=self._get_llm_reason_extractor(),
         )
 

@@ -21,6 +21,13 @@ class SourceAccessError(RuntimeError):
     pass
 
 
+# Aliases for backward compatibility with kad_client.py
+KadRateLimitError = SourceRateLimitError
+KadUnavailableError = SourceUnavailableError
+KadInvalidResponseError = SourceInvalidResponseError
+KadAccessError = SourceAccessError
+
+
 @dataclass
 class SearchParams:
     inn_or_name: str | None
