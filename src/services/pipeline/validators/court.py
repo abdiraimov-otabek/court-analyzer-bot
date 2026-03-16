@@ -43,8 +43,13 @@ class JurisdictionValidator:
         req_tokens = cls._tokenize(requested_court)
         act_tokens = cls._tokenize(actual_court)
 
-        if not req_tokens or not act_tokens:
-            return False
+        if not req_tokens:
+            return False  # Requested court has no meaningful tokens — can't validate
+
+        if not act_tokens:
+            # Actual court is generic (e.g., "Арбитражный суд" — only stop words).
+            # We cannot disprove a match, so give benefit of the doubt.
+            return True
 
         overlap = req_tokens & act_tokens
         if not overlap:

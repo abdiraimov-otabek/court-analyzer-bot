@@ -102,6 +102,38 @@ def _extract_place(text: str) -> str | None:
     return None
 
 
+def _extract_court_from_page(html) -> str | None:
+    """Try to read the structured court name from sudact.ru HTML metadata."""
+    # sudact.ru usually has a breadcrumb or header with the court name
+    for selector in [
+        {"class_": "court-name"},
+        {"class_": "h-col-name-court"},
+        {"id": "court-name"},
+    ]:
+        tag = html.find(**selector)  # type: ignore[arg-type]
+        if tag:
+            name = tag.get_text(" ", strip=True)
+            if name:
+                return name
+
+    # Fallback: look for the court name in breadcrumb links
+    crumbs = html.find_all("a", class_="breadcrumb-item")
+    for crumb in crumbs:
+        text = crumb.get_text(" ", strip=True)
+        if any(kw in text for kw in ("суд", "Суд", "СУД")):
+            return text
+
+    # Fallback 2: look for known court phrases in <title> or <h1>
+    for tag in html.find_all(["title", "h1"]):
+        text = tag.get_text(" ", strip=True)
+        m = re.search(
+            r'(Арбитражный\s+суд[^,\n<]{3,60})', text, re.I
+        )
+        if m:
+            return m.group(1).strip()
+    return None
+
+
 def _extract_article(html_container) -> str | None:
     if not html_container:
         return None
@@ -509,7 +541,7 @@ class SudactClient:
 
     def _parse_decision_page(
         self,
-        html: BeautifulSoup,
+        html,
         url: str,
         title: str,
         case_number: str,
@@ -523,10 +555,16 @@ class SudactClient:
 
         full_text = container.get_text("\n")
         judge = _extract_judge(full_text)
-        place = _extract_place(full_text)
         article = _extract_article(container)
         outcome = self._outcome_mapper.map_outcome(full_text)
         decision_date = _parse_date_from_title(title)
+
+        # Prefer structured court name from the full HTML page, then fall back to place
+        court_name = _extract_court_from_page(html)
+        if not court_name:
+            place = _extract_place(full_text)
+            court_name = f"Арбитражный суд г. {place}" if place else "Арбитражный суд"
+        place = _extract_place(full_text)  # keep raw_place for export
 
         # Extract act title from first line
         first_line = full_text.split("\n")[0].strip()
@@ -539,7 +577,7 @@ class SudactClient:
             outcome=outcome,
             reasons=("оценка обстоятельств дела",),
             case_id=url,
-            court_name=place or "Арбитражный суд",
+            court_name=court_name,
             case_link=url,
             analysis_text=full_text[:15000],  # truncate to avoid memory issues
             decisive_act_title=act_title or first_line[:60].strip(),

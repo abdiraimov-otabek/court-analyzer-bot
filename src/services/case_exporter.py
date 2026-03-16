@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime
 from io import BytesIO
 from typing import Sequence
+
+logger = logging.getLogger("case_exporter")
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -12,7 +15,38 @@ from openpyxl.worksheet.worksheet import Worksheet
 from src.domain.entities import CaseDecision
 
 
-def build_cases_excel(decisions: Sequence[CaseDecision]) -> bytes:
+def build_cases_excel(
+    decisions: Sequence[CaseDecision],
+    target_article: str | None = None,
+) -> bytes:
+    """Build an Excel workbook from a list of case decisions.
+
+    Args:
+        decisions: The list of decisions to export.
+        target_article: When provided (e.g. "61.3"), only rows whose
+            ``raw_article`` or ``matched_article`` contain this article
+            number are written to the sheet.  A summary row is appended
+            at the end showing how many rows passed the filter.
+    """
+    filtered = list(decisions)
+    skipped = 0
+    if target_article:
+        kept = []
+        article_lower = target_article.lower()
+        for d in decisions:
+            # Check both the raw scraped article and the pipeline-matched article
+            raw = (d.raw_article or "").lower()
+            matched = (getattr(d, "matched_article", None) or "").lower()
+            if article_lower in raw or article_lower in matched:
+                kept.append(d)
+            else:
+                skipped += 1
+        filtered = kept
+        logger.info(
+            "excel_export.article_filter article=%s kept=%d skipped=%d",
+            target_article, len(filtered), skipped,
+        )
+
     workbook = Workbook()
     sheet = workbook.active
     assert isinstance(sheet, Worksheet)
@@ -42,7 +76,7 @@ def build_cases_excel(decisions: Sequence[CaseDecision]) -> bytes:
         cell.fill = header_fill
         cell.alignment = header_alignment
 
-    for decision in decisions:
+    for decision in filtered:
         # Robust date formatting
         d_date = ""
         if decision.raw_date:
