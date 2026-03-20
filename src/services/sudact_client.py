@@ -411,11 +411,11 @@ class SudactClient:
         if date_to:
             base += f"&{prefix}-date_to={date_to}"
 
-        # Build text search term from article and/or INN/name
+        # Build text search term from INN/name
         search_terms = []
         if params.article:
-            # We separate article number for better matching on Sudact
-            search_terms.append(f"ст. {params.article}")
+            import urllib.parse
+            base += f"&{prefix}-lawchunkinfo={urllib.parse.quote(params.article)}"
             
         if params.law_display_name:
             search_terms.append(params.law_display_name)
@@ -434,7 +434,7 @@ class SudactClient:
             for t in search_terms:
                 if t not in unique_terms:
                     unique_terms.append(t)
-            base += f"&{prefix}-text={urllib.parse.quote(' '.join(unique_terms))}"
+            base += f"&{prefix}-txt={urllib.parse.quote(' '.join(unique_terms))}"
 
         # Court name filter
         if params.court:
@@ -490,7 +490,7 @@ class SudactClient:
         self, html: BeautifulSoup
     ) -> list[tuple[str, str, str]]:
         """Extract (relative_url, title, case_number) from a search result page."""
-        results = html.find("ul", class_="results2")
+        results = html.find("ul", class_="results2") or html.find("div", class_="results") or html.find("div", id="result-list")
         if not results:
             return []
         items: list[tuple[str, str, str]] = []
