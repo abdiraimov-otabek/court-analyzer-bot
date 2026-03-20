@@ -472,7 +472,24 @@ class SudactClient:
 
             if "doc_ajax" in url:
                 try:
+                    # Initial JSON parse
                     data = resp.json()
+                    
+                    # Polling logic for asynchronous search
+                    retries = 0
+                    while data.get("status") in {"new", "started", None} and retries < 15:
+                        if data.get("status") is None and "total_found" in data:
+                            break # It might be done despite missing status
+                        
+                        await asyncio.sleep(1.0)
+                        retries += 1
+                        resp = await self._client.get(url, headers=headers, follow_redirects=True)
+                        if resp.status_code != 200:
+                            break
+                        data = resp.json()
+                        if data.get("status") == "finished":
+                            break
+
                     html_content = data.get("content", "")
                     total_found = data.get("total_found")
                     if not total_found or "Документы не найдены" in total_found:
