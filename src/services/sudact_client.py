@@ -167,7 +167,7 @@ class SudactClient:
       5. Returns CaseDecision objects wrapped in FetchDecisionsResult
     """
 
-    _CATEGORY_URL = "/arbitral/"
+    _CATEGORY_URL = "/arbitral/doc_ajax/"
     _PARAM_PREFIX = "arbitral"
 
     def __init__(
@@ -462,6 +462,17 @@ class SudactClient:
             if resp.status_code != 200:
                 log_event(logger, "sudact.http_error", status=resp.status_code, url=url)
                 return None
+            
+            # Since doc_ajax returns JSON: {"content": "<html...>", "status": "finished"}
+            if "doc_ajax" in url:
+                try:
+                    data = resp.json()
+                    html_content = data.get("content", "")
+                    return BeautifulSoup(html_content, "lxml")
+                except ValueError:
+                    # Fallback if server returned raw HTML or invalid JSON
+                    return BeautifulSoup(resp.text, "lxml")
+            
             return BeautifulSoup(resp.text, "lxml")
         except httpx.TimeoutException:
             log_event(logger, "sudact.timeout", url=url)
