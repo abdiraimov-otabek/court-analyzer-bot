@@ -438,7 +438,7 @@ class SudactClient:
 
         # Court name filter
         if params.court:
-            display_court = COURT_MAPPING.get(params.court, params.court)
+            display_court = params.court
             import urllib.parse
             base += f"&{prefix}-court={urllib.parse.quote(display_court)}"
 
@@ -468,6 +468,9 @@ class SudactClient:
                 try:
                     data = resp.json()
                     html_content = data.get("content", "")
+                    total_found = data.get("total_found")
+                    if total_found:
+                        html_content += f'<div id="injected-total-found">{total_found}</div>'
                     return BeautifulSoup(html_content, "lxml")
                 except ValueError:
                     # Fallback if server returned raw HTML or invalid JSON
@@ -489,7 +492,7 @@ class SudactClient:
         """Try to extract the total result count displayed by sudact.ru."""
         # sudact shows something like "Найдено: 1 234 решения"
         for tag in html.find_all(string=re.compile(r"[Нн]айдено")):
-            m = re.search(r"([\d\s]+)", str(tag))
+            m = re.search(r"(\d[\d\s\xa0]*)", str(tag))
             if m:
                 try:
                     return int(m.group(1).replace(" ", "").replace("\xa0", ""))
@@ -501,7 +504,12 @@ class SudactClient:
         self, html: BeautifulSoup
     ) -> list[tuple[str, str, str]]:
         """Extract (relative_url, title, case_number) from a search result page."""
-        results = html.find("ul", class_="results2") or html.find("div", class_="results") or html.find("div", id="result-list")
+        results = (
+            html.find("ul", class_="results2") 
+            or html.find("ul", class_="results") 
+            or html.find("div", class_="results") 
+            or html.find("div", id="result-list")
+        )
         if not results:
             return []
         items: list[tuple[str, str, str]] = []

@@ -358,6 +358,7 @@ class QueryParser:
         stripped = re.sub(r"\d+\s*кв", " ", stripped, flags=re.I)
         stripped = re.sub(r"(\d+)\s*(?:аас|арбитражный апелляционный суд)", " ", stripped, flags=re.I)
         stripped = re.sub(r"ас\s+[а-я-]+(?:\s+[а-я-]+){0,2}", " ", stripped, flags=re.I)
+        stripped = re.sub(r"арбитражн\w*\s+суд\w*(?:\s+(?:города|г\.?|области|края|округа|республики)?\s*[а-я-]+){0,3}", " ", stripped, flags=re.I)
         stripped = self._cleanup_pattern.sub(" ", stripped)
         words = [word for word in re.findall(r"[а-яёa-z0-9-]{4,}", stripped, re.I) if word]
         if not words:
