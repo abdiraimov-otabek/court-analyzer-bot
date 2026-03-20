@@ -411,11 +411,15 @@ class SudactClient:
         if date_to:
             base += f"&{prefix}-date_to={date_to}"
 
+        # Add case type if specified (e.g., 'B' for bankruptcy)
+        if params.case_type:
+            base += f"&{prefix}-casetype={params.case_type}"
+
         # Build text search term from INN/name
         search_terms = []
         if params.article:
             import urllib.parse
-            base += f"&{prefix}-lawchunkinfo={urllib.parse.quote(params.article)}"
+            base += f"&{prefix}-lawchunkinfo={urllib.parse.quote_plus(params.article)}"
             
         if params.law_display_name:
             search_terms.append(params.law_display_name)
@@ -431,17 +435,20 @@ class SudactClient:
             import urllib.parse
             # Filter unique terms and join
             unique_terms = []
+            seen = set()
             for t in search_terms:
-                if t not in unique_terms:
+                if t and t not in seen:
                     unique_terms.append(t)
-            base += f"&{prefix}-txt={urllib.parse.quote(' '.join(unique_terms))}"
+                    seen.add(t)
+            if unique_terms:
+                base += f"&{prefix}-txt={urllib.parse.quote_plus(' '.join(unique_terms))}"
 
         # Court name filter
         if params.court:
-            display_court = params.court
             import urllib.parse
-            base += f"&{prefix}-court={urllib.parse.quote(display_court)}"
+            base += f"&{prefix}-court={urllib.parse.quote_plus(params.court)}"
 
+        log_event(logger, "sudact.build_url", url=base)
         return base
 
     # ------------------------------------------------------------------
@@ -460,20 +467,23 @@ class SudactClient:
             }
             resp = await self._client.get(url, headers=headers, follow_redirects=True)
             if resp.status_code != 200:
-                log_event(logger, "sudact.http_error", status=resp.status_code, url=url)
+                log_event(logger, "fetch_page.error", url=url, status=resp.status_code)
                 return None
-            
-            # Since doc_ajax returns JSON: {"content": "<html...>", "status": "finished"}
+
             if "doc_ajax" in url:
                 try:
                     data = resp.json()
                     html_content = data.get("content", "")
                     total_found = data.get("total_found")
-                    if total_found:
-                        html_content += f'<div id="injected-total-found">{total_found}</div>'
-                    return BeautifulSoup(html_content, "lxml")
+                    if not total_found or "Документы не найдены" in total_found:
+                        log_event(logger, "sudact.no_docs_found", url=url)
+                        return None
+                    
+                    # Wrap content in a body to ensure BS4 is robust
+                    full_html = f"<html><body>{html_content}<div id='injected-total-found'>{total_found}</div></body></html>"
+                    return BeautifulSoup(full_html, "lxml")
                 except ValueError:
-                    # Fallback if server returned raw HTML or invalid JSON
+                    log_event(logger, "fetch_page.json_invalid", url=url)
                     return BeautifulSoup(resp.text, "lxml")
             
             return BeautifulSoup(resp.text, "lxml")
