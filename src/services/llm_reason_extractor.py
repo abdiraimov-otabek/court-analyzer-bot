@@ -113,6 +113,8 @@ class LLMReasonExtractor:
         self._fast_model = fast_model
         self._timeout = timeout
         self._semaphore = asyncio.Semaphore(max_concurrent)
+        self._last_error: str | None = None
+        self._is_broken: bool = False
         self._cache: dict[str, tuple[str, ...]] = {}
         self._classify_cache: dict[
             str, tuple[bool, tuple[str, ...], str, str | None]
@@ -125,6 +127,33 @@ class LLMReasonExtractor:
         self._MAX_CACHE_SIZE = 2000
         self._budget_remaining: int | None = None
         self._logger = logging.getLogger("llm_reason_extractor")
+
+    def _handle_api_error(self, exc: Exception) -> None:
+        """Records API errors and marks the extractor as broken for fatal ones."""
+        error_msg = str(exc)
+        self._last_error = error_msg
+        
+        if isinstance(exc, httpx.HTTPStatusError):
+            status = exc.response.status_code
+            if status == 402:
+                self._is_broken = True
+                self._logger.error("llm.payment_required", extra={"data": {"error": error_msg}})
+            elif status == 401:
+                self._is_broken = True
+                self._logger.error("llm.unauthorized", extra={"data": {"error": error_msg}})
+            elif status >= 500:
+                self._logger.warning("llm.server_error", extra={"data": {"status": status, "error": error_msg}})
+        else:
+            self._logger.warning("llm.request_failed", extra={"data": {"error": error_msg}})
+
+    @property
+    def is_functional(self) -> bool:
+        """Returns True if the LLM is configured and hasn't hit a fatal error (402/401)."""
+        return bool(self._api_key) and not self._is_broken
+
+    @property
+    def last_error(self) -> str | None:
+        return self._last_error
 
     def _clean_llm_json(self, content: str) -> str:
         """Extract and clean JSON string from LLM response."""
@@ -244,9 +273,7 @@ class LLMReasonExtractor:
                 "date_to": parsed.get("date_to"),
             }
         except Exception as exc:
-            self._logger.warning(
-                "llm.parse_query_failed", extra={"data": {"error": str(exc)}}
-            )
+            self._handle_api_error(exc)
         return {
             "article": None,
             "full_article": None,
@@ -324,9 +351,7 @@ class LLMReasonExtractor:
 
             return summary_text
         except Exception as exc:
-            self._logger.warning(
-                "llm.generate_summary_failed", extra={"data": {"error": str(exc)}}
-            )
+            self._handle_api_error(exc)
             # Fallback to simple template
             return f"Суд: {court}\nВсего дел: {total}\nУдовлетворено: {satisfied}\nОтказано: {denied}"
 
@@ -398,10 +423,7 @@ class LLMReasonExtractor:
             self._outcome_cache[cache_key] = (reasons, outcome)
             return reasons, outcome
         except Exception as exc:
-            self._logger.warning(
-                "llm.extract_with_outcome_failed",
-                extra={"data": {"error": repr(exc)}},
-            )
+            self._handle_api_error(exc)
             return self._FALLBACK, None
 
     async def _call_extract_with_outcome(
@@ -546,10 +568,7 @@ class LLMReasonExtractor:
             self._pdf_choice_cache[cache_key] = index
             return normalized_candidates[index]
         except Exception as exc:
-            self._logger.warning(
-                "llm.choose_decisive_pdf_failed",
-                extra={"data": {"error": repr(exc)}},
-            )
+            self._handle_api_error(exc)
             return normalized_candidates[0]
 
     async def analyze_pdf_case(
@@ -640,10 +659,7 @@ class LLMReasonExtractor:
             self._pdf_analysis_cache[cache_key] = result
             return result
         except Exception as exc:
-            self._logger.warning(
-                "llm.analyze_pdf_case_failed",
-                extra={"data": {"error": repr(exc)}},
-            )
+            self._handle_api_error(exc)
             return False, self._missing_proof_reasons(list(self._FALLBACK)), "", None
 
     def _parse_pdf_choice_result(self, raw: str) -> PdfChoiceResult:
@@ -729,9 +745,7 @@ class LLMReasonExtractor:
                     self._classify_cache[cache_key] = res
 
             except Exception as exc:
-                self._logger.warning(
-                    "llm.batch_classify_failed", extra={"data": {"error": str(exc)}}
-                )
+                self._handle_api_error(exc)
                 for idx in chunk_indices:
                     # Fail-safe: if LLM fails, pass through as relevant to avoid 100% rejection
                     results[idx] = (

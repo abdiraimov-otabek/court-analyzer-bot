@@ -13,7 +13,7 @@ class AppConfig:
     hash_salt: str
     telegram_bot_token: str | None
     admin_auth_token: str | None
-    openrouter_api_key: str | None = None
+    openrouter_api_key: str | None = None  # Optional: enables AI-driven analysis features
     decision_source_mode: str = "sudact"
     shadow_mode_enabled: bool = False
 

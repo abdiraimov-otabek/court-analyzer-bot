@@ -306,16 +306,15 @@ class RequestProcessor:
         )
         result = replace(
             result,
-            summary=self._append_reliability_note(
-                result.summary,
-                fallback_used=fallback_used,
-                fallback_reason=fallback_reason,
-            ),
             primary_source=primary_source,
             fallback_used=fallback_used,
             fallback_reason=fallback_reason,
             version_bundle=current_version_bundle(),
             confidence_score=confidence_score,
+            summary=self._append_llm_status_note(
+                result.summary,
+                self._analysis_service._llm_reason_extractor
+            )
         )
 
         try:
@@ -540,6 +539,16 @@ class RequestProcessor:
                 "из-за недостаточного качества исходного текста."
             )
         return f"{summary}\n\nПримечание: {note}"
+
+    def _append_llm_status_note(self, summary: str, extractor) -> str:
+        if extractor is None:
+            return summary + "\n\n⚠️ AI-анализ отключен (отсутствует API ключ)."
+        if not extractor.is_functional:
+             error_note = ""
+             if "402" in (extractor.last_error or ""):
+                 error_note = " (недостаточно средств на балансе AI-провайдера)"
+             return summary + f"\n\n⚠️ AI-анализ временно ограничен{error_note}. Выводы могут быть менее точными."
+        return summary
 
     def _truncate_analysis_text(
         self, decision: CaseDecision, max_length: int

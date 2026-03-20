@@ -94,7 +94,7 @@ class AnalysisService:
             conf_sum = sum(d.reason_confidence for d in verifiable_decisions)
             avg_reason_conf = conf_sum / len(verifiable_decisions)
 
-        if self._llm_reason_extractor and include_narrative_summary:
+        if self._llm_reason_extractor and self._llm_reason_extractor.is_functional and include_narrative_summary:
             summary = await self._llm_reason_extractor.generate_summary(
                 court=court,
                 period=period,

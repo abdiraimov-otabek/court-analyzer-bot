@@ -34,7 +34,14 @@ class JurisdictionValidator:
             return True  # Any court is valid if not specified
 
         if not actual_court:
-            return False
+            # No court name extracted — give benefit of the doubt rather than reject
+            return True
+
+        # Give benefit of the doubt when actual_court is just a generic fallback with no location
+        actual_tokens = cls._tokenize(actual_court)
+        if not actual_tokens:
+            # All stop words (e.g. "Арбитражный суд") — court extraction failed, don't reject
+            return True
 
         # Try a direct substring match first for safety (case insensitive)
         if requested_court.lower() in actual_court.lower():

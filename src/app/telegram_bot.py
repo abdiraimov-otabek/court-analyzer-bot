@@ -248,6 +248,44 @@ async def _run_analysis(message: Message, user_id: UserId, query_text: str) -> N
         log_event(logger, "analysis.cancelled")
         container.active_requests.set_phase(user_id, "cancelled")
         raise
+    except NotEnoughData:
+        log_event(logger, "analysis.failed_not_enough_data")
+        container.active_requests.set_phase(user_id, "failed")
+        try:
+            await message.answer(
+                "По вашему запросу найдено слишком мало дел для формирования статистики.\n"
+                "Попробуйте расширить период поиска или изменить параметры запроса.",
+                reply_markup=_help_kb(),
+            )
+        except Exception:
+            pass
+    except CourtNotFoundError:
+        log_event(logger, "analysis.failed_court_not_found")
+        container.active_requests.set_phase(user_id, "failed")
+        try:
+            await message.answer(
+                "По вашему запросу не найдено дел в указанном суде.\n"
+                "Проверьте правильность названия суда и попробуйте снова.",
+                reply_markup=_help_kb(),
+            )
+        except Exception:
+            pass
+    except NoRelevantCasesError as exc:
+        log_event(
+            logger,
+            "analysis.failed_no_relevant_cases",
+            total_processed=exc.total_processed,
+            filtered_by_article=exc.filtered_by_article,
+        )
+        container.active_requests.set_phase(user_id, "failed")
+        try:
+            await message.answer(
+                f"Обработано {exc.total_processed} дел, но ни одно не соответствует запрошенной статье.\n"
+                "Возможно, статья указана неверно или таких дел нет в выбранном периоде.",
+                reply_markup=_help_kb(),
+            )
+        except Exception:
+            pass
     except InsufficientQualityError as exc:
         log_event(
             logger,
