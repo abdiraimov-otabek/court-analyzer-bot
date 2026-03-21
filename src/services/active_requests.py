@@ -144,6 +144,8 @@ class ActiveRequestRegistry:
                 return
             active.attempted_cases = attempted_cases
             active.processed_cases = attempted_cases
+            if attempted_cases > active.total_cases:
+                active.total_cases = attempted_cases
 
     def update_successful(self, user_id: UserId, successful_cases: int) -> None:
         with self._lock:

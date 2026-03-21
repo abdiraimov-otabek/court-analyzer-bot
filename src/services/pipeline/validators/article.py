@@ -31,7 +31,7 @@ class ArticleValidator:
         self.issue_phrase = issue_phrase
 
     def validate(
-        self, text: str, llm_proof_quote: str = ""
+        self, text: str, llm_proof_quote: str = "", raw_article: str = ""
     ) -> Tuple[EvidenceTier, str, str]:
         if not self.target_article:
             return EvidenceTier.TIER_D_NO_MATCH, "No Article Requested", "N/A"
@@ -39,6 +39,22 @@ class ArticleValidator:
         original_text = text or ""
         normalized_text = original_text.lower()
         supplemental_quote = llm_proof_quote.strip()
+        normalized_raw_article = (raw_article or "").lower().strip()
+
+        # If the source card explicitly points to a different article/law anchor,
+        # treat it as a strong negative signal. This helps filter cases where
+        # target article is only mentioned in passing.
+        if normalized_raw_article:
+            has_target_in_raw = self._has_exact_article_match(normalized_raw_article)
+            looks_like_specific_other_anchor = bool(
+                re.search(r"(ст\.?|статья|апк|гк|нк|ук|коап|\d)", normalized_raw_article)
+            )
+            if looks_like_specific_other_anchor and not has_target_in_raw:
+                return (
+                    EvidenceTier.TIER_D_NO_MATCH,
+                    self._reference_label(),
+                    "Карточка дела указывает на иную норму, не соответствующую запросу",
+                )
 
         if not self._has_exact_article_match(normalized_text):
             if supplemental_quote and self._has_exact_article_match(supplemental_quote.lower()):
@@ -188,7 +204,28 @@ class ArticleValidator:
         if any(re.search(p, text, re.I) for p in dissonant_patterns):
             return True
 
-        # Check for issue phrase as an override
+        # 3. Bankruptcy-specific noise filtering for article 61.3:
+        # case texts often include a generic list "ст. 61.2 и 61.3" while
+        # actually deciding under a different norm (e.g., 61.11/61.14).
+        if self.target_article == "61.3":
+            list_reference_patterns = [
+                r"включая\s+сделк\w+\s*,?\s*указан\w+\s+в\s+стать\w+\s*61\.2\s+и\s+61\.3",
+                r"стать\w+\s*61\.2\s+и\s+61\.3\s+закона\s+о\s+банкротств",
+                r"ст\.\s*61\.2\s+и\s+61\.3\s+закона\s+о\s+банкротств",
+            ]
+            has_list_reference = any(re.search(p, text, re.I) for p in list_reference_patterns)
+            has_core_613_context = any(
+                marker in text
+                for marker in (
+                    "предпочтен",
+                    "предпочтительн",
+                    "сделка с предпочтением",
+                )
+            )
+            if has_list_reference and not has_core_613_context:
+                return True
+
+        # 4. Check for issue phrase as an override
         issue_tokens = [
             token
             for token in (self.issue_phrase or "").lower().split()
