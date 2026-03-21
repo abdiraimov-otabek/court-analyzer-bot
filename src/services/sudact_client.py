@@ -415,13 +415,21 @@ class SudactClient:
         if params.case_type:
             base += f"&{prefix}-casetype={params.case_type}"
 
-        # Build text search term from INN/name
+        # Build text search term from INN/name and Article
         search_terms = []
-        if params.article:
+        if params.full_article:
+            import urllib.parse
+            # Use full string for lawchunkinfo, it's highly specific
+            base += f"&{prefix}-lawchunkinfo={urllib.parse.quote_plus(params.full_article)}"
+            # Include ONLY the article number in text search for best retrieval
+            # (Adding the law name in txt too can often cause 0 results or timeout on Sudact)
+            if params.article:
+                search_terms.append(params.article)
+        elif params.article:
             import urllib.parse
             base += f"&{prefix}-lawchunkinfo={urllib.parse.quote_plus(params.article)}"
-            
-        if params.law_display_name:
+            search_terms.append(params.article)
+        elif params.law_display_name:
             search_terms.append(params.law_display_name)
         elif params.law_family == "127-ФЗ":
             search_terms.append("банкротство")
@@ -492,6 +500,7 @@ class SudactClient:
 
                     html_content = data.get("content", "")
                     total_found = data.get("total_found")
+                    total_found = data.get("total_found")
                     if not total_found or "Документы не найдены" in total_found:
                         log_event(logger, "sudact.no_docs_found", url=url)
                         return None
@@ -518,7 +527,7 @@ class SudactClient:
     def _extract_total_count_text(self, html: BeautifulSoup) -> int | None:
         """Try to extract the total result count displayed by sudact.ru."""
         # sudact shows something like "Найдено: 1 234 решения"
-        for tag in html.find_all(string=re.compile(r"[Нн]айдено")):
+        for tag in html.find_all(string=re.compile(r"[Нн]айден")):
             m = re.search(r"(\d[\d\s\xa0]*)", str(tag))
             if m:
                 try:
