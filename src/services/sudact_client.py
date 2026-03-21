@@ -500,7 +500,6 @@ class SudactClient:
 
                     html_content = data.get("content", "")
                     total_found = data.get("total_found")
-                    total_found = data.get("total_found")
                     if not total_found or "Документы не найдены" in total_found:
                         log_event(logger, "sudact.no_docs_found", url=url)
                         return None
@@ -526,15 +525,33 @@ class SudactClient:
 
     def _extract_total_count_text(self, html: BeautifulSoup) -> int | None:
         """Try to extract the total result count displayed by sudact.ru."""
-        # sudact shows something like "Найдено: 1 234 решения"
+        # First, prefer JSON-origin marker when available (doc_ajax responses).
+        # It may look like: "Показано 1-11 из 491" — we need 491, not 11.
+        injected_total = html.find(id="injected-total-found")
+        if injected_total:
+            total = self._extract_max_int(injected_total.get_text(" ", strip=True))
+            if total is not None:
+                return total
+
+        # Fallback: parse standard "Найдено" labels on regular pages.
         for tag in html.find_all(string=re.compile(r"[Нн]айден")):
-            m = re.search(r"(\d[\d\s\xa0]*)", str(tag))
-            if m:
-                try:
-                    return int(m.group(1).replace(" ", "").replace("\xa0", ""))
-                except ValueError:
-                    pass
+            total = self._extract_max_int(str(tag))
+            if total is not None:
+                return total
         return None
+
+    @staticmethod
+    def _extract_max_int(text: str) -> int | None:
+        numbers = re.findall(r"\d[\d\s\xa0]*", text or "")
+        parsed: list[int] = []
+        for raw in numbers:
+            try:
+                parsed.append(int(raw.replace(" ", "").replace("\xa0", "")))
+            except ValueError:
+                continue
+        if not parsed:
+            return None
+        return max(parsed)
 
     def _extract_list_items(
         self, html: BeautifulSoup

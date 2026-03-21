@@ -65,3 +65,16 @@ def test_active_request_registry_rejects_different_request_when_one_is_running()
     )
 
     assert second.status == "busy"
+
+
+def test_active_request_registry_expands_total_when_attempted_exceeds_estimate():
+    registry = ActiveRequestRegistry()
+    user_id = UserId("123")
+    registry.start(user_id, query_text="q1", total_cases=11)
+
+    registry.update_attempted(user_id, attempted_cases=206)
+
+    active = registry.get(user_id)
+    assert active is not None
+    assert active.total_cases == 206
+    assert active.processed_cases == 206
