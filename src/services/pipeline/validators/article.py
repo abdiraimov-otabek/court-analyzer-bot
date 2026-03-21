@@ -31,7 +31,7 @@ class ArticleValidator:
         self.issue_phrase = issue_phrase
 
     def validate(
-        self, text: str, llm_proof_quote: str = ""
+        self, text: str, llm_proof_quote: str = "", raw_article: str = ""
     ) -> Tuple[EvidenceTier, str, str]:
         if not self.target_article:
             return EvidenceTier.TIER_D_NO_MATCH, "No Article Requested", "N/A"
@@ -39,6 +39,22 @@ class ArticleValidator:
         original_text = text or ""
         normalized_text = original_text.lower()
         supplemental_quote = llm_proof_quote.strip()
+        normalized_raw_article = (raw_article or "").lower().strip()
+
+        # If the source card explicitly points to a different article/law anchor,
+        # treat it as a strong negative signal. This helps filter cases where
+        # target article is only mentioned in passing.
+        if normalized_raw_article:
+            has_target_in_raw = self._has_exact_article_match(normalized_raw_article)
+            looks_like_specific_other_anchor = bool(
+                re.search(r"(ст\.?|статья|апк|гк|нк|ук|коап|\d)", normalized_raw_article)
+            )
+            if looks_like_specific_other_anchor and not has_target_in_raw:
+                return (
+                    EvidenceTier.TIER_D_NO_MATCH,
+                    self._reference_label(),
+                    "Карточка дела указывает на иную норму, не соответствующую запросу",
+                )
 
         if not self._has_exact_article_match(normalized_text):
             if supplemental_quote and self._has_exact_article_match(supplemental_quote.lower()):

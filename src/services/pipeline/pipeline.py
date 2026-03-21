@@ -139,7 +139,8 @@ class CasePipeline:
                 if params.article:
                     tier, matched_art, evidence_quote = article_validator.validate(
                         text_to_scan, 
-                        llm_proof_quote=llm_info["quote"] if llm_info else decision.proof_quote
+                        llm_proof_quote=llm_info["quote"] if llm_info else decision.proof_quote,
+                        raw_article=decision.raw_article,
                     )
                 else:
                     tier = EvidenceTier.TIER_B_PROBABLE_MATCH
