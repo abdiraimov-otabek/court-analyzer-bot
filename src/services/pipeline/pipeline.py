@@ -9,18 +9,6 @@ from src.services.pipeline.validators.court import JurisdictionValidator
 from src.services.pipeline.validators.outcome import IssueOutcomeExtractor
 from src.services.pipeline.validators.scorer import EvidenceScorer
 
-# --- AI-Driven Relevance & Outcome Verification ---
-# - Integrated `llm_reason_extractor.classify_batch` into the `CasePipeline`.
-# - The AI now verifies every candidate case for relevance against the requested article and query context.
-# - AI-determined outcomes (`satisfied`/`denied`) now override rule-based logic for higher precision.
-# - Procedural "noise" (e.g., simple mentions of articles without merit analysis) is now filtered out by the AI with the code `irrelevant_by_ai`.
-# --- Excel Export Robustness ---
-# - Modified `CaseExporter.build_cases_excel` to handle `date`, `str`, or `None` types for `raw_date`, preventing `AttributeError` crashes.
-# --- Search Relevance Improvements ---
-# - Implemented a `COURT_MAPPING` to normalize court names (e.g., "АС Москвы" to "Арбитражный суд города Москвы").
-# - Added "банкротство" keyword reinforcement for 127-FZ queries to improve `sudact.ru` result relevance.
-
-
 @dataclass
 class ValidationResultRecord:
     decision: CaseDecision
