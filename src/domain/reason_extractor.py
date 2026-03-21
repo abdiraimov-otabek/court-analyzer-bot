@@ -1,4 +1,5 @@
 from __future__ import annotations
+import re
 
 
 class ReasonExtractor:
@@ -11,22 +12,32 @@ class ReasonExtractor:
     """
 
     def __init__(self) -> None:
-        # Primary patterns: (substring_to_match_in_lowercase, canonical_label)
-        # Multiple matches are collected — a decision may cite several grounds.
-        self._patterns: list[tuple[str, str]] = [
+        # Primary patterns: (regex_or_substring, canonical_label)
+        # Using regex for specific boundary checks (e.g. articles).
+        self._patterns: list[tuple[str | re.Pattern, str]] = [
             # ── SPECIFIC COMBINED GROUNDS (most specific — checked first) ──────────────
             ("неравноценное встречное", "неравноценное встречное исполнение (п.1 ст.61.2)"),
             ("цель причинения вреда", "причинение вреда кредиторам (п.2 ст.61.2)"),
-            ("целью причинения вреда", "причинение вреда кредиторам (п.2 ст.61.2)"),  # inflected
-            ("целях причинения вреда", "причинение вреда кредиторам (п.2 ст.61.2)"),  # inflected
+            ("целью причинения вреда", "причинение вреда кредиторам (п.2 ст.61.2)"),
+            ("целях причинения вреда", "причинение вреда кредиторам (п.2 ст.61.2)"),
             ("причинения вреда кредитор", "причинение вреда кредиторам (п.2 ст.61.2)"),
             ("вред имущественным правам кредитор", "причинение вреда кредиторам (п.2 ст.61.2)"),
             ("причинен вред кредитор", "причинение вреда кредиторам (п.2 ст.61.2)"),
             ("причинение вреда кредитор", "причинение вреда кредиторам (п.2 ст.61.2)"),
+            # ── SUBSIDIARY LIABILITY & UNJUST ENRICHMENT (prio) ────────────────────────
+            (re.compile(r"\b61\.12\b"), "субсидиарная ответственность (ст.61.12)"),
+            (re.compile(r"\b61\.11\b"), "субсидиарная ответственность (ст.61.11)"),
+            ("субсидиарн", "привлечение к субсидиарной ответственности"),
+            ("неосновательн", "неосновательное обогащение"),
+            (re.compile(r"\b1102\b"), "неосновательное обогащение (ст.1102 ГК)"),
+            (re.compile(r"\b395\b"), "проценты за пользование чужими денежными средствами"),
+            ("контролирующее должника лицо", "действия контролирующего лица"),
+            ("недостоверность сведений", "недостоверность сведений в ЕГРЮЛ"),
+            # ── REST OF PATTERNS ──────────────────────────────────────────────────────
             ("осведомленность о признаках несостоятельност", "осведомленность контрагента о банкротстве"),
             ("знал о признаках несостоятельност", "осведомленность контрагента о банкротстве"),
-            ("знал о цел", "осведомленность контрагента о цели сделки"),    # знал о цели/целью
-            ("приобретател", "добросовестность приобретателя"),              # добросовестность/добросовестный приобретатель
+            ("знал о цел", "осведомленность контрагента о цели сделки"),
+            (re.compile(r"добросовестн\w*\s+приобретател"), "добросовестность приобретателя"),
             ("сделка с предпочтени", "сделка с предпочтением (ст.61.3)"),
             ("нарушение очередности удовлетворения", "нарушение очередности удовлетворения требований"),
             ("очередность удовлетворения", "нарушение очередности удовлетворения требований"),
@@ -41,20 +52,18 @@ class ReasonExtractor:
             ("не подтверждено доказательств", "недостаточность доказательств"),
             ("доказательства не представлен", "недостаточность доказательств"),
             ("применение последствий недействительности", "применение последствий недействительности сделки"),
-            # ── BANKRUPTCY LAW GROUNDS (ст.61.x) ─────────────────────────────────────
+            # ── BANKRUPTCY LAW GROUNDS ────────────────────────────────────────────────
             ("неравноценн", "неравноценное встречное исполнение (п.1 ст.61.2)"),
             ("подозрительн", "подозрительность сделки (ст.61.2)"),
             ("предпочтен", "сделка с предпочтением (ст.61.3)"),
             ("нарушение очередности", "нарушение очередности удовлетворения требований"),
             # ── CIVIL CODE GROUNDS ────────────────────────────────────────────────────
-            ("злоупотреб", "злоупотребление правом (ст.10 ГК)"),
+            (re.compile(r"\b10\s+гк"), "злоупотребление правом (ст.10 ГК)"),
             ("мним", "мнимость сделки (ст.170 ГК)"),
             ("притвор", "притворность сделки (ст.170 ГК)"),
-            ("ничтожн", "ничтожность сделки (ст.168 ГК)"),
-            ("кабальн", "кабальность сделки (ст.179 ГК)"),
+            (re.compile(r"\b168\s+гк"), "ничтожность сделки (ст.168 ГК)"),
+            (re.compile(r"\b179\s+гк"), "кабальность сделки (ст.179 ГК)"),
             ("крупная сделк", "крупная сделка"),
-            ("крупной сделк", "крупная сделка"),
-            ("крупную сделк", "крупная сделка"),
             # ── AFFILIATION AND AWARENESS ─────────────────────────────────────────────
             ("аффилирован", "аффилированность сторон"),
             ("заинтересован", "заинтересованность контрагента"),
@@ -66,35 +75,21 @@ class ReasonExtractor:
             ("признаки банкротства", "признаки неплатежеспособности должника"),
             ("объективное банкротство", "объективное банкротство должника"),
             ("рыночн", "отклонение цены от рыночной стоимости"),
-            ("рыночная стоимост", "отклонение цены от рыночной стоимости"),
             ("занижение стоимост", "занижение стоимости имущества"),
-            ("завышение стоимост", "завышение стоимости имущества"),
             # ── CONSIDERATION / COUNTER-PERFORMANCE ──────────────────────────────────
             ("безвозмездн", "безвозмездность сделки"),
             ("встречн", "отсутствие или неравноценность встречного исполнения"),
             ("возмездн", "возмездность сделки"),
             # ── EVIDENTIARY GROUNDS ──────────────────────────────────────────────────
             ("недоказ", "недоказанность обстоятельств"),
-            ("не доказан", "недоказанность обстоятельств"),
-            ("не доказано", "недоказанность обстоятельств"),
             ("недостаточно доказательств", "недостаточность доказательств"),
-            ("доказательств недостаточно", "недостаточность доказательств"),
             ("необоснован", "необоснованность требований"),
-            ("не обосновано", "необоснованность требований"),
             # ── GOOD FAITH ───────────────────────────────────────────────────────────
             ("добросовестн", "добросовестность контрагента"),
-            # ── STATUTE OF LIMITATIONS ───────────────────────────────────────────────
-            ("пропуск срока", "пропуск срока исковой давности"),
-            ("срок давности", "пропуск срока исковой давности"),
-            ("исковои давност", "пропуск срока исковой давности"),  # typo variant
-            ("пропущен срок", "пропуск срока исковой давности"),
             # ── PROCEDURAL GROUNDS ───────────────────────────────────────────────────
             ("нарушение процедуры", "нарушение процедуры"),
             ("процессуальн", "процессуальное нарушение"),
             ("ненадлежащий ответчик", "ненадлежащий ответчик"),
-            ("ненадлежащего ответчик", "ненадлежащий ответчик"),
-            ("ненадлежащему ответчик", "ненадлежащий ответчик"),
-            ("ненадлежащим ответчик", "ненадлежащий ответчик"),
             ("ненадлежащее исполнение", "ненадлежащее исполнение обязанностей"),
             ("несоблюдение", "несоблюдение установленного порядка"),
             # ── INSOLVENCY ADMINISTRATOR (АУ) GROUNDS ───────────────────────────────
@@ -105,11 +100,10 @@ class ReasonExtractor:
             ("недействит", "недействительность сделки"),
             ("применение последствий", "применение последствий недействительности сделки"),
             ("реституц", "реституция (возврат исполненного)"),
-            # ── STATUTORY ARTICLE REFERENCES (always captured when mentioned) ────────
-            # Placed here so they are captured even when other patterns also match.
-            ("61.2", "оспаривание сделки по ст.61.2 Закона о банкротстве"),
-            ("61.3", "оспаривание сделки по ст.61.3 Закона о банкротстве"),
-            ("61.1", "оспаривание сделки по ст.61.1 Закона о банкротстве"),
+            # ── STATUTORY ARTICLE REFERENCES ─────────────────────────────────────────
+            (re.compile(r"\b61\.2\b"), "оспаривание сделки по ст.61.2 Закона о банкротстве"),
+            (re.compile(r"\b61\.3\b"), "оспаривание сделки по ст.61.3 Закона о банкротстве"),
+            (re.compile(r"\b61\.1\b(?!\d)"), "оспаривание сделки по ст.61.1 Закона о банкротстве"),
             # ── GENERAL LEGAL GROUNDS ────────────────────────────────────────────────
             ("отсутствуют основания", "отсутствие правовых оснований"),
             ("не установлено оснований", "отсутствие правовых оснований"),
@@ -118,12 +112,12 @@ class ReasonExtractor:
             ("правовые основания", "отсутствие правовых оснований"),
         ]
 
-        # Fallback keywords: used ONLY when no primary pattern matched.
-        # Ordered by priority — stops after collecting 3 reasons.
-        self._fallback_keywords: list[tuple[str, str]] = [
-            ("61.2", "оспаривание сделки по ст.61.2 Закона о банкротстве"),
-            ("61.3", "оспаривание сделки по ст.61.3 Закона о банкротстве"),
-            ("61.1", "оспаривание сделки по ст.61.1 Закона о банкротстве"),
+        # Fallback keywords (broader pass)
+        self._fallback_keywords: list[tuple[str | re.Pattern, str]] = [
+            (re.compile(r"\b61\.2\b"), "оспаривание сделки по ст.61.2 Закона о банкротстве"),
+            (re.compile(r"\b61\.3\b"), "оспаривание сделки по ст.61.3 Закона о банкротстве"),
+            (re.compile(r"\b61\.1[12]\b"), "субсидиарная ответственность"),
+            (re.compile(r"\b61\.1\b(?!\d)"), "оспаривание сделки по ст.61.1 Закона о банкротстве"),
             ("10 гк", "злоупотребление правом (ст.10 ГК)"),
             ("168 гк", "ничтожность сделки (ст.168 ГК)"),
             ("170 гк", "мнимость/притворность сделки (ст.170 ГК)"),
@@ -140,69 +134,84 @@ class ReasonExtractor:
             ("несостоятельност", "обстоятельства банкротства"),
         ]
 
-    def extract_with_confidence(self, text: str) -> tuple[tuple[str, ...], float]:
-        """Extract reasons and return a confidence score for how they were matched.
+    def _match(self, pattern: str | re.Pattern, text: str) -> bool:
+        if isinstance(pattern, str):
+            return pattern in text
+        return bool(pattern.search(text))
 
-        Returns (reasons, confidence) where confidence is:
-        - 0.5 for primary pattern matches
-        - 0.3 for fallback keyword matches
-        - 0.1 for generic fallback ("оценка обстоятельств дела")
-        """
+    def extract_with_confidence(self, text: str) -> tuple[tuple[str, ...], float]:
         if not text:
             return (("оценка обстоятельств дела",), 0.1)
         lower = text.lower()
 
-        # Primary patterns
         reasons: list[str] = []
         seen: set[str] = set()
+        
+        # 1. Match specific named patterns and high-priority articles
         for pattern, label in self._patterns:
-            if pattern in lower and label not in seen:
+            if self._match(pattern, lower) and label not in seen:
                 seen.add(label)
                 reasons.append(label)
                 if len(reasons) >= 3:
                     break
+        
+        # 2. Generic Article Discovery (satisfies user request to "find all")
+        # Finds patterns like "ст. 61.2", "ст. 1102", "статьи 10" etc.
+        if len(reasons) < 3:
+            # Substantive articles: Bankruptcy Law (61.x, 61.11, etc.), Civil Code (10, 168, 1102, etc.)
+            # We exclude common procedural noise (APC, GPC, article 110, 167 etc.)
+            article_matches = re.finditer(r"(?:ст\.?|стать[ьяеи])\s*(\d+(?:\.\d+)?)\b", lower)
+            for match in article_matches:
+                article_num = match.group(1)
+                
+                # Heuristic: skip common procedural articles if they appear in APC/GPC context
+                # Article 110 (costs), 167-170 (judgment rules), 223 (bankruptcy procedure)
+                if article_num in {"110", "167", "168", "169", "170", "171", "176", "184", "185", "223"}:
+                    # Check context for procedural codes
+                    context = lower[max(0, match.start() - 30) : match.end() + 30]
+                    if any(code in context for code in ["апк", "гпк", "процессуальн"]):
+                        continue
+                
+                label = f"ст.{article_num}"
+                # Add law name if possible
+                law_context = lower[match.end() : match.end() + 50]
+                if "банкрот" in law_context:
+                    label += " Закона о банкротстве"
+                elif "гк" in law_context or "гражданск" in law_context:
+                    label += " ГК РФ"
+                
+                if label not in seen:
+                    # Filter: we only want "ground-sounding" articles
+                    # For bankruptcy cases, 61.x are almost always grounds.
+                    # For civil cases, 10, 1102, 395, 309, 450 etc. are grounds.
+                    is_substantive = (
+                        article_num.startswith("61.") or 
+                        article_num in {"10", "168", "170", "395", "1102", "1107", "15", "309", "450"} or
+                        "банкрот" in label or "гк" in label
+                    )
+                    
+                    if is_substantive:
+                        seen.add(label)
+                        reasons.append(label)
+                        if len(reasons) >= 3:
+                            break
+        
         if reasons:
             return (tuple(reasons), 0.5)
 
-        # Fallback keywords
+        # 3. Fallback keywords (broader pass)
         for keyword, label in self._fallback_keywords:
-            if keyword in lower and label not in seen:
+            if self._match(keyword, lower) and label not in seen:
                 seen.add(label)
                 reasons.append(label)
-            if len(reasons) >= 3:
-                break
+                if len(reasons) >= 3:
+                    break
+                    
         if reasons:
             return (tuple(reasons), 0.3)
 
         return (("оценка обстоятельств дела",), 0.1)
 
     def extract(self, text: str) -> tuple[str, ...]:
-        if not text:
-            return ()
-        lower = text.lower()
-
-        # Collect all matching primary patterns (multiple grounds are common)
-        reasons: list[str] = []
-        seen: set[str] = set()
-        for pattern, label in self._patterns:
-            if pattern in lower and label not in seen:
-                seen.add(label)
-                reasons.append(label)
-                if len(reasons) >= 3:
-                    break
-
-        if reasons:
-            return tuple(reasons)
-
-        # Fallback: broader keyword pass (up to 3 reasons)
-        for keyword, label in self._fallback_keywords:
-            if keyword in lower and label not in seen:
-                seen.add(label)
-                reasons.append(label)
-            if len(reasons) >= 3:
-                break
-
-        if not reasons:
-            reasons.append("оценка обстоятельств дела")
-
-        return tuple(reasons)
+        reasons, _ = self.extract_with_confidence(text)
+        return reasons
