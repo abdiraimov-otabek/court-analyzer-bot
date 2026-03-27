@@ -11,6 +11,8 @@ def test_container_reuses_same_rate_limiter_instance():
             hash_salt="salt",
             telegram_bot_token="token",
             admin_auth_token="admin",
+            kad_api_base_url="https://api.test",
+            kad_api_key="kad_key",
         )
     )
 

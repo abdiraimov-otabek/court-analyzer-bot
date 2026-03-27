@@ -11,7 +11,7 @@ def test_settings_repository_roundtrip(tmp_path):
     repo = SettingsRepository(connection)
 
     default_settings = repo.get()
-    assert default_settings.max_cases == 50
+    assert default_settings.max_cases == 500
     assert default_settings.fetch_concurrency_min == 6
     assert default_settings.fetch_concurrency_max == 10
     assert default_settings.max_llm_calls_per_request == 50

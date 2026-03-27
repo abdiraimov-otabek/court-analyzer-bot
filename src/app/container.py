@@ -19,7 +19,7 @@ from src.infrastructure.sqlite import SqliteConnection
 from src.services.access_control import AccessControlList
 from src.services.active_requests import ActiveRequestRegistry
 from src.services.hashing import HashingService
-from src.services.sudact_client import SudactClient
+from src.services.kad_client import ParserApiKadClient
 from src.services.llm_reason_extractor import LLMReasonExtractor
 from src.services.quarter_selection import QuarterSelectionRegistry
 from src.services.rate_limit import HourlyRateLimiter
@@ -56,7 +56,7 @@ class Container:
         limits = httpx.Limits(max_connections=100, max_keepalive_connections=50)
         self.sync_http_client = httpx.Client(timeout=30, limits=limits)
         self.async_http_client = httpx.AsyncClient(timeout=30, limits=limits)
-        self._case_client: SudactClient | None = None
+        self._case_client: ParserApiKadClient | None = None
         self._llm_extractor: LLMReasonExtractor | None = None
 
     def build_bot_logic(self) -> BotLogic:
@@ -84,15 +84,19 @@ class Container:
             hashing_service=self._build_hashing_service(),
         )
 
-    def _get_case_client(self) -> SudactClient:
+    def _get_case_client(self) -> ParserApiKadClient:
         if self._case_client is None:
             self._case_client = self._build_case_client()
         return self._case_client
 
-    def _build_case_client(self) -> SudactClient:
-        return SudactClient(
+    def _build_case_client(self) -> ParserApiKadClient:
+        return ParserApiKadClient(
+            base_url=self.config.kad_api_base_url,
+            api_key=self.config.kad_api_key,
             async_http_client=self.async_http_client,
+            sync_http_client=self.sync_http_client,
             llm_reason_extractor=self._get_llm_reason_extractor(),
+            details_cache_repository=self.case_details_cache_repository,
         )
 
     def _get_llm_reason_extractor(self) -> LLMReasonExtractor | None:

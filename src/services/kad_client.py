@@ -711,6 +711,46 @@ class ParserApiKadClient:
             settings.max_documents_per_case,
             fallback_case_id=case_id,
         )
+
+        if decision is not None and decision.document_links:
+            extracted_articles = []
+            for doc in reversed(decision.document_links):
+                doc_url = doc.get("url")
+                if doc_url:
+                    try:
+                        import io
+                        import pypdf
+                        target_url = doc_url
+                        if target_url.startswith("/"):
+                            target_url = f"{self._base_url.rstrip('/')}{target_url}"
+                        
+                        pdf_resp = await self._async_http_client.get(target_url, timeout=10.0)
+                        if pdf_resp.status_code == 200:
+                            pdf_bytes = io.BytesIO(pdf_resp.content)
+                            try:
+                                reader = pypdf.PdfReader(pdf_bytes)
+                                text = ""
+                                for page in reader.pages:
+                                    if page_text := page.extract_text():
+                                        text += page_text + "\n"
+                                
+                                found = re.findall(
+                                    r"(?i)(?:ст\.?\s*\d+(?:\.\d+)*\s*(?:ГК\s*РФ|АПК\s*РФ)?|статья\s*\d+(?:\.\d+)*\s*(?:ГК\s*РФ|АПК\s*РФ)?)", 
+                                    text
+                                )
+                                if found:
+                                    extracted_articles.extend(found)
+                                    break
+                            except Exception as pdf_exc:
+                                log_event(self._logger, "pdf_parsing_error", error=str(pdf_exc), url=target_url)
+                    except Exception as exc:
+                        log_event(self._logger, "pdf_download_error", error=str(exc), url=doc_url)
+            
+            if extracted_articles:
+                unique = list(dict.fromkeys(a.strip().replace('\n', ' ').replace('\r', '') for a in extracted_articles))
+                new_reasons = list(decision.reasons)
+                new_reasons.insert(0, f"Статьи: {', '.join(unique[:5])}")
+                decision = replace(decision, reasons=tuple(new_reasons))
         # Skip per-case LLM enrichment when article classification will run later —
         # classify_and_extract already extracts reasons, so this would be double cost.
         if (

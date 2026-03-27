@@ -13,8 +13,10 @@ class AppConfig:
     hash_salt: str
     telegram_bot_token: str | None
     admin_auth_token: str | None
+    kad_api_base_url: str
+    kad_api_key: str
     openrouter_api_key: str | None = None  # Optional: enables AI-driven analysis features
-    decision_source_mode: str = "sudact"
+    decision_source_mode: str = "kad"
     shadow_mode_enabled: bool = False
 
 
@@ -31,8 +33,10 @@ def load_config() -> AppConfig:
         hash_salt=os.getenv("HASH_SALT", ""),
         telegram_bot_token=os.getenv("TELEGRAM_BOT_TOKEN"),
         admin_auth_token=os.getenv("ADMIN_AUTH_TOKEN"),
+        kad_api_base_url=os.getenv("KAD_API_BASE_URL", "https://kad.arbitr.ru/"),
+        kad_api_key=os.getenv("KAD_API_KEY", ""),
         openrouter_api_key=os.getenv("OPENROUTER_API_KEY"),
-        decision_source_mode=os.getenv("DECISION_SOURCE_MODE", "sudact"),
+        decision_source_mode=os.getenv("DECISION_SOURCE_MODE", "kad"),
         shadow_mode_enabled=os.getenv("SHADOW_MODE_ENABLED", "false").lower() == "true",
     )
 
@@ -44,6 +48,10 @@ def load_config() -> AppConfig:
         missing.append("TELEGRAM_BOT_TOKEN")
     if not config.admin_auth_token:
         missing.append("ADMIN_AUTH_TOKEN")
+    if not config.kad_api_base_url:
+        missing.append("KAD_API_BASE_URL")
+    if not config.kad_api_key:
+        missing.append("KAD_API_KEY")
 
     if missing:
         raise ValueError(
