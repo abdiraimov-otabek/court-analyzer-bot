@@ -5,6 +5,7 @@ from src.infrastructure.settings_repository import SettingsRepository
 from src.infrastructure.sqlite import SqliteConnection
 
 
+
 def test_settings_repository_roundtrip(tmp_path):
     db_path = tmp_path / "app.db"
     connection = SqliteConnection(str(db_path))
