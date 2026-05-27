@@ -271,6 +271,7 @@ class RequestProcessor:
             total_pages=fetch_result_stats.total_pages,
             total_cases_found=visible_total_cases_found,
             include_narrative_summary=True,
+            model_override=settings.llm_model,
         )
         build_duration_ms = int((datetime.now() - build_start).total_seconds() * 1000)
 

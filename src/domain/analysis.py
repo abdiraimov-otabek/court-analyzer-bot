@@ -38,6 +38,7 @@ class AnalysisService:
         total_pages: int = 0,
         total_cases_found: int = 0,
         include_narrative_summary: bool = True,
+        model_override: str | None = None,
     ) -> AnalysisResult:
         satisfied = 0
         denied = 0
@@ -108,6 +109,7 @@ class AnalysisService:
                 total_pages=total_pages,
                 total_cases_found=total_cases_found,
                 reason_confidence=avg_reason_conf,
+                model_override=model_override,
             )
         else:
             summary = "Детальная сводка не сформирована."

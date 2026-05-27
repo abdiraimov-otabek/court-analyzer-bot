@@ -92,6 +92,8 @@ class SettingsModel(BaseModel):
     max_pdf_pages_per_case: int
     pdf_fetch_timeout_seconds: int
     allow_law_inference: bool
+    llm_model: str
+    fast_llm_model: str
     analysis_prompt: str
 
 
@@ -133,6 +135,8 @@ def _build_settings_model(settings) -> SettingsModel:
         max_pdf_pages_per_case=settings.max_pdf_pages_per_case,
         pdf_fetch_timeout_seconds=settings.pdf_fetch_timeout_seconds,
         allow_law_inference=settings.allow_law_inference,
+        llm_model=settings.llm_model,
+        fast_llm_model=settings.fast_llm_model,
         analysis_prompt=settings.analysis_prompt,
     )
 
@@ -503,6 +507,10 @@ def admin_ui(request: Request) -> Response:
                     <label for="allow_law_inference">Разрешать боту аккуратно определять закон, если он однозначно понятен из запроса</label>
                   </div>
                 </div>
+                <div class="row">
+                   <div><label>Основная модель LLM (OpenRouter ID)</label><input name="llm_model" value="{_html.escape(str(settings.llm_model))}" /></div>
+                   <div><label>Быстрая модель LLM (OpenRouter ID)</label><input name="fast_llm_model" value="{_html.escape(str(settings.fast_llm_model))}" /></div>
+                </div>
                 <div class="checkbox">
                   <input id="allow_all_users" type="checkbox" name="allow_all_users" value="true" {"checked" if settings.allow_all_users else ""} />
                   <label for="allow_all_users">Разрешить пользоваться ботом всем (без списка разрешенных пользователей)</label>
@@ -563,6 +571,8 @@ def admin_update_settings(
     max_pdf_pages_per_case: int = Form(...),
     pdf_fetch_timeout_seconds: int = Form(...),
     allow_law_inference: bool = Form(False),
+    llm_model: str = Form(...),
+    fast_llm_model: str = Form(...),
     analysis_prompt: str = Form(...),
 ) -> RedirectResponse:
     try:
@@ -587,6 +597,8 @@ def admin_update_settings(
             max_pdf_pages_per_case=max_pdf_pages_per_case,
             pdf_fetch_timeout_seconds=pdf_fetch_timeout_seconds,
             allow_law_inference=allow_law_inference,
+            llm_model=llm_model,
+            fast_llm_model=fast_llm_model,
             analysis_prompt=analysis_prompt,
         )
     except ValueError as exc:
@@ -640,6 +652,8 @@ def update_settings(payload: SettingsModel) -> SettingsModel:
             max_pdf_pages_per_case=payload.max_pdf_pages_per_case,
             pdf_fetch_timeout_seconds=payload.pdf_fetch_timeout_seconds,
             allow_law_inference=payload.allow_law_inference,
+            llm_model=payload.llm_model,
+            fast_llm_model=payload.fast_llm_model,
             analysis_prompt=payload.analysis_prompt,
         )
     except ValueError as exc:

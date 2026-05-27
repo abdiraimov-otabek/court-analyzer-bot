@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/Users/otabek-abdiraimov/Projects/test_bot/run_cli_test.py", line 9, in <module>
+    from src.app.container import Container
+  File "/Users/otabek-abdiraimov/Projects/test_bot/src/app/container.py", line 22, in <module>
+    from src.services.kad_client import ParserApiKadClient
+  File "/Users/otabek-abdiraimov/Projects/test_bot/src/services/kad_client.py", line 1110
+    await self._extract_outcome_and_reasons(events)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+SyntaxError: 'await' outside async function

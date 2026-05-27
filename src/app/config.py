@@ -18,6 +18,9 @@ class AppConfig:
     openrouter_api_key: str | None = None  # Optional: enables AI-driven analysis features
     decision_source_mode: str = "kad"
     shadow_mode_enabled: bool = False
+    captcha_solver_api_key: str | None = None  # Optional: enables CAPTCHA auto-solving (e.g. 2Captcha key)
+    captcha_solver_url: str | None = None  # Optional: custom CAPTCHA solver API base URL
+    captcha_solver_timeout: int = 180  # Max seconds to wait for CAPTCHA solution
 
 
 def load_config() -> AppConfig:
@@ -38,6 +41,9 @@ def load_config() -> AppConfig:
         openrouter_api_key=os.getenv("OPENROUTER_API_KEY"),
         decision_source_mode=os.getenv("DECISION_SOURCE_MODE", "kad"),
         shadow_mode_enabled=os.getenv("SHADOW_MODE_ENABLED", "false").lower() == "true",
+        captcha_solver_api_key=os.getenv("CAPTCHA_SOLVER_API_KEY"),
+        captcha_solver_url=os.getenv("CAPTCHA_SOLVER_URL"),
+        captcha_solver_timeout=int(os.getenv("CAPTCHA_SOLVER_TIMEOUT", "180")),
     )
 
     # Validate mandatory environment variables used by the default runtime.

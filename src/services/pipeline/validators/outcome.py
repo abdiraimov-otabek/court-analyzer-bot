@@ -19,6 +19,7 @@ class IssueOutcomeExtractor:
         self,
         decision: CaseDecision,
         initial_outcome: CaseOutcome | None = None,
+        model_override: str | None = None,
     ) -> Tuple[CaseOutcome, Tuple[str, ...]]:
         """
         Takes a CaseDecision prepopulated by the retrieval engine (Stage A).
@@ -49,7 +50,7 @@ class IssueOutcomeExtractor:
             # Re-verify with LLM to ensure the outcome actually applies to the target issue,
             # not just a generic motion in the case.
             llm_reasons, llm_outcome_str = await self._llm.extract_with_outcome(
-                decision
+                decision, model_override=model_override
             )
 
             final_outcome = current_outcome

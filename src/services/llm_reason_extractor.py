@@ -97,6 +97,7 @@ class LLMReasonExtractor:
     _NOT_RELEVANT: tuple[str, ...] = ("НЕ_РЕЛЕВАНТНО",)
     _CANONICAL_SET: frozenset[str] = frozenset(_CANONICAL_LABELS)
     _MAX_RETRIES = 1
+    _NO_QUOTE_PREFIX = "Логический вывод:"
 
     def __init__(
         self,
@@ -140,7 +141,11 @@ class LLMReasonExtractor:
                 self._logger.error("llm.payment_required", extra={"data": {"error": error_msg}})
             elif status == 401:
                 self._is_broken = True
-                self._logger.error("llm.unauthorized", extra={"data": {"error": error_msg}})
+                self._logger.error("llm.unauthorized", extra={"data": {"error": "Invalid OPENROUTER_API_KEY. Please check your .env file."}})
+            elif status == 403:
+                # 403 Forbidden is often model access or credits issue on OpenRouter
+                self._logger.error("llm.forbidden", extra={"data": {"error": error_msg}})
+                print(f"OpenRouter 403 Forbidden: {error_msg}")
             elif status >= 500:
                 self._logger.warning("llm.server_error", extra={"data": {"status": status, "error": error_msg}})
         else:
@@ -200,7 +205,9 @@ class LLMReasonExtractor:
     def reset_fetch_budget(self) -> None:
         self._budget_remaining = None
 
-    async def parse_query(self, query_text: str) -> dict[str, str | None]:
+    async def parse_query(
+        self, query_text: str, fast_model_override: str | None = None
+    ) -> dict[str, str | None]:
         """Extract search parameters from a natural language query using LLM.
 
         Returns dict with 'article', 'court', 'year', 'quarter', 'case_type'.
@@ -244,7 +251,7 @@ class LLMReasonExtractor:
                     "X-Title": "Court Bot",
                 },
                 json={
-                    "model": self._fast_model,
+                    "model": fast_model_override or self._fast_model,
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": 0,
                     "max_tokens": 150,
@@ -299,6 +306,7 @@ class LLMReasonExtractor:
         total_pages: int = 0,
         total_cases_found: int = 0,
         reason_confidence: float = 1.0,
+        model_override: str | None = None,
     ) -> str:
         """Generate a professional legal summary of the analysis results."""
         prompt = (
@@ -339,7 +347,7 @@ class LLMReasonExtractor:
                     "X-Title": "Court Bot",
                 },
                 json={
-                    "model": self._model,
+                    "model": model_override or self._model,
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": 0,
                     "max_tokens": 400,
@@ -370,7 +378,7 @@ class LLMReasonExtractor:
         try:
             async with self._semaphore:
                 result = await self._call_with_retry(text, outcome)
-            # item 1.7: Bounded Cache
+            # Bounded cache — evict oldest entries when full
             if len(self._cache) > self._MAX_CACHE_SIZE:
                 # Simple eviction: clear 50 if full
                 keys_to_remove = list(self._cache.keys())[:50]
@@ -388,7 +396,7 @@ class LLMReasonExtractor:
             return self._FALLBACK  # never let LLM failures crash the pipeline
 
     async def extract_with_outcome(
-        self, decision: CaseDecision
+        self, decision: CaseDecision, model_override: str | None = None
     ) -> tuple[tuple[str, ...], str | None]:
         """Extract both legal grounds and outcome mapping for a SINGLE case.
         Unlike classify_batch, this is used for per-case enrichment."""
@@ -497,6 +505,7 @@ class LLMReasonExtractor:
         decision: CaseDecision,
         params: "SearchParams",
         candidates: list[dict[str, str]],
+        fast_model_override: str | None = None,
     ) -> dict[str, str] | None:
         if not candidates:
             return None
@@ -550,7 +559,7 @@ class LLMReasonExtractor:
                     "X-Title": "Court Bot",
                 },
                 json={
-                    "model": self._fast_model,
+                    "model": fast_model_override or self._fast_model,
                     "messages": [{"role": "user", "content": "\n".join(prompt_lines)}],
                     "temperature": 0,
                     "max_tokens": 200,
@@ -576,6 +585,7 @@ class LLMReasonExtractor:
         decision: CaseDecision,
         params: "SearchParams",
         pdf_text: str,
+        model_override: str | None = None,
     ) -> tuple[bool, tuple[str, ...], str, str | None]:
         if not pdf_text or not pdf_text.strip():
             return False, self._NOT_RELEVANT, "", None
@@ -618,7 +628,7 @@ class LLMReasonExtractor:
                     "X-Title": "Court Bot",
                 },
                 json={
-                    "model": self._model,
+                    "model": model_override or self._model,
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": 0,
                     "max_tokens": 500,
@@ -679,6 +689,7 @@ class LLMReasonExtractor:
         decisions: list[CaseDecision],
         article: str,
         query_text: str = "",
+        model_override: str | None = None,
     ) -> list[tuple[bool, tuple[str, ...], str, str | None]]:
         """Classify a batch of decisions using batch LLM calls for efficiency.
 
@@ -718,10 +729,10 @@ class LLMReasonExtractor:
             if self._budget_remaining is not None:
                 if self._budget_remaining <= 0:
                     for idx in chunk_indices:
-                        # Fail-safe: if budget exhausted, pass through as relevant to avoid data loss
+                        # Budget exhausted: mark explicitly so pipeline can report it
                         results[idx] = (
                             True,
-                            (self._FALLBACK[0], "Capped by budget"),
+                            ("budget_exhausted", "Верификация пропущена — бюджет LLM исчерпан"),
                             "",
                             None,
                         )
@@ -731,7 +742,10 @@ class LLMReasonExtractor:
             try:
                 async with self._semaphore:
                     batch_results = await self._call_classify_batch_api(
-                        chunk_decisions, article, query_text
+                        chunk_decisions,
+                        article,
+                        query_text,
+                        model_override=model_override,
                     )
 
                 for idx, res in zip(chunk_indices, batch_results):
@@ -762,6 +776,7 @@ class LLMReasonExtractor:
         decisions: list[CaseDecision],
         article: str,
         query_text: str = "",
+        model_override: str | None = None,
     ) -> list[tuple[bool, tuple[str, ...], str, str | None]]:
         items = []
         for i, d in enumerate(decisions):
@@ -776,27 +791,27 @@ class LLMReasonExtractor:
         cases_text = "\n\n".join(items)
 
         prompt = (
-            f"Ты — элитный юрист-аналитик. Твоя задача — отобрать ТОЛЬКО релевантные судебные акты и предоставить безупречную аналитику.\n\n"
+            f"Ты — строгий юрист-аналитик. Твоя задача — отобрать ТОЛЬКО релевантные судебные акты.\n\n"
             f"ЗАПРОС ПОЛЬЗОВАТЕЛЯ: {query_text}\n"
             f"ЦЕЛЕВАЯ СТАТЬЯ: {article}\n\n"
             f"АКТЫ ДЛЯ АНАЛИЗА:\n"
             f"{cases_text}\n\n"
-            f"СТРОГИЕ КРИТЕРИИ ДЛЯ 100% УВЕРЕННОСТИ:\n"
-            f"1. **Суть**: Акт релевантен, если в нем документально доказано, что судебный акт отвечает запросу пользователя. Статья {article} должна быть ключевым элементом спора.\n"
-            f"2. **Процессуальный мусор**: Обычное упоминание номера статьи в списке без связи с существом дела — relevant: false. **ВНИМАНИЕ**: Заявления о включении в реестр (без их рассмотрения по существу), уведомления о времени и месте, возвраты заявлений, запросы документов — это НЕ релевантные акты.\n"
-            f"3. **Контекст**: Если суть спора, указанная пользователем, на 100% совпадает с сутью акта, только тогда relevant: true.\n"
-            f"4. **Банкротство**: Если запрошена ст. 61.2 или 61.3 Закона о банкротстве, ищи признаки оспаривания сделок (подозрительность, предпочтение). Если акт просто описывает процедуру банкротства без анализа сделки — relevant: false.\n\n"
+            f"СТРОГИЕ КРИТЕРИИ РЕЛЕВАНТНОСТИ:\n"
+            f"1. Акт релевантен (relevant: true), ТОЛЬКО если в нем ДОКУМЕНТАЛЬНО ДОКАЗАНО, что судебный акт отвечает запросу пользователя. Статья {article} должна быть ключевым элементом спора.\n"
+            f"2. Ообычное упоминание номера статьи в списке, без связи с существом дела — relevant: false.\n"
+            f"3. Заявления о включении в реестр (без их рассмотрения по существу), уведомления о времени и месте, возвраты заявлений, запросы документов — это НЕ релевантные акты (relevant: false).\n\n"
             f"ТРЕБОВАНИЯ К ПОЛЯМ ОТВЕТА:\n"
-            f"- **reasons**: Пиши профессиональным юридическим языком суть спора.\n"
-            f"- **proof_quote**: ТЫ ОБЯЗАН ДОКАЗАТЬ РЕЛЕВАНТНОСТЬ. Приведи точную цитату из текста ИЛИ твой строгий логический вывод (доказательство), который на 100% подтверждает релевантность запросу. БЕЗ ДОКАЗАТЕЛЬСТВА ДЕЛО СЧИТАЕТСЯ МУСОРОМ. Пустое поле разрешено только если relevant: false.\n"
+            f"- **reasons**: Краткая, юридически точная выжимка сути спора (1-2 предложения).\n"
+            f"- **proof_quote**: ТОЧНАЯ цитата из текста, доказывающая релевантность. Если цитаты нет, акт НЕ релевантен (relevant: false).\n"
             f'- **outcome**: "satisfied" (удовлетворено/обоснованно), "denied" (отказано/необоснованно) или "NOT FOUND IN DOCUMENT".\n\n'
             f"ФОРМАТ ОТВЕТА — СТРОГИЙ JSON-МАССИВ (ровно {len(decisions)} элементов):\n"
             f"[\n"
-            f'  {{"relevant": true, "reasons": ["Обоснование"], "proof_quote": "Цитата", "outcome": "satisfied"}},\n'
-            f'  {{"relevant": false, "reasons": ["Не подходит"], "proof_quote": "", "outcome": "NOT FOUND IN DOCUMENT"}}\n'
+            f'  {{"relevant": true, "reasons": ["Обоснование"], "proof_quote": "Точная цитата", "outcome": "satisfied"}},\n'
+            f'  {{"relevant": false, "reasons": ["Не подходит по причине..."], "proof_quote": "", "outcome": "NOT FOUND IN DOCUMENT"}}\n'
             f"]\n\n"
             f"НИКАКИХ пояснений. Твой ответ должен быть только валидным JSON-массивом."
         )
+        self._logger.info("llm.classify_batch_prompt", extra={"data": {"prompt_preview": prompt[:1000] + "..." + prompt[-500:]}})
 
         response = await self._http_client.post(
             "https://openrouter.ai/api/v1/chat/completions",
@@ -807,15 +822,24 @@ class LLMReasonExtractor:
                 "X-Title": "Court Bot",
             },
             json={
-                "model": self._model,
+                "model": model_override or self._model,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0,
                 "max_tokens": 2500,  # Ensure full JSON response is received
             },
             timeout=self._timeout * 2,
         )
+        if response.status_code != 200:
+            error_body = response.text
+            self._logger.error(
+                "llm.classify_batch_failed",
+                extra={"data": {"status": response.status_code, "body": error_body}}
+            )
+            print(f"OpenRouter classify_batch Error {response.status_code}: {error_body}")
+
         response.raise_for_status()
         raw_content = response.json()["choices"][0]["message"]["content"]
+        self._logger.info("llm.classify_batch_raw", extra={"data": {"content": raw_content}})
         content = self._clean_llm_json(raw_content)
 
         try:
@@ -962,105 +986,6 @@ class LLMReasonExtractor:
             parts.append(f"Извлеченные основания: {', '.join(decision.reasons)}")
         return "\n".join(parts)
 
-    async def _call_classify_with_retry(
-        self,
-        text: str,
-        outcome: CaseOutcome,
-        article: str,
-        query_text: str = "",
-    ) -> tuple[bool, tuple[str, ...], str]:
-        last_exc: Exception = RuntimeError("no attempts")
-        for attempt in range(self._MAX_RETRIES + 1):
-            try:
-                return await self._call_classify_api(text, outcome, article, query_text)
-            except httpx.HTTPStatusError as exc:
-                if (
-                    exc.response.status_code in {429, 503}
-                    and attempt < self._MAX_RETRIES
-                ):
-                    await asyncio.sleep(1.0 * (attempt + 1))
-                    last_exc = exc
-                    continue
-                raise
-        raise last_exc
-
-    async def _call_classify_api(
-        self,
-        context: str,
-        outcome: CaseOutcome,
-        article: str,
-        query_text: str = "",
-    ) -> tuple[bool, tuple[str, ...], str]:
-        outcome_ru = {"satisfied": "Удовлетворено", "denied": "Отказано"}.get(
-            outcome.value, "Не определено"
-        )
-        prompt = (
-            f"Ты — элитный юрист-аналитик Арбитражных судов РФ. Твоя задача — ПРОВЕРИТЬ, относится ли этот акт прямо к запросу пользователя.\n\n"
-            f"ЗАПРОС ПОЛЬЗОВАТЕЛЯ: {query_text}\n"
-            f"ЦЕЛЕВАЯ СТАТЬЯ: {article}\n"
-            f"КОНТЕКСТ ИЗ КАД:\n{context}\n"
-            f"ИСХОД ДЕЛА: {outcome_ru}\n\n"
-            f"СТРОГИЕ КРИТЕРИИ ДЛЯ 100% УВЕРЕННОСТИ:\n"
-            f"1. СТАТЬЯ: Акт ДОЛЖЕН быть по ст. {article} в строгом контексте запроса ({query_text}). Если статья иная или контекст не совпадает — НЕ_РЕЛЕВАНТНО.\n"
-            f"2. ЗАКОН: Акт должен относиться к той же области права, что и запрос. Если есть малейшие сомнения — НЕ_РЕЛЕВАНТНО.\n"
-            f"3. СОДЕРЖАНИЕ: Процедурные определения БЕЗ сути рассматриваемого спора — НЕ_РЕЛЕВАНТНО.\n"
-            f"4. СУТЬ И ДОКАЗАТЕЛЬСТВО: ТЫ ОБЯЗАН ДОКАЗАТЬ РЕЛЕВАНТНОСТЬ. В `proof_quote` приведи короткую цитату (1-2 предложения) или строгий логический вывод (доказательство), на 100% доказывающий суть спора по ст. {article}. БЕЗ ДОКАЗАТЕЛЬСТВА ДЕЛО СЧИТАЕТСЯ МУСОРОМ. Пустое поле разрешено только если relevant: false.\n\n"
-            f"ВЕРНИ JSON:\n"
-            f'{{ "relevant": true/false, "reasons": ["краткий тезис"], "proof_quote": "цитата" }}'
-        )
-        response = await self._http_client.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {self._api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://github.com/court-bot",
-                "X-Title": "Court Bot",
-            },
-            json={
-                "model": self._model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0,
-                "max_tokens": 150,
-            },
-            timeout=self._timeout,
-        )
-        response.raise_for_status()
-        raw_content = response.json()["choices"][0]["message"]["content"]
-        content = self._clean_llm_json(raw_content)
-
-        try:
-            item = json.loads(content)
-        except json.JSONDecodeError as e:
-            self._logger.error(
-                "llm.json_parse_failed",
-                extra={"data": {"content": raw_content, "error": str(e)}},
-            )
-            raise
-
-        if isinstance(item, list) and item:
-            item = item[0]
-
-        is_relevant = bool(item.get("relevant", True))
-        reasons = item.get("reasons", [])
-        proof_quote = item.get("proof_quote", "")
-
-        if not isinstance(reasons, list) or not reasons:
-            reasons = [self._FALLBACK[0]]
-
-        if is_relevant and not proof_quote:
-            return (
-                False,
-                self._missing_proof_reasons(reasons),
-                "",
-            )
-
-        valid_reasons = tuple(r for r in reasons if isinstance(r, str) and r.strip())
-
-        return (
-            is_relevant,
-            valid_reasons if valid_reasons else self._FALLBACK,
-            proof_quote,
-        )
 
     def _missing_proof_reasons(self, reasons: list[str] | tuple[str, ...]) -> tuple[str, ...]:
         cleaned = [r.strip() for r in reasons if isinstance(r, str) and r.strip()]

@@ -1,0 +1,1568 @@
+INFO:request_processor:analysis.started
+INFO:case_pipeline:Starting Pipeline Stage A: Retrieval
+DEBUG:httpcore.connection:connect_tcp.started host='openrouter.ai' port=443 local_address=None timeout=15 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107dbb230>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='openrouter.ai' timeout=15
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107d2ed50>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:09 GMT'), (b'Content-Type', b'application/json'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Access-Control-Allow-Origin', b'*'), (b'Permissions-Policy', b'payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")'), (b'Referrer-Policy', b'no-referrer, strict-origin-when-cross-origin'), (b'X-Content-Type-Options', b'nosniff'), (b'Content-Encoding', b'gzip'), (b'Server', b'cloudflare'), (b'CF-RAY', b'9e37ce598bbeeff3-ARN')])
+INFO:httpx:HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+INFO:llm_reason_extractor:llm.parse_query.v2
+INFO:kad_client:kad.llm_query_parsed
+INFO:request_processor:analysis.phase
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107df9d10>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107d92520>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:10 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=1&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:10 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1499'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=1&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107e5df30>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ebe7b0>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ea9ae0>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107dc3460>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107e77c50>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107e77850>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107f64140>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107f64410>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107e7f070>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107efd2b0>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107e4e750>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107eed6d0>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107eec650>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ee60a0>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ee41b0>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107e25ef0>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107e25c70>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107f18b90>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107eea650>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107f54c50>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef43d0>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef4e50>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107f0af90>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107f3ad50>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107e12f30>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ec0af0>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107e12ee0>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ec0960>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ec35c0>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ec2b70>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ec2080>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107e5abc0>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ec3200>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ec3430>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ec0fa0>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ec3e80>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107e10280>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ec0820>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1498'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=2&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef2a30>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef2f80>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef2e90>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef2c10>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef2a80>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef2da0>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef15e0>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107e5b840>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ec0a50>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef2fd0>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef0d70>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef2bc0>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107e12fd0>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef1040>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef09b0>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef2760>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef2260>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef0aa0>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef2620>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef2800>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef1590>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef24e0>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef1c70>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef2670>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107e5abc0>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ec3200>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef25d0>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107e12f30>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ec0960>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ec0fa0>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ec35c0>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=8&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=15&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=5&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=7&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=16&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=6&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=9&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=10&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=13&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=12&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=17&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=3&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=11&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=4&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=19&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=14&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=21&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=34&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=23&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=18&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=20&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=24&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=26&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=36&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=25&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=28&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=30&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=37&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=31&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=39&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=33&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ec2bc0>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x10c140dc0>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=35&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x10c141270>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=32&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:11 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=22&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ef2580>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ec0af0>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107e9c500>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ec3e80>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:13 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=27&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:13 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=38&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:13 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=29&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:13 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/search?key=6cd3c8216f76d5d036293882c32814d3&page=40&Text=%D1%81%D1%82.+61.2+%D0%97%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0+%D0%BE+%D0%B1%D0%B0%D0%BD%D0%BA%D1%80%D0%BE%D1%82%D1%81%D1%82%D0%B2%D0%B5&InnType=Any&DateFrom=2024-01-01&DateTo=2024-12-31&Court=%D0%90%D0%A1+%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0+%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B&CaseType=B "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+DEBUG:httpcore.connection:close.started
+DEBUG:httpcore.connection:close.complete
+INFO:request_processor:analysis.phase
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107f97ac0>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:13 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1499'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=985290f3-c7dd-4f9d-a62a-574af1e935f2 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:13 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1499'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=5207e06a-1f18-4dcf-ad50-a890f14aae7d "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:13 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1499'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=f083dedd-1ca1-4cbd-9946-5a4585bc996d "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:13 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1499'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=72f62db7-e424-4f95-85c5-9c1fae945632 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:13 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1499'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=c5e7a555-ef66-4960-aaf5-1c75109639e7 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:13 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1499'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=28184ee6-c10d-4fd5-9179-a8fa26bb06bc "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:13 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1499'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=23e534ee-5b5b-4f8b-8f2c-391d73e6dc62 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+INFO:kad_client:case.raw_keys
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107f858b0>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:13 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Content-Length', b'4361'), (b'Keep-Alive', b'timeout=2, max=1498'), (b'Connection', b'Keep-Alive'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=9a3b51c6-df2a-4e0e-b7c3-096659409035 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:13 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=39bad616-d959-4270-b451-b45426aadd64 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:13 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1498'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=96184883-ab79-4cd4-9a2c-36ac5dcda607 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:13 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1498'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=b92ea41e-e8a8-4832-948e-73b3106201a5 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:13 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1498'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=6bcd3f5e-9601-4a15-b20b-2219d3c31b88 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:13 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1498'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=5779161f-1899-41b0-b0c5-67dcda84ca82 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:13 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1498'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=c3e9f410-3a54-459f-b357-c53dc0488636 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ec3570>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:13 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1497'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=e5b1c2b4-6841-47b3-9210-2c237ed78cbd "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:13 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1498'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=7692afe2-05c1-41f3-b278-eb2d3f32b4db "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:13 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1497'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=f8a42134-a932-411f-8331-d2bee6f10ae2 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:13 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1497'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=6a1a3987-8b62-4b67-9061-3986f1c19eee "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:connect_tcp.started host='parser-api.com' port=443 local_address=None timeout=30 socket_options=None
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:13 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Content-Length', b'7403'), (b'Keep-Alive', b'timeout=2, max=1497'), (b'Connection', b'Keep-Alive'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=fa5f5215-667b-490b-b5a6-8040bc906dfb "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1497'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=5ab5617a-4990-4be2-b298-5ababf1cd969 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107e9e4e0>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1497'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=ee09e2d4-af69-448a-859f-6b9b4b89354e "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.connection:connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x10c1aaad0>
+DEBUG:httpcore.connection:start_tls.started ssl_context=<ssl.SSLContext object at 0x10774f140> server_hostname='parser-api.com' timeout=30
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1499'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=5aac42ba-3d6c-455c-93a0-e71520200b75 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1496'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=f2c2d631-7de4-4c7c-8b8f-9416322ec0ff "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1497'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=f43d8e65-3130-4081-a257-b8bd8dfc3017 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1496'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=323015df-f6eb-45f7-b0d6-8d8cd85cacf8 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+INFO:kad_client:fetch_decisions.progress
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1496'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=66165590-5749-4fc4-bbee-da587489995a "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=84b22dd0-2a17-4125-84a4-795fffa65a12 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1496'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=47afbbb7-6c3a-45ee-8a13-6eae13515833 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1496'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=d87dfb68-55bc-4d73-a398-ad24e114174c "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.connection:start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x107ea62b0>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1496'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=679afef7-1c43-4e08-9084-69fda5b212ed "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1495'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=de007270-0be8-4673-95a5-ef63cc572d05 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1498'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=a5bc63ef-8b9a-4ebd-8e31-bb1dc8d71fe7 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1496'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=a8226b92-a509-40e0-a19a-fceaba4f7dc4 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1495'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=7391477e-1b59-4096-8b80-42e758459c1f "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1495'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=2b0c371a-5976-4cc2-803b-0a40bb0a781c "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1500'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=7f3d4bc7-1182-4ac8-bd1c-c4cf54c50309 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1495'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=e649b5cb-d6dc-4299-a581-a11fd2be7393 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1495'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=7898c6e6-c536-441e-8d14-8df8ec586c9c "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1494'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=15fa8df8-0bfe-4582-bcbe-b11297540b00 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1497'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=9ca68700-d95c-489a-a1e0-433627ba5b94 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1499'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=84068362-9541-4df2-9dd0-27eddd286ff5 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1495'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=2f44d077-1d92-48b8-8193-4c188cba338c "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1494'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=12bf300c-00f2-4b70-abb0-4518ea17a576 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1494'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=d39c3df7-a808-4a40-bfbc-64868b738563 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1494'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=a7bd4aef-ec95-4471-a4b0-5c66f0a4b744 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1494'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=ad6cfb2f-2c5e-4aac-9a43-439a1a211dcd "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1493'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=2e424010-498a-40a1-9dba-d70d0fc4a4e4 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1496'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=9042d0cf-8360-41ee-87f3-17d849244222 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1498'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=b6f9daa9-07e6-4da0-a22c-c9b185a6776e "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Server', b'Apache/2.4.66 (Debian)'), (b'Referrer-Policy', b'no-referrer'), (b'Cache-Control', b'no-cache, must-revalidate'), (b'Expires', b'Sat, 26 Jul 1997 05:00:00 GMT'), (b'Keep-Alive', b'timeout=2, max=1494'), (b'Connection', b'Keep-Alive'), (b'Transfer-Encoding', b'chunked'), (b'Content-Type', b'application/json; charset=UTF-8')])
+INFO:httpx:HTTP Request: GET https://parser-api.com/parser/arbitr_api/details_by_id?key=6cd3c8216f76d5d036293882c32814d3&CaseId=804b8164-8ab2-4545-a93c-eaf3b6ad6fa3 "HTTP/1.1 200 OK"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'GET']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+INFO:kad_client:fetch_decisions.progress
+INFO:kad_client:fetch_decisions.stats
+INFO:request_processor:analysis.phase
+INFO:kad_client:fetch_decisions.article_classification_start
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 400, b'Bad Request', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Content-Type', b'application/json'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Access-Control-Allow-Origin', b'*'), (b'Permissions-Policy', b'payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")'), (b'Referrer-Policy', b'no-referrer, strict-origin-when-cross-origin'), (b'X-Content-Type-Options', b'nosniff'), (b'Server', b'cloudflare'), (b'CF-RAY', b'9e37ce7bbd30eff3-ARN')])
+INFO:httpx:HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 400 Bad Request"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+ERROR:llm_reason_extractor:llm.classify_batch_failed
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 400, b'Bad Request', [(b'Date', b'Sat, 28 Mar 2026 15:53:14 GMT'), (b'Content-Type', b'application/json'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Access-Control-Allow-Origin', b'*'), (b'Permissions-Policy', b'payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")'), (b'Referrer-Policy', b'no-referrer, strict-origin-when-cross-origin'), (b'X-Content-Type-Options', b'nosniff'), (b'Server', b'cloudflare'), (b'CF-RAY', b'9e37ce7c5e72eff3-ARN')])
+INFO:httpx:HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 400 Bad Request"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+ERROR:llm_reason_extractor:llm.classify_batch_failed
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 400, b'Bad Request', [(b'Date', b'Sat, 28 Mar 2026 15:53:15 GMT'), (b'Content-Type', b'application/json'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Access-Control-Allow-Origin', b'*'), (b'Permissions-Policy', b'payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")'), (b'Referrer-Policy', b'no-referrer, strict-origin-when-cross-origin'), (b'X-Content-Type-Options', b'nosniff'), (b'Server', b'cloudflare'), (b'CF-RAY', b'9e37ce7cefcbeff3-ARN')])
+INFO:httpx:HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 400 Bad Request"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+ERROR:llm_reason_extractor:llm.classify_batch_failed
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 400, b'Bad Request', [(b'Date', b'Sat, 28 Mar 2026 15:53:15 GMT'), (b'Content-Type', b'application/json'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Access-Control-Allow-Origin', b'*'), (b'Permissions-Policy', b'payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")'), (b'Referrer-Policy', b'no-referrer, strict-origin-when-cross-origin'), (b'X-Content-Type-Options', b'nosniff'), (b'Server', b'cloudflare'), (b'CF-RAY', b'9e37ce7d7940eff3-ARN')])
+INFO:httpx:HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 400 Bad Request"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+ERROR:llm_reason_extractor:llm.classify_batch_failed
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 400, b'Bad Request', [(b'Date', b'Sat, 28 Mar 2026 15:53:15 GMT'), (b'Content-Type', b'application/json'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Access-Control-Allow-Origin', b'*'), (b'Permissions-Policy', b'payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")'), (b'Referrer-Policy', b'no-referrer, strict-origin-when-cross-origin'), (b'X-Content-Type-Options', b'nosniff'), (b'Server', b'cloudflare'), (b'CF-RAY', b'9e37ce7e1aeaeff3-ARN')])
+INFO:httpx:HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 400 Bad Request"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+ERROR:llm_reason_extractor:llm.classify_batch_failed
+INFO:kad_client:fetch_decisions.article_classification_done
+INFO:case_pipeline:Starting Pipeline Stage B: Validation on 50 candidates
+INFO:request_processor:analysis.phase
+INFO:case_pipeline:Pipeline finished. Found 0 strong cases out of 50 candidates.
+DEBUG:httpcore.http11:send_request_headers.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:send_request_headers.complete
+DEBUG:httpcore.http11:send_request_body.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:send_request_body.complete
+DEBUG:httpcore.http11:receive_response_headers.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:receive_response_headers.complete return_value=(b'HTTP/1.1', 400, b'Bad Request', [(b'Date', b'Sat, 28 Mar 2026 15:53:15 GMT'), (b'Content-Type', b'application/json'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Access-Control-Allow-Origin', b'*'), (b'Permissions-Policy', b'payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")'), (b'Referrer-Policy', b'no-referrer, strict-origin-when-cross-origin'), (b'X-Content-Type-Options', b'nosniff'), (b'Server', b'cloudflare'), (b'CF-RAY', b'9e37ce7ebc31eff3-ARN')])
+INFO:httpx:HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 400 Bad Request"
+DEBUG:httpcore.http11:receive_response_body.started request=<Request [b'POST']>
+DEBUG:httpcore.http11:receive_response_body.complete
+DEBUG:httpcore.http11:response_closed.started
+DEBUG:httpcore.http11:response_closed.complete
+INFO:request_processor:analysis.quality_warning_ignored
+INFO:request_processor:analysis.completed
+Initializing components...
+KAD API Key: Set
+OpenRouter API Key: Set
+
+=============================================
+Executing End-to-End Test
+Query: Практика АС Москвы по статье 61.2 Закона о банкротстве за 2024 год
+Max cases: 50
+=============================================
+
+OpenRouter classify_batch Error 400: {"error":{"message":"google/gemini-2.0-flash is not a valid model ID","code":400},"user_id":"user_2zPIuOhqJgqokCqzj7JIMZ1HHzq"}
+OpenRouter classify_batch Error 400: {"error":{"message":"google/gemini-2.0-flash is not a valid model ID","code":400},"user_id":"user_2zPIuOhqJgqokCqzj7JIMZ1HHzq"}
+OpenRouter classify_batch Error 400: {"error":{"message":"google/gemini-2.0-flash is not a valid model ID","code":400},"user_id":"user_2zPIuOhqJgqokCqzj7JIMZ1HHzq"}
+OpenRouter classify_batch Error 400: {"error":{"message":"google/gemini-2.0-flash is not a valid model ID","code":400},"user_id":"user_2zPIuOhqJgqokCqzj7JIMZ1HHzq"}
+OpenRouter classify_batch Error 400: {"error":{"message":"google/gemini-2.0-flash is not a valid model ID","code":400},"user_id":"user_2zPIuOhqJgqokCqzj7JIMZ1HHzq"}
+
+=============================================
+TEST COMPLETED SUCCESSFULLY
+=============================================
+
+Summary:
+СВОДКА ПО ЗАПРОСУ:
+Суд: АС города Москвы | Период: 2024 год | Статья: 61.2 | Всего дел: 50 | Проверено: 50
+Статистика: Удовлетворено - 0 (0%), Отказано - 0 (0%), Не определено - 50 (100%)
+
+Суд: АС города Москвы
+Всего дел: 50
+Удовлетворено: 0
+Отказано: 0
+
+Relevant Cases:
+- А40-316650/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316908/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316676/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316651/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316627/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316653/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316645/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316754/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316640/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316622/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316617/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316611/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316605/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316673/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316570/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316539/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316417/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316394/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316383/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316376/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316349/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316341/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316338/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316331/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316326/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316317/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316312/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316298/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316232/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316234/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316424/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316231/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316230/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316225/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316222/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316217/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316213/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316195/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316192/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316174/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316208/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316118/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316164/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316161/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316152/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316149/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316147/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316140/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316133/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+
+- А40-316124/2024: Outcome=unknown, Confidence=Weak
+  Reasons: оценка обстоятельств дела; LLM Error: Client error '400 Bad Request' for url 'https://op
+  Proof: 
+

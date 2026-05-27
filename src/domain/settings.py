@@ -28,6 +28,8 @@ class Settings:
     max_pdf_pages_per_case: int = 20
     pdf_fetch_timeout_seconds: int = 45
     allow_law_inference: bool = True
+    llm_model: str = "anthropic/claude-3.5-sonnet"
+    fast_llm_model: str = "google/gemini-2.0-flash-001"
 
 
 def default_settings(now: datetime) -> Settings:
@@ -54,4 +56,6 @@ def default_settings(now: datetime) -> Settings:
         max_pdf_pages_per_case=20,
         pdf_fetch_timeout_seconds=45,
         allow_law_inference=True,
+        llm_model="anthropic/claude-3.5-sonnet",
+        fast_llm_model="google/gemini-2.0-flash-001",
     )

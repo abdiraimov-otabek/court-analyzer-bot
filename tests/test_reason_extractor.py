@@ -3,7 +3,7 @@ from src.domain.reason_extractor import ReasonExtractor
 
 def test_reason_extractor_finds_patterns():
     extractor = ReasonExtractor()
-    text = "Суд установил пропуск срока и недоказанность обстоятельств."
+    text = "Суд установил пропуск срока исковой давности и недоказанность обстоятельств."
     reasons = extractor.extract(text)
 
     assert any("пропуск срока" in r for r in reasons)

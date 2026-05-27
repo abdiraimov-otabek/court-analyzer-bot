@@ -62,6 +62,8 @@ class SqliteConnection:
                     max_pdf_pages_per_case integer not null default 20,
                     pdf_fetch_timeout_seconds integer not null default 45,
                     allow_law_inference integer not null default 1,
+                    llm_model text not null default 'anthropic/claude-3.5-sonnet',
+                    fast_llm_model text not null default 'google/gemini-2.0-flash-001',
                     analysis_prompt text not null,
                     updated_at text not null
                 );
@@ -193,6 +195,14 @@ class SqliteConnection:
         if "allow_law_inference" not in columns:
             conn.execute(
                 "alter table settings add column allow_law_inference integer not null default 1"
+            )
+        if "llm_model" not in columns:
+            conn.execute(
+                "alter table settings add column llm_model text not null default 'anthropic/claude-3.5-sonnet'"
+            )
+        if "fast_llm_model" not in columns:
+            conn.execute(
+                "alter table settings add column fast_llm_model text not null default 'google/gemini-2.0-flash-001'"
             )
 
     def _ensure_active_requests_columns(self, conn: sqlite3.Connection) -> None:

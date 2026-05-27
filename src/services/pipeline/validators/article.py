@@ -66,6 +66,12 @@ class ArticleValidator:
                         self._reference_label(),
                         supplemental_quote,
                     )
+            if self._has_substantive_bankruptcy_match(normalized_text):
+                return (
+                    EvidenceTier.TIER_B_PROBABLE_MATCH,
+                    self._reference_label(),
+                    self._extract_substantive_snippet(original_text),
+                )
             return (
                 EvidenceTier.TIER_D_NO_MATCH,
                 self._reference_label(),
@@ -100,6 +106,40 @@ class ArticleValidator:
             else EvidenceTier.TIER_B_PROBABLE_MATCH
         )
         return tier, self._reference_label(), snippet
+
+    def _has_substantive_bankruptcy_match(self, text: str) -> bool:
+        if self.target_article != "61.2":
+            return False
+        if not self._law_matches(text):
+            return False
+        if self._is_context_dissonant(text):
+            return False
+
+        strong_patterns = [
+            r"оспариван\w+\s+сделк\w+",
+            r"признан\w+\s+недействительн\w+\s+сделк\w+",
+            r"неравноценн\w+",
+            r"встречн\w+\s+исполнен\w+",
+            r"причинен\w+\s+вред",
+            r"подозрительн\w+\s+сделк\w+",
+            r"аффилированн\w+",
+        ]
+        return any(re.search(pattern, text, re.I) for pattern in strong_patterns)
+
+    def _extract_substantive_snippet(self, text: str) -> str:
+        patterns = [
+            r"оспариван\w+\s+сделк\w+",
+            r"признан\w+\s+недействительн\w+\s+сделк\w+",
+            r"неравноценн\w+",
+            r"встречн\w+\s+исполнен\w+",
+            r"причинен\w+\s+вред",
+            r"подозрительн\w+\s+сделк\w+",
+        ]
+        for pattern in patterns:
+            match = re.search(rf".{{0,120}}{pattern}.{{0,160}}", text, re.I | re.S)
+            if match:
+                return f"...{' '.join(match.group(0).split())}..."
+        return self._extract_snippet(text)
 
     def _reference_label(self) -> str:
         parts = []

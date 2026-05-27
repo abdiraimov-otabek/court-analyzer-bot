@@ -40,6 +40,8 @@ class SettingsRepository:
             max_pdf_pages_per_case=row["max_pdf_pages_per_case"],
             pdf_fetch_timeout_seconds=row["pdf_fetch_timeout_seconds"],
             allow_law_inference=bool(row["allow_law_inference"]),
+            llm_model=row["llm_model"],
+            fast_llm_model=row["fast_llm_model"],
         )
 
     def save(self, settings: Settings) -> None:
@@ -68,10 +70,12 @@ class SettingsRepository:
                     max_pdf_pages_per_case,
                     pdf_fetch_timeout_seconds,
                     allow_law_inference,
+                    llm_model,
+                    fast_llm_model,
                     analysis_prompt,
                     updated_at
                 )
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     settings.max_cases,
@@ -94,6 +98,8 @@ class SettingsRepository:
                     settings.max_pdf_pages_per_case,
                     settings.pdf_fetch_timeout_seconds,
                     1 if settings.allow_law_inference else 0,
+                    settings.llm_model,
+                    settings.fast_llm_model,
                     settings.analysis_prompt,
                     settings.updated_at.isoformat(),
                 ),

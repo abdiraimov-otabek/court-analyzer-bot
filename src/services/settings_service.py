@@ -36,6 +36,8 @@ class SettingsService:
         allow_law_inference: bool = True,
         max_llm_calls_per_request: int = 50,
         max_analysis_text_length: int = 50_000,
+        llm_model: str = "anthropic/claude-3.5-sonnet",
+        fast_llm_model: str = "google/gemini-2.0-flash-001",
     ) -> Settings:
         if max_cases < 5 or max_cases > 5000:
             raise ValueError("max_cases must be between 5 and 5000")
@@ -104,6 +106,8 @@ class SettingsService:
             max_pdf_pages_per_case=max_pdf_pages_per_case,
             pdf_fetch_timeout_seconds=pdf_fetch_timeout_seconds,
             allow_law_inference=allow_law_inference,
+            llm_model=llm_model,
+            fast_llm_model=fast_llm_model,
         )
         self._repository.save(settings)
         return settings

@@ -156,7 +156,9 @@ class CasePipeline:
                         passed_outcome = CaseOutcome.DENIED
 
                 final_outcome, final_reasons = await self.outcome_extractor.extract_outcome(
-                    decision, initial_outcome=passed_outcome
+                    decision,
+                    initial_outcome=passed_outcome,
+                    model_override=settings.llm_model,
                 )
                 
                 if llm_info and llm_info["reasons"]:

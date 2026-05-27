@@ -1,0 +1,417 @@
+[2m21:01:26[0m [32mINFO   [0m __main__: Initializing components...
+[2m21:01:27[0m [32mINFO   [0m request_processor: analysis.started [2m{"query_text": "Практика АС Москвы по статье 61.2 Закона о банкротстве за 2024 год", "max_cases": 50, "max_documents_per_case": 5, "max_pages": 80}[0m
+[2m21:01:27[0m [32mINFO   [0m case_pipeline: Starting Pipeline Stage A: Retrieval
+[2m21:01:28[0m [32mINFO   [0m llm_reason_extractor: llm.parse_query.v2 [2m{"article": "61.2", "full_article": "ст. 61.2 Закона о банкротстве", "court": "АС города Москвы", "year": 2024, "quarter": null, "case_type": "Б", "date_from": null, "date_to": null}[0m
+[2m21:01:28[0m [32mINFO   [0m kad_client: kad.llm_query_parsed [2m{"params": {"inn_or_name": null, "inn_type": "Any", "date_from": "2024-01-01", "date_to": "2024-12-31", "court": "АС города Москвы", "case_type": "B", "case_number": null, "article": "61.2", "full_article": "ст. 61.2 Закона о банкротстве", "law_family": "127-ФЗ", "law_display_name": "Закона о банкротстве", "law_inferred": false, "part": null, "paragraph": null, "subparagraph": null, "issue_phrase": null, "use_court_filter": true, "_regex_quarter": null}}[0m
+[2m21:01:28[0m [32mINFO   [0m request_processor: analysis.phase [2m{"phase": "collecting"}[0m
+[2m21:01:33[0m [32mINFO   [0m request_processor: analysis.phase [2m{"phase": "analyzing"}[0m
+[2m21:01:33[0m [32mINFO   [0m kad_client: case.raw_keys [2m{"keys": ["CaseInstances", "CaseNumber", "CaseType", "CourtHearings", "Finished", "Others", "Plaintiffs", "Respondents", "StartDate", "State", "Thirds"]}[0m
+[2m21:01:34[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:34[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:34[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/f083dedd-1ca1-4cbd-9946-5a4585bc996d/1c0568be-1f02-4e76-a051-4fa5cf56c583/A40-316676-2024_20251002_Opredelenie.pdf"}[0m
+[2m21:01:34[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:34[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:34[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/c5e7a555-ef66-4960-aaf5-1c75109639e7/63b10db3-4af0-45b8-aacc-551c9fb826c5/A40-316653-2024_20260311_Opredelenie.pdf"}[0m
+[2m21:01:34[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:34[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:34[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/985290f3-c7dd-4f9d-a62a-574af1e935f2/200166bd-3ce9-42bc-8060-64accfde512e/A40-316650-2024_20251229_Opredelenie.pdf"}[0m
+[2m21:01:34[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:34[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:34[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/5207e06a-1f18-4dcf-ad50-a890f14aae7d/75232e21-ddf5-4ed4-92fd-13fdb8a242c6/A40-316908-2024_20250804_Opredelenie.pdf"}[0m
+[2m21:01:34[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:34[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:34[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/28184ee6-c10d-4fd5-9179-a8fa26bb06bc/a6355244-897f-4a2e-a934-8dc483dd8df1/A40-316754-2024_20260326_Opredelenie.pdf"}[0m
+[2m21:01:34[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:34[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:34[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/9a3b51c6-df2a-4e0e-b7c3-096659409035/d700e2c2-12b1-4c40-83cd-7d71a36c61bc/A40-316645-2024_20250117_Opredelenie.pdf"}[0m
+[2m21:01:34[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:34[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:34[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/f083dedd-1ca1-4cbd-9946-5a4585bc996d/abfca17d-8886-482f-a3b4-038e6f24c150/A40-316676-2024_20251125_Opredelenie.pdf"}[0m
+[2m21:01:34[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:34[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:34[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/c5e7a555-ef66-4960-aaf5-1c75109639e7/0123a017-110d-43e0-af5f-10a92a3640a9/A40-316653-2024_20260320_Opredelenie.pdf"}[0m
+[2m21:01:34[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:34[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:34[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/5207e06a-1f18-4dcf-ad50-a890f14aae7d/f5da9f86-1a25-450b-acad-02908d5366d0/A40-316908-2024_20251007_Opredelenie.pdf"}[0m
+[2m21:01:34[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:34[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:34[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/f083dedd-1ca1-4cbd-9946-5a4585bc996d/a0d82e3c-4862-4480-ab34-36a16395c2cb/A40-316676-2024_20251128_Opredelenie.pdf"}[0m
+[2m21:01:34[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:34[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:34[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/96184883-ab79-4cd4-9a2c-36ac5dcda607/e4bd12cb-54ef-4109-92ab-8b3912d45d30/A40-316640-2024_20250711_Opredelenie.pdf"}[0m
+[2m21:01:34[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:34[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:34[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/5779161f-1899-41b0-b0c5-67dcda84ca82/557e91d9-8476-420d-9cb8-56bc3c3832c5/A40-316611-2024_20250522_Opredelenie.pdf"}[0m
+[2m21:01:35[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:35[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:35[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/f083dedd-1ca1-4cbd-9946-5a4585bc996d/076ba39f-a9b6-49c3-974d-0ca86e749504/A40-316676-2024_20260122_Reshenija_i_postanovlenija.pdf"}[0m
+[2m21:01:35[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:35[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:35[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/6bcd3f5e-9601-4a15-b20b-2219d3c31b88/6140f0f3-eed6-4233-bd5f-267185d3df92/A40-316617-2024_20250620_Opredelenie.pdf"}[0m
+[2m21:01:35[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:35[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:35[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/96184883-ab79-4cd4-9a2c-36ac5dcda607/42ab54d0-784b-49b9-92f2-1f481c093441/A40-316640-2024_20250718_Opredelenie.pdf"}[0m
+[2m21:01:35[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:35[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:35[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/985290f3-c7dd-4f9d-a62a-574af1e935f2/53c10c01-1680-47e0-8de9-a035d2f1a01e/A40-316650-2024_20260302_Opredelenie.pdf"}[0m
+[2m21:01:35[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:35[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:35[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/5779161f-1899-41b0-b0c5-67dcda84ca82/ccdc7593-45f6-4ad2-814e-8e8d5aa28514/A40-316611-2024_20250819_Opredelenie.pdf"}[0m
+[2m21:01:35[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:35[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:35[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/6bcd3f5e-9601-4a15-b20b-2219d3c31b88/eb8b2942-8c8d-4581-bbb6-517c8b4a3729/A40-316617-2024_20250908_Opredelenie.pdf"}[0m
+[2m21:01:35[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:35[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:35[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/6bcd3f5e-9601-4a15-b20b-2219d3c31b88/dcbc1161-9e2d-416a-9294-29298cfbce3b/A40-316617-2024_20251007_Opredelenie.pdf"}[0m
+[2m21:01:35[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:35[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:35[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/e5b1c2b4-6841-47b3-9210-2c237ed78cbd/e171c3fd-88f9-4f5e-8b70-6a813c5c5117/A40-316570-2024_20250331_Opredelenie.pdf"}[0m
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:36[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/e5b1c2b4-6841-47b3-9210-2c237ed78cbd/43987c10-6377-45fd-82b2-93f4903c0fd2/A40-316570-2024_20250428_Opredelenie.pdf"}[0m
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:36[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/7692afe2-05c1-41f3-b278-eb2d3f32b4db/91b281c0-175a-4300-a3f2-169a85fb53a0/A40-316539-2024_20251202_Opredelenie.pdf"}[0m
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:36[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/b92ea41e-e8a8-4832-948e-73b3106201a5/9434126b-e94f-4274-a370-c140276673b9/A40-316622-2024_20251203_Opredelenie.pdf"}[0m
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:36[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/e5b1c2b4-6841-47b3-9210-2c237ed78cbd/ccb872dc-e189-42ff-870b-b0b103e739ed/A40-316570-2024_20251105_Opredelenie.pdf"}[0m
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:36[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/96184883-ab79-4cd4-9a2c-36ac5dcda607/668ee99e-0733-44a7-b0be-3f810e9846a4/A40-316640-2024_20250915_Opredelenie.pdf"}[0m
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:36[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/5779161f-1899-41b0-b0c5-67dcda84ca82/9113bea9-f566-4143-b49e-04e6bc308d4e/A40-316611-2024_20260220_Opredelenie.pdf"}[0m
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:36[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/b92ea41e-e8a8-4832-948e-73b3106201a5/cc866de3-5b26-4077-ade6-dd3c39680782/A40-316622-2024_20251203_Opredelenie.pdf"}[0m
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:36[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/7692afe2-05c1-41f3-b278-eb2d3f32b4db/6e02b8d3-60f2-4e87-851e-67fdd3464c6b/A40-316539-2024_20260320_Opredelenie.pdf"}[0m
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:36[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/96184883-ab79-4cd4-9a2c-36ac5dcda607/4c69bef9-f21d-4b5d-a0ac-31a42a84655f/A40-316640-2024_20251023_Opredelenie.pdf"}[0m
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:36[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/84b22dd0-2a17-4125-84a4-795fffa65a12/a45ca49d-9ca9-4b21-b483-aa8dc4dbb321/A40-316424-2024_20260306_Prochie_sudebnye_dokumenty.pdf"}[0m
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:36[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/39bad616-d959-4270-b451-b45426aadd64/ba6aae1b-1564-4d4b-9786-ab85ef66a056/A40-316673-2024_20251120_Opredelenie.pdf"}[0m
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:36[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/23e534ee-5b5b-4f8b-8f2c-391d73e6dc62/2d0ba082-4e3f-4c24-b1c5-923793a8ae16/A40-316627-2024_20251216_Postanovlenie_apelljacionnoj_instancii.pdf"}[0m
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:36[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:36[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/c3e9f410-3a54-459f-b357-c53dc0488636/e9fd00e1-cdb0-45fb-b6c0-01a39a21f5da/A40-316605-2024_20260227_Opredelenie.pdf"}[0m
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:37[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/b92ea41e-e8a8-4832-948e-73b3106201a5/e3a75431-bcf4-4b96-a913-c2676ec9a740/A40-316622-2024_20251217_Opredelenie.pdf"}[0m
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:37[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/e5b1c2b4-6841-47b3-9210-2c237ed78cbd/23bed6e8-9af2-4f71-90f7-e9651d923c57/A40-316570-2024_20251203_Opredelenie.pdf"}[0m
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:37[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/f8a42134-a932-411f-8331-d2bee6f10ae2/59af7c3b-e165-404e-95c4-c72a742a8bce/A40-316417-2024_20260114_Opredelenie.pdf"}[0m
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:37[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/39bad616-d959-4270-b451-b45426aadd64/71d0d5c9-76ee-413b-889e-050964abbac2/A40-316673-2024_20260319_Opredelenie.pdf"}[0m
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:37[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/84b22dd0-2a17-4125-84a4-795fffa65a12/dd30c2f0-db2e-48d9-b871-adc213457b34/A40-316424-2024_20260316_Opredelenie.pdf"}[0m
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:37[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/c3e9f410-3a54-459f-b357-c53dc0488636/dd5d3523-9d90-4c8b-bcbc-6eacf4dd6af4/A40-316605-2024_20260302_Opredelenie.pdf"}[0m
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:37[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/fa5f5215-667b-490b-b5a6-8040bc906dfb/a2491673-95f0-45f0-b790-5f6e1a912309/A40-316383-2024_20250117_Opredelenie.pdf"}[0m
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:37[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/b92ea41e-e8a8-4832-948e-73b3106201a5/824a240c-12f0-478e-81de-7f4dbd650af7/A40-316622-2024_20260318_Opredelenie.pdf"}[0m
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:37[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/84b22dd0-2a17-4125-84a4-795fffa65a12/879ea46f-0e96-41c3-9a77-b1ad69640028/A40-316424-2024_20260325_Opredelenie.pdf"}[0m
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:37[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/fa5f5215-667b-490b-b5a6-8040bc906dfb/5effd935-ed01-4e25-b909-19c8fa8e795a/A40-316383-2024_20250303_Opredelenie.pdf"}[0m
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:37[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/ee09e2d4-af69-448a-859f-6b9b4b89354e/b6f44fec-8389-4413-bafa-68ef0b1fe321/A40-316349-2024_20250603_Opredelenie.pdf"}[0m
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:37[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/5aac42ba-3d6c-455c-93a0-e71520200b75/8bf8a920-e7e3-417e-95cd-439c51c7f12e/A40-316341-2024_20251117_Opredelenie.pdf"}[0m
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:37[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/5ab5617a-4990-4be2-b298-5ababf1cd969/420d0de9-6635-445e-9e2c-cc882f38b4d5/A40-316376-2024_20250703_Opredelenie.pdf"}[0m
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:37[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/323015df-f6eb-45f7-b0d6-8d8cd85cacf8/7dfda03a-0394-4750-a9bf-6ec9035722d1/A40-316326-2024_20250213_Reshenija_i_postanovlenija.pdf"}[0m
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:37[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/fa5f5215-667b-490b-b5a6-8040bc906dfb/a76de774-7375-491e-9f7e-9e1b07059c19/A40-316383-2024_20250526_Opredelenie.pdf"}[0m
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:37[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/ee09e2d4-af69-448a-859f-6b9b4b89354e/cce1d450-080c-4202-97f3-00ed07ca8175/A40-316349-2024_20260122_Opredelenie.pdf"}[0m
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:37[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/f43d8e65-3130-4081-a257-b8bd8dfc3017/5112b000-c215-435f-b50e-5bca5523eb5c/A40-316331-2024_20250429_Opredelenie.pdf"}[0m
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:37[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/f2c2d631-7de4-4c7c-8b8f-9416322ec0ff/ba1f14e0-a16b-49af-b9f2-4b9bfa9abab7/A40-316338-2024_20251209_Opredelenie.pdf"}[0m
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:37[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/5ab5617a-4990-4be2-b298-5ababf1cd969/207766a3-9e3e-4f4f-8e8d-ed3e4b915c51/A40-316376-2024_20250804_Opredelenie.pdf"}[0m
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:37[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/323015df-f6eb-45f7-b0d6-8d8cd85cacf8/13e949e5-0051-4435-b0b9-d166c7859a4c/A40-316326-2024_20250813_Opredelenie.pdf"}[0m
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:37[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/ee09e2d4-af69-448a-859f-6b9b4b89354e/4a8c7117-dd6a-4034-b4a6-303dc05fe157/A40-316349-2024_20260318_Opredelenie.pdf"}[0m
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:37[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/7f3d4bc7-1182-4ac8-bd1c-c4cf54c50309/1dff1950-92a0-4c33-a49d-5d0de971e78f/A40-316208-2024_20260116_Opredelenie.pdf"}[0m
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:37[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/f43d8e65-3130-4081-a257-b8bd8dfc3017/30bd1c3a-a53b-4c62-a924-ec642c65d77b/A40-316331-2024_20250616_Opredelenie.pdf"}[0m
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:37[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:37[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/66165590-5749-4fc4-bbee-da587489995a/6f7e6e84-5f8c-4e20-8d60-1816f5c8aa3e/A40-316317-2024_20260120_Opredelenie.pdf"}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/f2c2d631-7de4-4c7c-8b8f-9416322ec0ff/91c54730-c6b3-4f96-ada8-1d283115c548/A40-316338-2024_20260210_Prochie_sudebnye_dokumenty.pdf"}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/323015df-f6eb-45f7-b0d6-8d8cd85cacf8/00667d2d-334f-4bc7-a57e-9ddbb8b2a6c1/A40-316326-2024_20250919_Opredelenie.pdf"}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/7f3d4bc7-1182-4ac8-bd1c-c4cf54c50309/b1b00c93-f313-4329-b7f4-ffcd73b7c791/A40-316208-2024_20260123_Opredelenie.pdf"}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/f43d8e65-3130-4081-a257-b8bd8dfc3017/c6263b48-104b-4293-a1e0-62aa25e10ea6/A40-316331-2024_20260127_Opredelenie.pdf"}[0m
+[2m21:01:38[0m [32mINFO   [0m kad_client: fetch_decisions.progress [2m{"attempted_cases": 25, "successful_cases": 24, "retry_count": 0, "target_concurrency": 10, "in_flight": 9}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/47afbbb7-6c3a-45ee-8a13-6eae13515833/d0da2550-a098-4454-a391-968ee9a7c7be/A40-316118-2024_20260326_Opredelenie.pdf"}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/f2c2d631-7de4-4c7c-8b8f-9416322ec0ff/9837fd1a-c1b4-4f01-bc38-e9f13034cec7/A40-316338-2024_20260220_Opredelenie.pdf"}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/66165590-5749-4fc4-bbee-da587489995a/e4da418d-600d-4623-90c3-e5245bf3b051/A40-316317-2024_20260202_Opredelenie.pdf"}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/679afef7-1c43-4e08-9084-69fda5b212ed/69aab95b-2abc-4c0c-9838-2d070cc648b7/A40-316298-2024_20251218_Opredelenie.pdf"}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/5aac42ba-3d6c-455c-93a0-e71520200b75/a4161e62-a84a-48f4-9691-c2d5a4c4ccf3/A40-316341-2024_20251210_Opredelenie.pdf"}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/a5bc63ef-8b9a-4ebd-8e31-bb1dc8d71fe7/537a967d-18f4-440b-8f43-9dafbd7e8d0e/A40-316234-2024_20260114_Opredelenie.pdf"}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/47afbbb7-6c3a-45ee-8a13-6eae13515833/ed8e2cb7-1125-42e3-808d-078a60ee98d5/A40-316118-2024_20260326_Opredelenie.pdf"}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/de007270-0be8-4673-95a5-ef63cc572d05/901e8f8e-4ff0-4706-bb78-d1cc7114b3dc/A40-316232-2024_20250423_Opredelenie.pdf"}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/d87dfb68-55bc-4d73-a398-ad24e114174c/9cb07d0a-ad74-49bf-b9d7-457d439b9a3b/A40-316312-2024_20250618_Opredelenie.pdf"}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/5aac42ba-3d6c-455c-93a0-e71520200b75/d2d02f3e-9ffa-4872-b8c5-95445167e2a0/A40-316341-2024_20251223_Opredelenie.pdf"}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/a8226b92-a509-40e0-a19a-fceaba4f7dc4/b26231e3-4e52-4795-af06-658b933df5ac/A40-316231-2024_20260127_Opredelenie.pdf"}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/a5bc63ef-8b9a-4ebd-8e31-bb1dc8d71fe7/a1c2264f-726c-4fef-a06f-a6c5f09ead6f/A40-316234-2024_20260218_Opredelenie.pdf"}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/7391477e-1b59-4096-8b80-42e758459c1f/6e6cd8ae-b18f-49fe-81d1-ea30940711d8/A40-316230-2024_20251215_Opredelenie.pdf"}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/47afbbb7-6c3a-45ee-8a13-6eae13515833/4ab6bf45-6f81-4c8c-8ee0-7653a3a34d8c/A40-316118-2024_20260326_Opredelenie.pdf"}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/de007270-0be8-4673-95a5-ef63cc572d05/2566704e-7686-4140-b2d2-187e9c5eeae2/A40-316232-2024_20250528_Opredelenie.pdf"}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/5aac42ba-3d6c-455c-93a0-e71520200b75/c0c90030-1857-42d0-9dda-df0f39ac2401/A40-316341-2024_20251223_Prochie_sudebnye_dokumenty.pdf"}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/a8226b92-a509-40e0-a19a-fceaba4f7dc4/958ca552-cce7-419f-96bf-91f50698aa26/A40-316231-2024_20260213_Opredelenie.pdf"}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/a5bc63ef-8b9a-4ebd-8e31-bb1dc8d71fe7/16f20194-eae4-4f92-9765-bcb0f0fa37c1/A40-316234-2024_20260316_Opredelenie.pdf"}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/47afbbb7-6c3a-45ee-8a13-6eae13515833/a8824bf5-76c8-46b4-9d70-64d6c5ce6d2b/A40-316118-2024_20260327_Opredelenie.pdf"}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/2b0c371a-5976-4cc2-803b-0a40bb0a781c/e3b2a676-43a6-4cfd-a397-94959a18e702/A40-316225-2024_20251006_Opredelenie.pdf"}[0m
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:38[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:38[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/5aac42ba-3d6c-455c-93a0-e71520200b75/66d2401e-d006-47b3-b765-f3b1c73316b8/A40-316341-2024_20260211_Opredelenie.pdf"}[0m
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:39[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/679afef7-1c43-4e08-9084-69fda5b212ed/2f3e5d17-6209-43e1-bbed-0f36331cad6d/A40-316298-2024_20251218_Opredelenie.pdf"}[0m
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:39[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/66165590-5749-4fc4-bbee-da587489995a/939e9fa2-8933-43cf-9ba1-47539a25441f/A40-316317-2024_20260320_Opredelenie.pdf"}[0m
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:39[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/e649b5cb-d6dc-4299-a581-a11fd2be7393/8fe4920b-558c-4714-8f1f-f15e39e3ba9d/A40-316222-2024_20250109_Opredelenie.pdf"}[0m
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:39[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/7898c6e6-c536-441e-8d14-8df8ec586c9c/8d883ee8-27e3-4558-82b7-d3a7b1af3b81/A40-316217-2024_20251124_Prochie_sudebnye_dokumenty.pdf"}[0m
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:39[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/d87dfb68-55bc-4d73-a398-ad24e114174c/221a1180-a058-4e98-a570-997909b8f26c/A40-316312-2024_20250729_Opredelenie.pdf"}[0m
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:39[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/679afef7-1c43-4e08-9084-69fda5b212ed/49f0dea7-8082-4c26-942c-8fd7949730e7/A40-316298-2024_20260306_Opredelenie.pdf"}[0m
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:39[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/9ca68700-d95c-489a-a1e0-433627ba5b94/43d4bf17-eec4-4be6-89d4-88259e7bc473/A40-316195-2024_20251120_Opredelenie.pdf"}[0m
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:39[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/e649b5cb-d6dc-4299-a581-a11fd2be7393/13fdd460-2bc6-4ac2-bf64-8b6193795dd5/A40-316222-2024_20250211_Opredelenie.pdf"}[0m
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:39[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/84068362-9541-4df2-9dd0-27eddd286ff5/12c1bfdf-0142-4a44-af44-b4548011ee0b/A40-316192-2024_20250924_Opredelenie.pdf"}[0m
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:39[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/2f44d077-1d92-48b8-8193-4c188cba338c/39f748c3-6f6a-4a5a-93c3-12205f2a6bfb/A40-316174-2024_20250923_Opredelenie.pdf"}[0m
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:39[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/12bf300c-00f2-4b70-abb0-4518ea17a576/8f671b29-b2e2-47fa-9bb9-9d87af5fd6b6/A40-316164-2024_20251119_Opredelenie.pdf"}[0m
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:39[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/7898c6e6-c536-441e-8d14-8df8ec586c9c/47ac378a-77cd-4785-bca8-262c60b6c448/A40-316217-2024_20251201_Reshenija_i_postanovlenija.pdf"}[0m
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:39[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/d39c3df7-a808-4a40-bfbc-64868b738563/70a96d64-8e1a-46e9-ba14-d1d15d2766be/A40-316161-2024_20250718_Opredelenie.pdf"}[0m
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:39[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/d87dfb68-55bc-4d73-a398-ad24e114174c/b49fa290-b9cc-4bc1-a23b-ded1cde8364e/A40-316312-2024_20250827_Opredelenie.pdf"}[0m
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:39[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/84068362-9541-4df2-9dd0-27eddd286ff5/799b010c-b6e1-460e-b580-81e1b994ad26/A40-316192-2024_20251028_Prochie_sudebnye_dokumenty.pdf"}[0m
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:39[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/2f44d077-1d92-48b8-8193-4c188cba338c/b50040c3-3c1b-45ce-aef1-fb8a85fd22b7/A40-316174-2024_20251117_Opredelenie.pdf"}[0m
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:39[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/2b0c371a-5976-4cc2-803b-0a40bb0a781c/33f15603-4752-471c-8a71-a1fbba97ec7c/A40-316225-2024_20251119_Opredelenie.pdf"}[0m
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:39[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/d39c3df7-a808-4a40-bfbc-64868b738563/bcb205fd-6536-4a75-9a08-fbd81ecfde99/A40-316161-2024_20250729_Opredelenie.pdf"}[0m
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:39[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/a7bd4aef-ec95-4471-a4b0-5c66f0a4b744/87eae192-a439-4eb3-9d0b-f45a5c67a2bc/A40-316152-2024_20260320_Opredelenie.pdf"}[0m
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:39[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/84068362-9541-4df2-9dd0-27eddd286ff5/abf92ae8-bac8-4905-96f7-086df5f2eb25/A40-316192-2024_20251031_Opredelenie.pdf"}[0m
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:39[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/ad6cfb2f-2c5e-4aac-9a43-439a1a211dcd/8e184089-f275-4062-bd16-8f38d5a0f365/A40-316149-2024_20250609_Opredelenie.pdf"}[0m
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:39[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/a7bd4aef-ec95-4471-a4b0-5c66f0a4b744/da185ef5-8f02-4548-a2b5-7bcfffb7c51e/A40-316152-2024_20260320_Opredelenie.pdf"}[0m
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:39[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/d39c3df7-a808-4a40-bfbc-64868b738563/03423d90-0367-4c1f-9707-0899f5fe357d/A40-316161-2024_20250902_Opredelenie.pdf"}[0m
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:39[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:39[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/9ca68700-d95c-489a-a1e0-433627ba5b94/13f0ffa5-d6fc-42b6-a761-f6a2adc52ad3/A40-316195-2024_20251120_Prochie_sudebnye_dokumenty.pdf"}[0m
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:40[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/e649b5cb-d6dc-4299-a581-a11fd2be7393/27abb225-30ac-45cd-97d3-5e72d1420780/A40-316222-2024_20250408_Opredelenie.pdf"}[0m
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:40[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/2e424010-498a-40a1-9dba-d70d0fc4a4e4/c0891595-47b4-48a1-bd77-9a8d780581ae/A40-316147-2024_20250529_Opredelenie.pdf"}[0m
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:40[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/ad6cfb2f-2c5e-4aac-9a43-439a1a211dcd/8ebdfe53-7481-4bb2-ac85-2205da7c9356/A40-316149-2024_20250715_Opredelenie.pdf"}[0m
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:40[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/9042d0cf-8360-41ee-87f3-17d849244222/2168801c-7567-4ed1-b9f6-28082d231e7f/A40-316140-2024_20260128_Opredelenie.pdf"}[0m
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:40[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/12bf300c-00f2-4b70-abb0-4518ea17a576/3c398b2c-0257-4e90-a9d6-96006fceef53/A40-316164-2024_20260205_Prochie_sudebnye_dokumenty.pdf"}[0m
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:40[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/d87dfb68-55bc-4d73-a398-ad24e114174c/fd2906f3-297d-452d-a39c-cddd141df674/A40-316312-2024_20251002_Opredelenie.pdf"}[0m
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:40[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/b6f9daa9-07e6-4da0-a22c-c9b185a6776e/cc44e403-72bd-427b-8e46-953283cedf8f/A40-316133-2024_20250806_Opredelenie.pdf"}[0m
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:40[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/ad6cfb2f-2c5e-4aac-9a43-439a1a211dcd/1e09d1f3-b4e0-43a5-b318-c92a4d3357ad/A40-316149-2024_20250815_Opredelenie.pdf"}[0m
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:40[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/804b8164-8ab2-4545-a93c-eaf3b6ad6fa3/d9c24b3c-e1cc-4619-abbd-d98b65dd19c9/A40-316124-2024_20250530_Opredelenie.pdf"}[0m
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:40[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/9042d0cf-8360-41ee-87f3-17d849244222/fb9338e1-1317-424c-bdfa-b37755bba0da/A40-316140-2024_20260209_Opredelenie.pdf"}[0m
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:40[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/b6f9daa9-07e6-4da0-a22c-c9b185a6776e/2e901213-691e-4210-bb21-d42938d63c37/A40-316133-2024_20250818_Opredelenie.pdf"}[0m
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:40[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/12bf300c-00f2-4b70-abb0-4518ea17a576/2bd33433-480d-4330-b26d-e03c815888ae/A40-316164-2024_20260206_Opredelenie.pdf"}[0m
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:40[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/a7bd4aef-ec95-4471-a4b0-5c66f0a4b744/f28c7467-57fd-4c81-a99d-e2025cdf98d0/A40-316152-2024_20260320_Opredelenie.pdf"}[0m
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:40[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/ad6cfb2f-2c5e-4aac-9a43-439a1a211dcd/10efaa06-52c2-4607-88ea-351d01b9614b/A40-316149-2024_20250924_Opredelenie.pdf"}[0m
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:40[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/804b8164-8ab2-4545-a93c-eaf3b6ad6fa3/2f7c7fef-7e5d-48e1-92cf-14d4f852e3a3/A40-316124-2024_20250530_Opredelenie.pdf"}[0m
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:40[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/b6f9daa9-07e6-4da0-a22c-c9b185a6776e/37e754c8-b5e4-4319-bb7d-51a57ec47dd7/A40-316133-2024_20250923_Opredelenie.pdf"}[0m
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:40[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/804b8164-8ab2-4545-a93c-eaf3b6ad6fa3/06fdd667-a99d-47ef-9bab-847da399c688/A40-316124-2024_20250808_Opredelenie.pdf"}[0m
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:40[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:40[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/b6f9daa9-07e6-4da0-a22c-c9b185a6776e/960f0bdf-bc49-4ea7-9f9f-d9b2b571ed46/A40-316133-2024_20251119_Opredelenie.pdf"}[0m
+[2m21:01:41[0m [33mWARNING[0m pypdf._reader: invalid pdf header: b'\r\n\r\n\r'
+[2m21:01:41[0m [33mWARNING[0m pypdf._reader: EOF marker not found
+[2m21:01:41[0m [32mINFO   [0m kad_client: pdf.parse_error [2m{"error": "Stream has ended unexpectedly", "url": "https://kad.arbitr.ru/Kad/PdfDocument/804b8164-8ab2-4545-a93c-eaf3b6ad6fa3/133b17a3-d327-4280-84d0-a3f7509ba7a8/A40-316124-2024_20251007_Opredelenie.pdf"}[0m
+[2m21:01:41[0m [32mINFO   [0m kad_client: fetch_decisions.progress [2m{"attempted_cases": 50, "successful_cases": 43, "retry_count": 0, "target_concurrency": 10, "in_flight": 0}[0m
+[2m21:01:41[0m [32mINFO   [0m kad_client: fetch_decisions.stats [2m{"attempted_cases": 50, "successful_cases": 43, "retry_count": 0, "effective_concurrency": 10, "case_id_collection_ms": 4905, "details_fetch_ms": 7861, "unavailable_failures": 0, "rate_limit_failures": 0, "invalid_failures": 0, "filtered_by_court": 0, "court_compared_cases": 43}[0m
+[2m21:01:41[0m [32mINFO   [0m request_processor: analysis.phase [2m{"phase": "classifying"}[0m
+[2m21:01:41[0m [32mINFO   [0m kad_client: fetch_decisions.article_classification_start [2m{"article": "61.2", "total_decisions": 43}[0m
+[2m21:01:41[0m [32mINFO   [0m llm_reason_extractor: llm.classify_batch_prompt [2m{"prompt_preview": "Ты — строгий юрист-аналитик. Твоя задача — отобрать ТОЛЬКО релевантные судебные акты.\n\nЗАПРОС ПОЛЬЗОВАТЕЛЯ: Практика АС Москвы по статье 61.2 Закона о банкротстве за 2024 год\nЦЕЛЕВАЯ СТАТЬЯ: 61.2\n\nАКТЫ ДЛЯ АНАЛИЗА:\n--- АКТ №1 ---\nИсход (автоматический): Не определено\nКонтекст:\nДело: А40-316651/2024\nСуд: АС города Москвы\nКатегория: Банкротство\nТекст события (последние важные данные): --- СОБЫТИЕ №1 ---\nХодатайства None Ходатайство об уточнении размера исковых требований  None     \n\n--- СОБЫТИЕ №2 ---\nДополнение к делу None Письмо (исходящее)  None     \n\n--- СОБЫТИЕ №3 ---\nХодатайства None Ходатайство о приобщении к делу дополнительных документов Ходатайства № б/н от 18.02.2026 None     \n\n--- СОБЫТИЕ №4 ---\nХодатайства None Ходатайство об ознакомлении с материалами дела Ходатайства № б/н от 18.02.2026 None     \n\n--- СОБЫТИЕ №5 ---\nХодатайства None Ходатайство (заявления) Ходатайства №51-26-И от 20.03.2026 None     \n\n--- АКТ №2 ---\nИсход (автоматический): Не определено\nКонтекст:\nДело: А40... (relevant: false).\n- **outcome**: \"satisfied\" (удовлетворено/обоснованно), \"denied\" (отказано/необоснованно) или \"NOT FOUND IN DOCUMENT\".\n\nФОРМАТ ОТВЕТА — СТРОГИЙ JSON-МАССИВ (ровно 10 элементов):\n[\n  {\"relevant\": true, \"reasons\": [\"Обоснование\"], \"proof_quote\": \"Точная цитата\", \"outcome\": \"satisfied\"},\n  {\"relevant\": false, \"reasons\": [\"Не подходит по причине...\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"}\n]\n\nНИКАКИХ пояснений. Твой ответ должен быть только валидным JSON-массивом."}[0m
+[2m21:01:45[0m [32mINFO   [0m llm_reason_extractor: llm.classify_batch_raw [2m{"content": "```json\n[\n  {\"relevant\": false, \"reasons\": [\"Дело содержит только процессуальные действия, не связанные с применением ст. 61.2 Закона о банкротстве.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело содержит только процессуальные действия, не связанные с применением ст. 61.2 Закона о банкротстве.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело содержит только информацию о возврате заявления о банкротстве, что не относится к применению ст. 61.2 Закона о банкротстве.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело содержит только процессуальные действия, не связанные с применением ст. 61.2 Закона о банкротстве.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело содержит только информацию о завершении реализации имущества, что не относится к применению ст. 61.2 Закона о банкротстве.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело содержит только информацию о завершении реализации имущества, что не относится к применению ст. 61.2 Закона о банкротстве.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело содержит только информацию о признании банкротом и введении реализации имущества, что не относится к применению ст. 61.2 Закона о банкротстве.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело содержит только информацию о завершении реализации имущества, что не относится к применению ст. 61.2 Закона о банкротстве.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело содержит заявление в порядке ст. 60 Закона о банкротстве, но не содержит информации о применении ст. 61.2.\"], \"proof_quote\": \"Заявление №51 от 12.03.2026\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело содержит только информацию об утверждении плана реструктуризации долгов, что не относится к применению ст. 61.2 Закона о банкротстве.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"}\n]\n```"}[0m
+[2m21:01:45[0m [32mINFO   [0m llm_reason_extractor: llm.classify_batch_prompt [2m{"prompt_preview": "Ты — строгий юрист-аналитик. Твоя задача — отобрать ТОЛЬКО релевантные судебные акты.\n\nЗАПРОС ПОЛЬЗОВАТЕЛЯ: Практика АС Москвы по статье 61.2 Закона о банкротстве за 2024 год\nЦЕЛЕВАЯ СТАТЬЯ: 61.2\n\nАКТЫ ДЛЯ АНАЛИЗА:\n--- АКТ №1 ---\nИсход (автоматический): Не определено\nКонтекст:\nДело: А40-316640/2024\nСуд: АС города Москвы\nКатегория: Банкротство\nТекст события (последние важные данные): --- СОБЫТИЕ №1 ---\nОпределение None О включении требований в реестр требований кредиторов В ответ на Заявление (14.04.2025) от ПАО \"СОВКОМБАНК\" None     \n\n--- СОБЫТИЕ №2 ---\nОпределение None О включении требований в реестр требований кредиторов В ответ на Заявление (22.04.2025) от ПАО \"СБЕРБАНК РОССИИ\" None     \n\n--- СОБЫТИЕ №3 ---\nХодатайства None Ходатайство о завершении процедуры реализации имущества гражданина Ходатайства № б/н от 22.08.2025 None     \n\n--- СОБЫТИЕ №4 ---\nОпределение None О принятии заявления (ходатайства) к рассмотрению В ответ на Ходатайства (22.08.2025) от Коваль Анастасия Сергеевна, ... (relevant: false).\n- **outcome**: \"satisfied\" (удовлетворено/обоснованно), \"denied\" (отказано/необоснованно) или \"NOT FOUND IN DOCUMENT\".\n\nФОРМАТ ОТВЕТА — СТРОГИЙ JSON-МАССИВ (ровно 10 элементов):\n[\n  {\"relevant\": true, \"reasons\": [\"Обоснование\"], \"proof_quote\": \"Точная цитата\", \"outcome\": \"satisfied\"},\n  {\"relevant\": false, \"reasons\": [\"Не подходит по причине...\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"}\n]\n\nНИКАКИХ пояснений. Твой ответ должен быть только валидным JSON-массивом."}[0m
+[2m21:01:49[0m [32mINFO   [0m llm_reason_extractor: llm.classify_batch_raw [2m{"content": "```json\n[\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Рассматриваются вопросы включения требований в реестр кредиторов и завершения реализации имущества.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Рассматриваются вопросы продления срока реализации имущества.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Рассматриваются процессуальные вопросы.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Рассматриваются вопросы включения требований в реестр кредиторов и завершения реализации имущества.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Рассматриваются процессуальные вопросы и завершение процедуры реализации имущества.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Рассматриваются вопросы включения требований в реестр кредиторов и продления срока реализации имущества.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Рассматриваются вопросы отложения судебного разбирательства и установления размера вознаграждения арбитражного управляющего.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Рассматриваются вопросы включения требований в реестр кредиторов, возврата заявления и продления срока реализации имущества.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Рассматриваются вопросы возврата заявления о признании должника банкротом.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Рассматриваются вопросы включения требований в реестр кредиторов и продления срока реализации имущества.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"}\n]\n```"}[0m
+[2m21:01:49[0m [32mINFO   [0m llm_reason_extractor: llm.classify_batch_prompt [2m{"prompt_preview": "Ты — строгий юрист-аналитик. Твоя задача — отобрать ТОЛЬКО релевантные судебные акты.\n\nЗАПРОС ПОЛЬЗОВАТЕЛЯ: Практика АС Москвы по статье 61.2 Закона о банкротстве за 2024 год\nЦЕЛЕВАЯ СТАТЬЯ: 61.2\n\nАКТЫ ДЛЯ АНАЛИЗА:\n--- АКТ №1 ---\nИсход (автоматический): Не определено\nКонтекст:\nДело: А40-316349/2024\nСуд: АС города Москвы\nКатегория: Банкротство\nТекст события (последние важные данные): --- СОБЫТИЕ №1 ---\nОпределение None О включении требований в реестр требований кредиторов В ответ на Заявление (04.04.2025) от ПАО \"СБЕРБАНК РОССИИ\" None     \n\n--- СОБЫТИЕ №2 ---\nЗаявление None Заявление об установлении размера требований кредиторов Заявление №26-11/000513 от 16.01.2026 None     \n\n--- СОБЫТИЕ №3 ---\nОпределение None О принятии заявления об установлении размера требований кредиторов к рассмотрению В ответ на Заявление (16.01.2026) от ИНСПЕКЦИЯ ФЕДЕРАЛЬНОЙ НАЛОГОВОЙ СЛУЖБЫ № 9 ПО Г. МОСКВЕ None     \n\n--- СОБЫТИЕ №4 ---\nДополнение к делу None Отчет о результатах реализации имущества гражданина... (relevant: false).\n- **outcome**: \"satisfied\" (удовлетворено/обоснованно), \"denied\" (отказано/необоснованно) или \"NOT FOUND IN DOCUMENT\".\n\nФОРМАТ ОТВЕТА — СТРОГИЙ JSON-МАССИВ (ровно 10 элементов):\n[\n  {\"relevant\": true, \"reasons\": [\"Обоснование\"], \"proof_quote\": \"Точная цитата\", \"outcome\": \"satisfied\"},\n  {\"relevant\": false, \"reasons\": [\"Не подходит по причине...\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"}\n]\n\nНИКАКИХ пояснений. Твой ответ должен быть только валидным JSON-массивом."}[0m
+[2m21:01:53[0m [32mINFO   [0m llm_reason_extractor: llm.classify_batch_raw [2m{"content": "```json\n[\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Рассматриваются вопросы включения требований в реестр.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Рассматриваются вопросы реализации имущества и завершения процедуры.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Рассматриваются процессуальные вопросы апелляционного обжалования.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Рассматриваются вопросы включения требований в реестр.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Рассматриваются вопросы реализации имущества и завершения процедуры.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Рассматриваются вопросы включения требований в реестр.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Рассматриваются вопросы продления конкурсного производства.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Рассматриваются вопросы включения требований в реестр и отложения судебного разбирательства.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Рассматриваются вопросы принятия заявлений к рассмотрению и включения требований в реестр.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Рассматриваются вопросы ознакомления с материалами дела и отчетности арбитражного управляющего.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"}\n]\n```"}[0m
+[2m21:01:53[0m [32mINFO   [0m llm_reason_extractor: llm.classify_batch_prompt [2m{"prompt_preview": "Ты — строгий юрист-аналитик. Твоя задача — отобрать ТОЛЬКО релевантные судебные акты.\n\nЗАПРОС ПОЛЬЗОВАТЕЛЯ: Практика АС Москвы по статье 61.2 Закона о банкротстве за 2024 год\nЦЕЛЕВАЯ СТАТЬЯ: 61.2\n\nАКТЫ ДЛЯ АНАЛИЗА:\n--- АКТ №1 ---\nИсход (автоматический): Не определено\nКонтекст:\nДело: А40-316317/2024\nСуд: АС города Москвы\nКатегория: Банкротство\nТекст события (последние важные данные): --- СОБЫТИЕ №1 ---\nЗаявление None Заявление об установлении размера требований кредиторов Заявление № б/н от 30.12.2025 None     \n\n--- СОБЫТИЕ №2 ---\nОпределение None О принятии заявления об установлении размера требований кредиторов к рассмотрению В ответ на Заявление (30.12.2025) от МЕЖРАЙОННАЯ ИНСПЕКЦИЯ ФЕДЕРАЛЬНОЙ НАЛОГОВОЙ СЛУЖБЫ № 51 ПО Г. МОСКВЕ None     \n\n--- СОБЫТИЕ №3 ---\nОпределение None Об отложении судебного разбирательства Дата и время судебного заседания 30.03.2026, 15:35, Зал судебных заседаний № 6010 None     \n\n--- СОБЫТИЕ №4 ---\nХодатайства None Ходатайство об отложении судебного разбирате... (relevant: false).\n- **outcome**: \"satisfied\" (удовлетворено/обоснованно), \"denied\" (отказано/необоснованно) или \"NOT FOUND IN DOCUMENT\".\n\nФОРМАТ ОТВЕТА — СТРОГИЙ JSON-МАССИВ (ровно 10 элементов):\n[\n  {\"relevant\": true, \"reasons\": [\"Обоснование\"], \"proof_quote\": \"Точная цитата\", \"outcome\": \"satisfied\"},\n  {\"relevant\": false, \"reasons\": [\"Не подходит по причине...\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"}\n]\n\nНИКАКИХ пояснений. Твой ответ должен быть только валидным JSON-массивом."}[0m
+[2m21:01:58[0m [32mINFO   [0m llm_reason_extractor: llm.classify_batch_raw [2m{"content": "```json\n[\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Рассматриваются вопросы об установлении размера требований кредиторов.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Рассматриваются вопросы о реструктуризации долгов.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Процедура реализации имущества гражданина завершена.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Процедура реализации имущества гражданина завершена.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Процедура реализации имущества гражданина завершена.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Заявление о признании должника банкротом оставлено без рассмотрения.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Производство по делу о банкротстве прекращено.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Процедура реализации имущества гражданина завершена.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Рассматриваются вопросы об отложении судебного разбирательства.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"},\n  {\"relevant\": false, \"reasons\": [\"Дело о банкротстве, но отсутствует информация о применении ст. 61.2 Закона о банкротстве. Рассматриваются вопросы об истребовании доказательств.\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"}\n]\n```"}[0m
+[2m21:01:58[0m [32mINFO   [0m llm_reason_extractor: llm.classify_batch_prompt [2m{"prompt_preview": "Ты — строгий юрист-аналитик. Твоя задача — отобрать ТОЛЬКО релевантные судебные акты.\n\nЗАПРОС ПОЛЬЗОВАТЕЛЯ: Практика АС Москвы по статье 61.2 Закона о банкротстве за 2024 год\nЦЕЛЕВАЯ СТАТЬЯ: 61.2\n\nАКТЫ ДЛЯ АНАЛИЗА:\n--- АКТ №1 ---\nИсход (автоматический): Не определено\nКонтекст:\nДело: А40-316149/2024\nСуд: АС города Москвы\nКатегория: Банкротство\nТекст события (последние важные данные): --- СОБЫТИЕ №1 ---\nОпределение None О принятии заявления об установлении размера требований кредиторов к рассмотрению В ответ на Заявление (03.06.2025) от ПАО \"СБЕРБАНК РОССИИ\" None     \n\n--- СОБЫТИЕ №2 ---\nОпределение None О включении требований в реестр требований кредиторов В ответ на Заявление (03.06.2025) от ПАО \"СБЕРБАНК РОССИИ\" None     \n\n--- СОБЫТИЕ №3 ---\nХодатайства None Ходатайство о завершении процедуры реализации имущества гражданина Ходатайства № б/н от 13.08.2025 None     \n\n--- СОБЫТИЕ №4 ---\nОпределение None О назначении судебного заседания Дата и время судебного заседания 23.09.2025, 17:53,...н (relevant: false).\n- **outcome**: \"satisfied\" (удовлетворено/обоснованно), \"denied\" (отказано/необоснованно) или \"NOT FOUND IN DOCUMENT\".\n\nФОРМАТ ОТВЕТА — СТРОГИЙ JSON-МАССИВ (ровно 3 элементов):\n[\n  {\"relevant\": true, \"reasons\": [\"Обоснование\"], \"proof_quote\": \"Точная цитата\", \"outcome\": \"satisfied\"},\n  {\"relevant\": false, \"reasons\": [\"Не подходит по причине...\"], \"proof_quote\": \"\", \"outcome\": \"NOT FOUND IN DOCUMENT\"}\n]\n\nНИКАКИХ пояснений. Твой ответ должен быть только валидным JSON-массивом."}[0m
+[2m21:02:00[0m [32mINFO   [0m llm_reason_extractor: llm.classify_batch_raw [2m{"content": "```json\n[\n  {\n    \"relevant\": false,\n    \"reasons\": [\n      \"Дело о банкротстве физического лица. В тексте отсутствуют упоминания о статье 61.2 Закона о банкротстве. Рассматриваются вопросы включения требований в реестр, завершения реализации имущества.\"\n    ],\n    \"proof_quote\": \"\",\n    \"outcome\": \"NOT FOUND IN DOCUMENT\"\n  },\n  {\n    \"relevant\": false,\n    \"reasons\": [\n      \"Дело о банкротстве физического лица. В тексте отсутствуют упоминания о статье 61.2 Закона о банкротстве. Рассматриваются вопросы включения требований в реестр, завершения реализации имущества.\"\n    ],\n    \"proof_quote\": \"\",\n    \"outcome\": \"NOT FOUND IN DOCUMENT\"\n  },\n  {\n    \"relevant\": false,\n    \"reasons\": [\n      \"Дело о банкротстве физического лица. В тексте отсутствуют упоминания о статье 61.2 Закона о банкротстве. Рассматриваются вопросы включения требований в реестр, завершения реализации имущества.\"\n    ],\n    \"proof_quote\": \"\",\n    \"outcome\": \"NOT FOUND IN DOCUMENT\"\n  }\n]\n```"}[0m
+[2m21:02:00[0m [32mINFO   [0m kad_client: fetch_decisions.article_classification_done [2m{"article": "61.2", "total_input": 43, "relevant": 0, "filtered_relevance": 43}[0m
+Traceback (most recent call last):
+  File "/Users/otabek-abdiraimov/Projects/test_bot/run_cli_test.py", line 52, in main
+    result = await processor.process(user_id, query, test_settings)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/otabek-abdiraimov/Projects/test_bot/src/services/request_processor.py", line 287, in process
+    raise NotEnoughData()
+src.services.request_processor.NotEnoughData
+KAD API Key: Set
+OpenRouter API Key: Set
+
+=============================================
+Executing End-to-End Test
+Query: Практика АС Москвы по статье 61.2 Закона о банкротстве за 2024 год
+Max cases: 50
+=============================================
+
+
+Pipeline failed with error: 

@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.domain.entities import CaseDecision, CaseOutcome
 from src.domain.case_models import SearchParams
+from src.domain.entities import CaseDecision, CaseOutcome
 from src.services.llm_reason_extractor import LLMReasonExtractor
 
 
@@ -206,6 +206,7 @@ async def test_semaphore_limits_concurrency():
 
 # --- classify_and_extract tests ---
 
+
 def _make_decision(
     analysis_text: str = "Отказать в удовлетворении / Определение",
     outcome: CaseOutcome = CaseOutcome.DENIED,
@@ -255,7 +256,14 @@ async def test_classify_relevant_case_returns_true_and_reasons():
         "аффилированность сторон",
     ]
     # Return MUST be a list of objects for batch/wrapper
-    api_response = [{"relevant": True, "reasons": labels, "proof_quote": "test quote", "outcome": "satisfied"}]
+    api_response = [
+        {
+            "relevant": True,
+            "reasons": labels,
+            "proof_quote": "test quote",
+            "outcome": "satisfied",
+        }
+    ]
     http.post = AsyncMock(
         return_value=_mock_response(
             _api_body(json.dumps(api_response, ensure_ascii=False))
@@ -264,7 +272,9 @@ async def test_classify_relevant_case_returns_true_and_reasons():
     extractor = _make_extractor(http_client=http)
 
     decision = _make_decision("Признать сделку недействительной / Определение")
-    is_relevant, reasons, quote, llm_outcome = await extractor.classify_and_extract(decision, "61.2")
+    is_relevant, reasons, quote, llm_outcome = await extractor.classify_and_extract(
+        decision, "61.2"
+    )
 
     assert is_relevant is True
     assert reasons == tuple(labels)
@@ -277,7 +287,12 @@ async def test_classify_relevant_case_returns_true_and_reasons():
 async def test_classify_irrelevant_case_returns_false():
     http = AsyncMock()
     api_response = [
-        {"relevant": False, "reasons": ["НЕ_РЕЛЕВАНТНО"], "proof_quote": "", "outcome": "unknown"}
+        {
+            "relevant": False,
+            "reasons": ["НЕ_РЕЛЕВАНТНО"],
+            "proof_quote": "",
+            "outcome": "unknown",
+        }
     ]
     http.post = AsyncMock(
         return_value=_mock_response(
@@ -289,7 +304,9 @@ async def test_classify_irrelevant_case_returns_false():
     decision = _make_decision(
         "Включить в реестр требований кредиторов", CaseOutcome.SATISFIED
     )
-    is_relevant, reasons, quote, llm_outcome = await extractor.classify_and_extract(decision, "61.2")
+    is_relevant, reasons, quote, llm_outcome = await extractor.classify_and_extract(
+        decision, "61.2"
+    )
 
     assert is_relevant is False
     assert reasons == ("НЕ_РЕЛЕВАНТНО",)
@@ -305,7 +322,9 @@ async def test_classify_empty_text_returns_not_relevant():
     decision = _make_decision(
         analysis_text="", case_number="", court_name="", case_category=""
     )
-    is_relevant, reasons, quote, llm_outcome = await extractor.classify_and_extract(decision, "61.2")
+    is_relevant, reasons, quote, llm_outcome = await extractor.classify_and_extract(
+        decision, "61.2"
+    )
 
     assert is_relevant is False
     assert reasons == ("НЕ_РЕЛЕВАНТНО",)
@@ -327,7 +346,9 @@ async def test_classify_http_error_returns_true_fallback():
     extractor = _make_extractor(http_client=http)
 
     decision = _make_decision("some text")
-    is_relevant, reasons, quote, llm_outcome = await extractor.classify_and_extract(decision, "61.2")
+    is_relevant, reasons, quote, llm_outcome = await extractor.classify_and_extract(
+        decision, "61.2"
+    )
 
     assert is_relevant is True  # Fail-safe: keep case to avoid 100% rejection
     assert "оценка обстоятельств дела" in reasons
@@ -342,7 +363,9 @@ async def test_classify_malformed_json_returns_true_fallback():
     extractor = _make_extractor(http_client=http)
 
     decision = _make_decision("some text")
-    is_relevant, reasons, quote, llm_outcome = await extractor.classify_and_extract(decision, "61.3")
+    is_relevant, reasons, quote, llm_outcome = await extractor.classify_and_extract(
+        decision, "61.3"
+    )
 
     assert is_relevant is True  # Fail-safe: keep case to avoid 100% rejection
     assert "оценка обстоятельств дела" in reasons
@@ -353,7 +376,9 @@ async def test_classify_malformed_json_returns_true_fallback():
 async def test_classify_uses_separate_cache():
     http = AsyncMock()
     labels = ["подозрительность сделки (ст.61.2)"]
-    api_response = [{"relevant": True, "reasons": labels, "proof_quote": "q", "outcome": "denied"}]
+    api_response = [
+        {"relevant": True, "reasons": labels, "proof_quote": "q", "outcome": "denied"}
+    ]
     http.post = AsyncMock(
         return_value=_mock_response(
             _api_body(json.dumps(api_response, ensure_ascii=False))
@@ -378,10 +403,12 @@ async def test_classify_budget_exhausted_keeps_case():
     extractor.set_fetch_budget(0)
 
     decision = _make_decision("some text")
-    is_relevant, reasons, quote, llm_outcome = await extractor.classify_and_extract(decision, "61.2")
+    is_relevant, reasons, quote, llm_outcome = await extractor.classify_and_extract(
+        decision, "61.2"
+    )
 
     assert is_relevant is True  # Fail-safe: keep case to avoid data loss
-    assert "оценка обстоятельств дела" in reasons
+    assert "budget_exhausted" in reasons
     assert llm_outcome is None
     http.post.assert_not_called()
 
@@ -418,9 +445,18 @@ async def test_classify_relevant_without_quote_is_rejected():
 async def test_classify_prompt_includes_case_context():
     """Verify the prompt sent to LLM contains case number, court, category."""
     http = AsyncMock()
-    api_response = [{"relevant": True, "reasons": ["подозрительность сделки (ст.61.2)"], "proof_quote": "quote", "outcome": "denied"}]
+    api_response = [
+        {
+            "relevant": True,
+            "reasons": ["подозрительность сделки (ст.61.2)"],
+            "proof_quote": "quote",
+            "outcome": "denied",
+        }
+    ]
     http.post = AsyncMock(
-        return_value=_mock_response(_api_body(json.dumps(api_response, ensure_ascii=False)))
+        return_value=_mock_response(
+            _api_body(json.dumps(api_response, ensure_ascii=False))
+        )
     )
     extractor = _make_extractor(http_client=http)
 
@@ -453,11 +489,15 @@ async def test_classify_batch_pads_missing_items_from_llm_response():
         }
     ]
     http.post = AsyncMock(
-        return_value=_mock_response(_api_body(json.dumps(api_response, ensure_ascii=False)))
+        return_value=_mock_response(
+            _api_body(json.dumps(api_response, ensure_ascii=False))
+        )
     )
     extractor = _make_extractor(http_client=http)
 
-    decisions = [_make_decision(f"text {i}", case_number=f"А40-{i}/2024") for i in range(10)]
+    decisions = [
+        _make_decision(f"text {i}", case_number=f"А40-{i}/2024") for i in range(10)
+    ]
     results = await extractor.classify_batch(decisions, "61.2", "ст. 61.2")
 
     assert len(results) == 10
@@ -471,7 +511,12 @@ async def test_choose_decisive_pdf_uses_fast_model_and_selected_index():
     http = AsyncMock()
     http.post = AsyncMock(
         return_value=_mock_response(
-            _api_body(json.dumps({"selected_index": 2, "reason": "Это финальное решение"}, ensure_ascii=False))
+            _api_body(
+                json.dumps(
+                    {"selected_index": 2, "reason": "Это финальное решение"},
+                    ensure_ascii=False,
+                )
+            )
         )
     )
     extractor = _make_extractor(http_client=http)
@@ -490,8 +535,18 @@ async def test_choose_decisive_pdf_uses_fast_model_and_selected_index():
         law_display_name="ГК РФ",
     )
     candidates = [
-        {"name": "Исковое заявление", "url": "https://example.com/1.pdf", "date": "2025-01-10", "category": "procedural_act"},
-        {"name": "Решение суда", "url": "https://example.com/2.pdf", "date": "2025-02-01", "category": "merits_act"},
+        {
+            "name": "Исковое заявление",
+            "url": "https://example.com/1.pdf",
+            "date": "2025-01-10",
+            "category": "procedural_act",
+        },
+        {
+            "name": "Решение суда",
+            "url": "https://example.com/2.pdf",
+            "date": "2025-02-01",
+            "category": "merits_act",
+        },
     ]
 
     selected = await extractor.choose_decisive_pdf(

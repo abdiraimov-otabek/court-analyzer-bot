@@ -19,6 +19,7 @@ from src.infrastructure.sqlite import SqliteConnection
 from src.services.access_control import AccessControlList
 from src.services.active_requests import ActiveRequestRegistry
 from src.services.hashing import HashingService
+from src.services.captcha_solver import CaptchaSolver
 from src.services.kad_client import ParserApiKadClient
 from src.services.llm_reason_extractor import LLMReasonExtractor
 from src.services.quarter_selection import QuarterSelectionRegistry
@@ -58,6 +59,7 @@ class Container:
         self.async_http_client = httpx.AsyncClient(timeout=30, limits=limits)
         self._case_client: ParserApiKadClient | None = None
         self._llm_extractor: LLMReasonExtractor | None = None
+        self._captcha_solver: CaptchaSolver | None = None
 
     def build_bot_logic(self) -> BotLogic:
         return BotLogic(
@@ -97,6 +99,7 @@ class Container:
             sync_http_client=self.sync_http_client,
             llm_reason_extractor=self._get_llm_reason_extractor(),
             details_cache_repository=self.case_details_cache_repository,
+            captcha_solver=self._get_captcha_solver(),
         )
 
     def _get_llm_reason_extractor(self) -> LLMReasonExtractor | None:
@@ -108,6 +111,19 @@ class Container:
                 api_key=self.config.openrouter_api_key,
             )
             return self._llm_extractor
+        return None
+
+    def _get_captcha_solver(self) -> CaptchaSolver | None:
+        if self._captcha_solver is not None:
+            return self._captcha_solver
+        if self.config.captcha_solver_api_key:
+            self._captcha_solver = CaptchaSolver(
+                api_key=self.config.captcha_solver_api_key,
+                service_url=self.config.captcha_solver_url,
+                timeout_seconds=self.config.captcha_solver_timeout,
+                http_client=self.async_http_client,
+            )
+            return self._captcha_solver
         return None
 
     def _build_hashing_service(self) -> HashingService:

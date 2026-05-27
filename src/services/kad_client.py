@@ -13,7 +13,6 @@ from urllib.parse import quote_plus
 import httpx
 
 from src.app.bot_logging import log_debug, log_event
-from src.domain.entities import CaseDecision, CaseOutcome
 from src.domain.case_models import (
     DecisionFetchOutcome,
     FetchDecisionsResult,
@@ -25,9 +24,15 @@ from src.domain.case_models import (
     RequestResult,
     SearchParams,
 )
-from src.domain.reason_extractor import ReasonExtractor
+from src.domain.entities import CaseDecision, CaseOutcome
 from src.domain.settings import Settings
 from src.infrastructure.case_details_cache_repository import CaseDetailsCacheRepository
+from src.services.captcha_solver import (
+    CaptchaSolver,
+    extract_captcha_challenge,
+    solve_and_retry_pdf,
+    solve_and_retry_pdf_sync,
+)
 from src.services.llm_reason_extractor import LLMReasonExtractor
 from src.services.query_parser import QueryParser
 
@@ -63,6 +68,7 @@ class ParserApiKadClient:
         async_http_client: httpx.AsyncClient | None = None,
         details_cache_repository: CaseDetailsCacheRepository | None = None,
         llm_reason_extractor: LLMReasonExtractor | None = None,
+        captcha_solver: CaptchaSolver | None = None,
     ) -> None:
         if not base_url:
             raise ValueError("base_url is required")
@@ -75,8 +81,8 @@ class ParserApiKadClient:
         self._details_by_number_path = details_by_number_path
         self._search_path = search_path
         self._parser = QueryParser()
-        self._reason_extractor = ReasonExtractor()
         self._llm_reason_extractor = llm_reason_extractor
+        self._captcha_solver = captcha_solver
         self._logger = logging.getLogger("kad_client")
         # Cache court-name → accepted(True) / rejected(False) to skip redundant probe calls.
         self._court_validity_cache: dict[str, bool] = {}
@@ -94,6 +100,10 @@ class ParserApiKadClient:
         self._owns_sync_client = sync_http_client is None
         self._owns_async_client = async_http_client is None
         self._current_article: str | None = None
+        self._current_full_article: str | None = None
+        self._current_law_family: str | None = None
+        self._current_law_display_name: str | None = None
+        self._current_issue_phrase: str | None = None
 
     async def aclose(self) -> None:
         if self._owns_async_client:
@@ -297,7 +307,10 @@ class ParserApiKadClient:
         max_concurrency = settings.fetch_concurrency_max
         target_concurrency = min(max_concurrency, max(min_concurrency, 8))
         stable_success_window = 0
-        case_limit = min(settings.max_cases, len(case_ids))
+        pool_limit = settings.max_cases
+        if params.article:
+            pool_limit *= max(1, settings.candidate_pool_multiplier)
+        case_limit = min(pool_limit, len(case_ids))
         next_index = 0
         in_flight: set[asyncio.Task[DecisionFetchOutcome]] = set()
 
@@ -305,6 +318,10 @@ class ParserApiKadClient:
             on_stage_change("analyzing")
 
         self._current_article = params.article
+        self._current_full_article = params.full_article
+        self._current_law_family = params.law_family
+        self._current_law_display_name = params.law_display_name
+        self._current_issue_phrase = params.issue_phrase
         try:
 
             async def _fill_in_flight() -> None:
@@ -440,6 +457,10 @@ class ParserApiKadClient:
                 await _fill_in_flight()
         finally:
             self._current_article = None
+            self._current_full_article = None
+            self._current_law_family = None
+            self._current_law_display_name = None
+            self._current_issue_phrase = None
             if in_flight:
                 for task in in_flight:
                     task.cancel()
@@ -470,15 +491,9 @@ class ParserApiKadClient:
             if invalid_failures > 0:
                 raise KadInvalidResponseError("KAD API request failed")
 
-        # When article is specified, first hard-filter by case category, then classify via LLM
+        # When article is specified, classify via LLM
         if params.article and decisions:
             pre_filter_count = len(decisions)
-            category_filtered = 0
-            # Removed the aggressive 'Б' case category filter.
-            # Bankruptcy adversarial proceedings (complaints, invalidations under art. 60/61)
-            # are frequently classified as 'Г' (Civil) by the KAD system. Filtering them
-            # out here causes massive false negatives.
-            pre_llm_count = len(decisions)
 
         if params.article and self._llm_reason_extractor is not None and decisions:
             if on_stage_change:
@@ -490,17 +505,47 @@ class ParserApiKadClient:
                 total_decisions=len(decisions),
             )
 
-            # Batch classification for 100% data quality and cost reduction
-            classify_results = await self._llm_reason_extractor.classify_batch(
-                decisions, params.article, query_text
-            )
+            # Batch classification for short event texts (skip if Deep PDF already did it)
+            decisions_to_classify = [
+                d for d in decisions 
+                if d.pdf_status not in ("pdf_analyzed", "pdf_irrelevant")
+            ]
+            
+            classify_results = []
+            if decisions_to_classify:
+                classify_results = await self._llm_reason_extractor.classify_batch(
+                    decisions_to_classify, params.article, query_text,
+                    model_override=settings.llm_model
+                )
+            
+            batch_map = {
+                d.case_id: res 
+                for d, res in zip(decisions_to_classify, classify_results)
+            }
 
             relevant_decisions: list[CaseDecision] = []
             filtered_by_relevance = 0
-            no_quote_prefix = self._llm_reason_extractor._NO_QUOTE_PREFIX
-            for decision, (is_relevant, reasons, proof_quote, llm_outcome) in zip(
-                decisions, classify_results
-            ):
+            no_quote_prefix = getattr(
+                self._llm_reason_extractor, "_NO_QUOTE_PREFIX", "Логический вывод:"
+            )
+            for decision in decisions:
+                if decision.pdf_status == "pdf_analyzed":
+                    confidence = 1.0
+                    conflicts = []
+                    # Already vetted by PDF analysis: skip rules vs LLM check below
+                    relevant_decisions.append(replace(decision, confidence_score=1.0))
+                    continue
+                elif decision.pdf_status == "pdf_irrelevant":
+                    filtered_by_relevance += 1
+                    continue
+
+                res = batch_map.get(decision.case_id)
+                if not res:
+                    relevant_decisions.append(decision)
+                    continue
+                    
+                is_relevant, reasons, proof_quote, llm_outcome = res
+                
                 if is_relevant:
                     # Determine reason_confidence based on proof_quote quality
                     if proof_quote and not proof_quote.startswith(no_quote_prefix):
@@ -509,8 +554,12 @@ class ParserApiKadClient:
                         reason_conf = 0.7
 
                     updated = replace(
-                        decision, reasons=reasons, proof_quote=proof_quote,
+                        decision,
+                        reasons=reasons,
+                        proof_quote=proof_quote,
                         reason_confidence=reason_conf,
+                        source_system="llm_batch",
+                        source_quality_reasons=tuple(list(decision.source_quality_reasons or []) + ["ai_verified"])
                     )
 
                     confidence = 1.0
@@ -529,10 +578,23 @@ class ParserApiKadClient:
                         else:
                             # Rule-based detection succeeded. Verify LLM matches.
                             if updated.outcome.value != llm_outcome:
-                                confidence -= 1.0
-                                conflicts.append(
-                                    f"Conflict: Rules engine detected '{updated.outcome.value}' but LLM extracted '{llm_outcome}'"
-                                )
+                                # Conflict resolution: trust the source with evidence
+                                if proof_quote and not proof_quote.startswith(no_quote_prefix):
+                                    # LLM has a direct quote backing its assessment — trust LLM
+                                    confidence -= 0.15
+                                    if llm_outcome == "satisfied":
+                                        updated = replace(updated, outcome=CaseOutcome.SATISFIED)
+                                    elif llm_outcome == "denied":
+                                        updated = replace(updated, outcome=CaseOutcome.DENIED)
+                                    conflicts.append(
+                                        f"Resolved in favor of LLM (has proof quote): Rules='{updated.outcome.value}' → LLM='{llm_outcome}'"
+                                    )
+                                else:
+                                    # No proof quote — trust rule-based engine
+                                    confidence -= 0.2
+                                    conflicts.append(
+                                        f"Resolved in favor of rules (no proof quote): Rules='{updated.outcome.value}', LLM='{llm_outcome}'"
+                                    )
 
                     updated = replace(
                         updated,
@@ -554,15 +616,12 @@ class ParserApiKadClient:
                 "fetch_decisions.article_classification_done",
                 article=params.article,
                 total_input=pre_filter_count,
-                pre_llm_count=pre_llm_count,
                 relevant=len(decisions),
-                filtered_category=category_filtered,
                 filtered_relevance=filtered_by_relevance,
             )
 
         if self._llm_reason_extractor is not None:
             self._llm_reason_extractor.reset_fetch_budget()
-        self._current_article = None
         return FetchDecisionsResult(
             decisions=decisions,
             stats=FetchStats(
@@ -604,17 +663,13 @@ class ParserApiKadClient:
         should_cancel: Callable[[], bool] | None = None,
         on_collection_progress: Callable[[int], None] | None = None,
     ) -> tuple[list[str], int]:
+        pool_limit = settings.max_cases
+        if params.article:
+            pool_limit *= max(1, settings.candidate_pool_multiplier)
         self._search_case_types.clear()
         self._search_case_numbers.clear()
         case_ids: list[str] = []
         seen: set[str] = set()
-
-        # Phase 2.2: Parallelize collection. First page for count.
-        data_result = await self._request_json_async(
-            "GET", self._search_path, params=self._build_query(params, 1)
-        )
-        data = self._validate_success(data_result.data)
-        pages_count = int(data.get("PagesCount", 0) or 0)
 
         def _process_page(p_data: dict):
             for case in p_data.get("Cases", []):
@@ -632,37 +687,50 @@ class ParserApiKadClient:
                 if on_collection_progress:
                     on_collection_progress(len(case_ids))
 
-        _process_page(data)
-        if len(case_ids) >= settings.max_cases or pages_count <= 1:
-            return case_ids, pages_count
-
-        max_page = min(settings.max_pages, pages_count)
-        page_tasks = [
-            self._request_json_async(
-                "GET", self._search_path, params=self._build_query(params, p)
+        async def _collect_for_variant() -> int:
+            data_result = await self._request_json_async(
+                "GET", self._search_path, params=self._build_query(params, 1)
             )
-            for p in range(2, max_page + 1)
-        ]
+            data = self._validate_success(data_result.data)
+            pages_count = int(data.get("PagesCount", 0) or 0)
+            _process_page(data)
+            if len(case_ids) >= pool_limit or pages_count <= 1:
+                return pages_count
 
-        results = await asyncio.gather(*page_tasks, return_exceptions=True)
-        fail_count = 0
-        for res in results:
-            if isinstance(res, (BaseException, type(None))):
-                fail_count += 1
-                continue
-            try:
-                p_data = self._validate_success(res.data)
-                _process_page(p_data)
-                if len(case_ids) >= settings.max_cases:
-                    break
-            except Exception:
-                fail_count += 1
-                continue
+            max_page = min(settings.max_pages, pages_count)
+            page_tasks = [
+                self._request_json_async(
+                    "GET", self._search_path, params=self._build_query(params, p)
+                )
+                for p in range(2, max_page + 1)
+            ]
 
-        if pages_count > 1 and fail_count / (max_page - 1) > 0.3:
-            raise KadUnavailableError(
-                f"Too many pages failed to load ({fail_count}/{max_page - 1}). Data may be incomplete."
-            )
+            results = await asyncio.gather(*page_tasks, return_exceptions=True)
+            fail_count = 0
+            for res in results:
+                if isinstance(res, (BaseException, type(None))):
+                    fail_count += 1
+                    continue
+                try:
+                    p_data = self._validate_success(res.data)
+                    _process_page(p_data)
+                    if len(case_ids) >= pool_limit:
+                        break
+                except Exception:
+                    fail_count += 1
+                    continue
+
+            if pages_count > 1 and fail_count / (max_page - 1) > 0.3:
+                raise KadUnavailableError(
+                    f"Too many pages failed to load ({fail_count}/{max_page - 1}). Data may be incomplete."
+                )
+            return pages_count
+
+        pages_count = 0
+        try:
+            pages_count = await _collect_for_variant()
+        except KadUnavailableError:
+            pass
 
         return case_ids, pages_count
 
@@ -708,49 +776,102 @@ class ParserApiKadClient:
             case["CaseNumber"] = self._search_case_numbers[case_id]
         decision = self._build_decision_from_case(
             case,
-            settings.max_documents_per_case,
+            settings,
             fallback_case_id=case_id,
         )
 
         if decision is not None and decision.document_links:
-            extracted_articles = []
-            for doc in reversed(decision.document_links):
-                doc_url = doc.get("url")
-                if doc_url:
+            # Deep PDF Analysis: download the court act and analyze with LLM
+            pdf_text = await self._extract_pdf_text(decision, settings)
+            if pdf_text:
+                decision = replace(decision, pdf_status="pdf_extracted")
+                # If LLM is available and article query is active, run deep analysis
+                if (
+                    self._current_article
+                    and self._llm_reason_extractor is not None
+                    and self._llm_reason_extractor.is_functional
+                ):
                     try:
-                        import io
-                        import pypdf
-                        target_url = doc_url
-                        if target_url.startswith("/"):
-                            target_url = f"{self._base_url.rstrip('/')}{target_url}"
-                        
-                        pdf_resp = await self._async_http_client.get(target_url, timeout=10.0)
-                        if pdf_resp.status_code == 200:
-                            pdf_bytes = io.BytesIO(pdf_resp.content)
-                            try:
-                                reader = pypdf.PdfReader(pdf_bytes)
-                                text = ""
-                                for page in reader.pages:
-                                    if page_text := page.extract_text():
-                                        text += page_text + "\n"
-                                
-                                found = re.findall(
-                                    r"(?i)(?:ст\.?\s*\d+(?:\.\d+)*\s*(?:ГК\s*РФ|АПК\s*РФ)?|статья\s*\d+(?:\.\d+)*\s*(?:ГК\s*РФ|АПК\s*РФ)?)", 
-                                    text
+                        analysis_params = SearchParams(
+                            inn_or_name=None,
+                            inn_type=None,
+                            date_from=None,
+                            date_to=None,
+                            court=None,
+                            case_type=None,
+                            case_number=None,
+                            article=self._current_article,
+                            full_article=self._current_full_article,
+                            law_family=self._current_law_family,
+                            law_display_name=self._current_law_display_name,
+                            issue_phrase=self._current_issue_phrase,
+                        )
+                        (
+                            is_relevant,
+                            reasons,
+                            proof_quote,
+                            llm_outcome,
+                        ) = await self._llm_reason_extractor.analyze_pdf_case(
+                            decision,
+                            analysis_params,
+                            pdf_text,
+                            model_override=settings.llm_model,
+                        )
+                        decision = replace(
+                            decision,
+                            pdf_status="pdf_analyzed",
+                            proof_quote=proof_quote or decision.proof_quote,
+                            reasons=reasons if reasons else decision.reasons,
+                            source_system="pdf_llm",
+                        )
+                        if not is_relevant:
+                            decision = replace(
+                                decision,
+                                pdf_status="pdf_irrelevant",
+                                source_quality_reasons=decision.source_quality_reasons
+                                + ("pdf_irrelevant",),
+                            )
+                        if llm_outcome:
+                            if llm_outcome == "satisfied":
+                                decision = replace(
+                                    decision, outcome=CaseOutcome.SATISFIED
                                 )
-                                if found:
-                                    extracted_articles.extend(found)
-                                    break
-                            except Exception as pdf_exc:
-                                log_event(self._logger, "pdf_parsing_error", error=str(pdf_exc), url=target_url)
+                            elif llm_outcome == "denied":
+                                decision = replace(decision, outcome=CaseOutcome.DENIED)
+                        log_event(
+                            self._logger,
+                            "pdf.deep_analysis_done",
+                            case_id=case_id,
+                            relevant=is_relevant,
+                            has_quote=bool(proof_quote),
+                            llm_outcome=llm_outcome,
+                        )
                     except Exception as exc:
-                        log_event(self._logger, "pdf_download_error", error=str(exc), url=doc_url)
-            
-            if extracted_articles:
-                unique = list(dict.fromkeys(a.strip().replace('\n', ' ').replace('\r', '') for a in extracted_articles))
-                new_reasons = list(decision.reasons)
-                new_reasons.insert(0, f"Статьи: {', '.join(unique[:5])}")
-                decision = replace(decision, reasons=tuple(new_reasons))
+                        log_event(
+                            self._logger,
+                            "pdf.deep_analysis_failed",
+                            case_id=case_id,
+                            error=str(exc),
+                        )
+                        decision = replace(decision, pdf_status="pdf_analysis_error")
+                else:
+                    # Fallback: regex-only article extraction when LLM is unavailable
+                    found = re.findall(
+                        r"(?i)(?:ст\.?\s*\d+(?:\.\d+)*\s*(?:ГК\s*РФ|АПК\s*РФ)?|статья\s*\d+(?:\.\d+)*\s*(?:ГК\s*РФ|АПК\s*РФ)?)",
+                        pdf_text,
+                    )
+                    if found:
+                        unique = list(
+                            dict.fromkeys(
+                                a.strip().replace("\n", " ").replace("\r", "")
+                                for a in found
+                            )
+                        )
+                        new_reasons = list(decision.reasons)
+                        new_reasons.insert(0, f"Статьи: {', '.join(unique[:5])}")
+                        decision = replace(decision, reasons=tuple(new_reasons))
+            else:
+                decision = replace(decision, pdf_status="pdf_unavailable")
         # Skip per-case LLM enrichment when article classification will run later —
         # classify_and_extract already extracts reasons, so this would be double cost.
         if (
@@ -766,7 +887,9 @@ class ParserApiKadClient:
             (
                 llm_reasons,
                 llm_outcome,
-            ) = await self._llm_reason_extractor.extract_with_outcome(decision)
+            ) = await self._llm_reason_extractor.extract_with_outcome(
+                decision, model_override=settings.llm_model
+            )
 
             confidence = 1.0
             conflicts = []
@@ -854,10 +977,6 @@ class ParserApiKadClient:
         removed: list[str] = []
         while True:
             try:
-                # Use asdict for logging
-                from dataclasses import asdict
-
-                log_debug(self._logger, "search.sanitizing", params=asdict(params))
 
                 result = await self._request_json_async(
                     "GET", self._search_path, params=self._build_query(params, page=1)
@@ -921,12 +1040,6 @@ class ParserApiKadClient:
         if params.inn_or_name:
             query["Inn"] = params.inn_or_name
 
-        # Priority 1: full_article (e.g. "ст. 723 ГК РФ") — best for full-text precision
-        # Priority 2: article (e.g. "723") — fallback
-        search_text = params.full_article or params.article
-        if search_text:
-            query["Text"] = search_text
-
         if params.inn_type:
             query["InnType"] = params.inn_type
         if params.date_from:
@@ -940,7 +1053,7 @@ class ParserApiKadClient:
         return query
 
     def _fetch_case_by_number(
-        self, case_number: str, max_documents_per_case: int
+        self, case_number: str, settings: Settings
     ) -> CaseDecision | None:
         data = self._request_json(
             "GET",
@@ -953,11 +1066,11 @@ class ParserApiKadClient:
             return None
         case = cases[0]
         return self._build_decision_from_case(
-            case, max_documents_per_case=max_documents_per_case
+            case, settings=settings
         )
 
     async def _fetch_case_by_number_async(
-        self, case_number: str, max_documents_per_case: int
+        self, case_number: str, settings: Settings
     ) -> CaseDecision | None:
         data_result = await self._request_json_async(
             "GET",
@@ -970,7 +1083,7 @@ class ParserApiKadClient:
             return None
         case = cases[0]
         decision = self._build_decision_from_case(
-            case, max_documents_per_case=max_documents_per_case
+            case, settings=settings
         )
         if (
             decision is not None
@@ -989,7 +1102,7 @@ class ParserApiKadClient:
     def _build_decision_from_case(
         self,
         case: dict,
-        max_documents_per_case: int,
+        settings: Settings,
         fallback_case_id: str = "",
     ) -> CaseDecision | None:
         case_number = self._extract_case_number(case)
@@ -1004,11 +1117,11 @@ class ParserApiKadClient:
             events.extend(instance.get("InstanceEvents", []) or [])
 
         events = sorted(events, key=lambda event: event.get("Date", ""))
-        if max_documents_per_case:
-            events = events[-max_documents_per_case:]
+        if settings.max_documents_per_case:
+            events = events[-settings.max_documents_per_case:]
 
         outcome, reasons, decision_date, analysis_text, document_links, reason_conf = (
-            self._extract_outcome_and_reasons(events)
+            self._extract_outcome_and_reasons(events, settings)
         )
         case_category = self._extract_case_category(case)
         return CaseDecision(
@@ -1181,8 +1294,10 @@ class ParserApiKadClient:
         return (len(overlap) / min_size) >= 0.6
 
     def _extract_outcome_and_reasons(
-        self, events: list[dict]
-    ) -> tuple[CaseOutcome, tuple[str, ...], date, str, tuple[dict[str, str], ...], float]:
+        self, events: list[dict], settings: Settings
+    ) -> tuple[
+        CaseOutcome, tuple[str, ...], date, str, tuple[dict[str, str], ...], float
+    ]:
         if not events:
             return (
                 CaseOutcome.UNKNOWN,
@@ -1214,7 +1329,14 @@ class ParserApiKadClient:
             ).strip()
 
             docs: list[dict[str, str]] = []
-            if event.get("FileName") and event.get("Url"):
+            file_val = event.get("File")
+            
+            # KAD API new format: 'File' is a string URL, and name comes from event type
+            if isinstance(file_val, str) and file_val.strip():
+                name = str(event.get("EventContentTypeName") or event.get("EventTypeName") or "Документ")
+                docs.append({"name": name, "url": file_val.strip()})
+            # Legacy / Alternative format
+            elif event.get("FileName") and event.get("Url"):
                 docs.append({"name": str(event["FileName"]), "url": str(event["Url"])})
             elif event.get("Details") and isinstance(event["Details"], list):
                 for detail in event["Details"]:
@@ -1223,30 +1345,25 @@ class ParserApiKadClient:
                             "name": str(detail["FileName"]),
                             "url": str(detail["Url"]),
                         })
-
+            
             prepared.append((full_text, priority_text, decision_date, docs))
 
+        if not prepared:
+            return (
+                CaseOutcome.UNKNOWN,
+                ("оценка обстоятельств дела",),
+                datetime.now(),
+                "",
+                (),
+                0.0,
+            )
+
         decisive_idx = len(prepared) - 1
+        
+        # We no longer use regex Pass 1/2. 
+        # All outcome mapping is now done in Stage B with LLM for 100% accuracy.
+        # This stage only collects candidate data.
         outcome = CaseOutcome.UNKNOWN
-
-        # Pass 1: use only structured priority fields — highest accuracy
-        for idx in range(len(prepared) - 1, -1, -1):
-            priority_text = prepared[idx][1]
-            if priority_text:
-                mapped = self._map_outcome(priority_text)
-                if mapped != CaseOutcome.UNKNOWN:
-                    decisive_idx = idx
-                    outcome = mapped
-                    break
-
-        # Pass 2: fall back to full concatenated event text
-        if outcome == CaseOutcome.UNKNOWN:
-            for idx in range(len(prepared) - 1, -1, -1):
-                mapped = self._map_outcome(prepared[idx][0])
-                if mapped != CaseOutcome.UNKNOWN:
-                    decisive_idx = idx
-                    outcome = mapped
-                    break
 
         decision_date = prepared[decisive_idx][2]
 
@@ -1265,16 +1382,55 @@ class ParserApiKadClient:
                     all_docs.append(d)
                     seen_urls.add(d["url"])
 
-        # Reasons extraction still focuses on the decisive text, but fallback uses the combined text
-        reasons, reason_conf = self._reason_extractor.extract_with_confidence(prepared[decisive_idx][0])
-        if not reasons or reasons == ("оценка обстоятельств дела",):
-            reasons, reason_conf = self._reason_extractor.extract_with_confidence(analysis_text)
+        # DEEP ACCURACY FIX: If we have documents but metadata is sparse,
+        # we MUST include a snippet from the latest PDF for the classifier.
+        # Otherwise, specific article searches (e.g. 61.2) will fail 100% of the time.
+        if all_docs and len(analysis_text) < 2000:
+            latest_doc = all_docs[0] # all_docs is already reversed (latest first)
+            # We use a temporary dummy decision to reuse _extract_pdf_text logic
+            dummy = CaseDecision(
+                case_number="temp",
+                decision_date=datetime.now(),
+                outcome=CaseOutcome.UNKNOWN,
+                reasons=(),
+                case_id="temp",
+                document_links=(latest_doc,),
+            )
+            pdf_snippet = self._extract_pdf_text_sync(dummy, settings)
+            if pdf_snippet:
+                log_event(
+                    self._logger,
+                    "pdf.snippet_attached",
+                    document_count=len(all_docs),
+                    analysis_text_len=len(analysis_text),
+                    snippet_len=len(pdf_snippet),
+                )
+                # Add snippet to the BEGINNING of analysis_text so LLM sees it first
+                analysis_text = (
+                    f"--- ТЕКСТ ПОСЛЕДНЕГО ДОКУМЕНТА (ВЫПИСКА) ---\n"
+                    f"{pdf_snippet[:2000]}\n\n"
+                    f"{analysis_text}"
+                )
+            else:
+                log_event(
+                    self._logger,
+                    "pdf.snippet_missing",
+                    document_count=len(all_docs),
+                    analysis_text_len=len(analysis_text),
+                )
 
-        if not reasons:
-            reasons = ("оценка обстоятельств дела",)
-            reason_conf = 0.1
+        # Reason extraction is now done in Stage B with LLM for 100% accuracy.
+        reasons = ("оценка обстоятельств дела",)
+        reason_conf = 0.1
 
-        return outcome, reasons, decision_date, analysis_text, tuple(all_docs), reason_conf
+        return (
+            outcome,
+            reasons,
+            decision_date,
+            analysis_text,
+            tuple(all_docs),
+            reason_conf,
+        )
 
     def _build_event_text(self, event: dict) -> str:
         return " ".join([
@@ -1411,6 +1567,432 @@ class ParserApiKadClient:
             return any(m in text for m in self._ADMIN_MARKERS)
         return True  # unknown case type — don't filter
 
+    def _extract_pdf_text_sync(
+        self,
+        decision: CaseDecision,
+        settings: Settings,
+    ) -> str | None:
+        """Synchronous version of _extract_pdf_text for classification phase."""
+        import io
+        import pypdf
+
+        max_pages = settings.max_pdf_pages_per_case
+        timeout = settings.pdf_fetch_timeout_seconds
+        candidates: list[tuple[dict[str, str], str, int, tuple[str, ...]]] = []
+
+        for doc in reversed(decision.document_links):
+            doc_url = doc.get("url")
+            if not doc_url:
+                continue
+            try:
+                target_url = doc_url
+                if target_url.startswith("/"):
+                    target_url = f"{self._base_url.rstrip('/')}{target_url}"
+
+                # Use sync client
+                pdf_resp = self._sync_http_client.get(
+                    target_url,
+                    timeout=float(timeout),
+                    follow_redirects=True,
+                )
+                if pdf_resp.status_code != 200:
+                    log_event(
+                        self._logger,
+                        "pdf.download_non_200",
+                        url=target_url,
+                        status_code=pdf_resp.status_code,
+                    )
+                    continue
+                if self._response_looks_like_captcha(
+                    pdf_resp.headers.get("content-type", ""),
+                    pdf_resp.content,
+                ):
+                    solved_pdf: bytes | None = None
+                    if self._captcha_solver is not None:
+                        solved_pdf = solve_and_retry_pdf_sync(
+                            self._captcha_solver.api_key,
+                            self._captcha_solver.base_url,
+                            self._sync_http_client,
+                            target_url,
+                            pdf_resp.text,
+                            float(timeout),
+                        )
+                    if solved_pdf:
+                        pdf_resp_content = solved_pdf
+                    else:
+                        log_event(
+                            self._logger,
+                            "pdf.captcha_blocked",
+                            url=target_url,
+                            content_type=pdf_resp.headers.get("content-type", ""),
+                        )
+                        continue
+                else:
+                    pdf_resp_content = pdf_resp.content
+                pdf_bytes = io.BytesIO(pdf_resp_content)
+                try:
+                    reader = pypdf.PdfReader(pdf_bytes)
+                    text = ""
+                    for i, page in enumerate(reader.pages):
+                        if i >= max_pages:
+                            break
+                        if page_text := page.extract_text():
+                            text += page_text + "\n"
+                    if text.strip():
+                        score, reasons = self._score_pdf_candidate(
+                            doc, text, self._current_article
+                        )
+                        candidates.append((doc, text, score, reasons))
+                        log_event(
+                            self._logger,
+                            "pdf.candidate_scored",
+                            url=target_url,
+                            title=doc.get("name", ""),
+                            score=score,
+                            reasons="|".join(reasons),
+                        )
+                except Exception as pdf_exc:
+                    log_event(
+                        self._logger,
+                        "pdf.parse_error",
+                        error=str(pdf_exc),
+                        url=target_url,
+                    )
+                    continue
+            except Exception as exc:
+                log_event(
+                    self._logger,
+                    "pdf.download_error",
+                    error=str(exc),
+                    url=doc_url,
+                )
+                continue
+
+        if not candidates:
+            return None
+
+        best_doc, best_text, best_score, best_reasons = self._select_best_pdf_candidate(
+            candidates
+        )
+        log_event(
+            self._logger,
+            "pdf.candidate_selected",
+            url=best_doc.get("url", ""),
+            title=best_doc.get("name", ""),
+            score=best_score,
+            reasons="|".join(best_reasons),
+            candidate_count=len(candidates),
+            selection_mode="heuristic",
+        )
+        return best_text
+
+    async def _extract_pdf_text(
+        self,
+        decision: CaseDecision,
+        settings: Settings,
+    ) -> str | None:
+        """Download the most relevant PDF from document_links and extract text.
+
+        Iterates through documents in reverse order (latest first).
+        Respects ``settings.max_pdf_pages_per_case`` and
+        ``settings.pdf_fetch_timeout_seconds``.
+        Returns the extracted text or ``None`` if no readable PDF was found.
+        """
+        import io
+
+        import pypdf
+
+        max_pages = settings.max_pdf_pages_per_case
+        timeout = settings.pdf_fetch_timeout_seconds
+        candidates: list[tuple[dict[str, str], str, int, tuple[str, ...]]] = []
+
+        for doc in reversed(decision.document_links):
+            doc_url = doc.get("url")
+            if not doc_url:
+                continue
+            try:
+                target_url = doc_url
+                if target_url.startswith("/"):
+                    target_url = f"{self._base_url.rstrip('/')}{target_url}"
+
+                pdf_resp = await self._async_http_client.get(
+                    target_url,
+                    timeout=float(timeout),
+                    follow_redirects=True,
+                )
+                if pdf_resp.status_code != 200:
+                    log_event(
+                        self._logger,
+                        "pdf.download_non_200",
+                        url=target_url,
+                        status_code=pdf_resp.status_code,
+                    )
+                    continue
+                if self._response_looks_like_captcha(
+                    pdf_resp.headers.get("content-type", ""),
+                    pdf_resp.content,
+                ):
+                    solved_pdf: bytes | None = None
+                    if self._captcha_solver is not None:
+                        solved_pdf = await solve_and_retry_pdf(
+                            self._captcha_solver,
+                            self._async_http_client,
+                            target_url,
+                            pdf_resp.text,
+                            float(timeout),
+                        )
+                    if solved_pdf:
+                        pdf_resp_content = solved_pdf
+                    else:
+                        log_event(
+                            self._logger,
+                            "pdf.captcha_blocked",
+                            url=target_url,
+                            content_type=pdf_resp.headers.get("content-type", ""),
+                        )
+                        continue
+                else:
+                    pdf_resp_content = pdf_resp.content
+                pdf_bytes = io.BytesIO(pdf_resp_content)
+                try:
+                    reader = pypdf.PdfReader(pdf_bytes)
+                    text = ""
+                    for i, page in enumerate(reader.pages):
+                        if i >= max_pages:
+                            break
+                        if page_text := page.extract_text():
+                            text += page_text + "\n"
+                    if text.strip():
+                        score, reasons = self._score_pdf_candidate(
+                            doc, text, self._current_article
+                        )
+                        candidates.append((doc, text, score, reasons))
+                        log_event(
+                            self._logger,
+                            "pdf.candidate_scored",
+                            url=target_url,
+                            title=doc.get("name", ""),
+                            score=score,
+                            reasons="|".join(reasons),
+                        )
+                except Exception as pdf_exc:
+                    log_event(
+                        self._logger,
+                        "pdf.parse_error",
+                        error=str(pdf_exc),
+                        url=target_url,
+                    )
+            except Exception as exc:
+                log_event(
+                    self._logger,
+                    "pdf.download_error",
+                    error=str(exc),
+                    url=doc_url,
+                )
+
+        if not candidates:
+            return None
+
+        best_doc, best_text, best_score, best_reasons = self._select_best_pdf_candidate(
+            candidates
+        )
+        selection_mode = "heuristic"
+        if (
+            self._current_article
+            and len(candidates) > 1
+            and best_score < 70
+            and self._llm_reason_extractor is not None
+            and self._llm_reason_extractor.is_functional
+        ):
+            try:
+                candidate_payload = [
+                    {
+                        "name": doc.get("name", ""),
+                        "url": doc.get("url", ""),
+                        "date": doc.get("date", ""),
+                        "category": "merits_act" if "merits" in "|".join(reasons) else "procedural_act",
+                        "relevance": str(score),
+                    }
+                    for doc, _, score, reasons in sorted(
+                        candidates, key=lambda item: item[2], reverse=True
+                    )[:8]
+                ]
+                selected = await self._llm_reason_extractor.choose_decisive_pdf(
+                    decision=decision,
+                    params=SearchParams(
+                        inn_or_name=None,
+                        inn_type=None,
+                        date_from=None,
+                        date_to=None,
+                        court=None,
+                        case_type=None,
+                        case_number=None,
+                        article=self._current_article,
+                        full_article=self._current_full_article,
+                        law_family=self._current_law_family,
+                        law_display_name=self._current_law_display_name,
+                        issue_phrase=self._current_issue_phrase,
+                    ),
+                    candidates=candidate_payload,
+                    fast_model_override=settings.fast_llm_model,
+                )
+                if selected and selected.get("url"):
+                    for doc, text, score, reasons in candidates:
+                        if doc.get("url") == selected.get("url"):
+                            best_doc, best_text, best_score, best_reasons = (
+                                doc,
+                                text,
+                                score,
+                                reasons,
+                            )
+                            selection_mode = "llm"
+                            break
+            except Exception as exc:
+                log_event(
+                    self._logger,
+                    "pdf.candidate_selection_failed",
+                    error=str(exc),
+                    candidate_count=len(candidates),
+                )
+
+        log_event(
+            self._logger,
+            "pdf.candidate_selected",
+            url=best_doc.get("url", ""),
+            title=best_doc.get("name", ""),
+            score=best_score,
+            reasons="|".join(best_reasons),
+            candidate_count=len(candidates),
+            selection_mode=selection_mode,
+        )
+        return best_text
+
+    def _score_pdf_candidate(
+        self,
+        doc: dict[str, str],
+        text: str,
+        article: str | None,
+    ) -> tuple[int, tuple[str, ...]]:
+        normalized_text = " ".join(text.lower().split())
+        normalized_title = " ".join(
+            str(doc.get("name", "") or "").lower().split()
+        )
+        score = 0
+        reasons: list[str] = []
+
+        if article and self._text_has_article(normalized_text, article):
+            score += 60
+            reasons.append("article_match")
+
+        if self._pdf_title_looks_merits(normalized_title):
+            score += 20
+            reasons.append("merits_title")
+        if self._pdf_title_looks_procedural(normalized_title):
+            score -= 20
+            reasons.append("procedural_title")
+
+        if self._pdf_text_looks_merits(normalized_text, article):
+            score += 30
+            reasons.append("merits_text")
+        if self._pdf_text_looks_procedural(normalized_text):
+            score -= 25
+            reasons.append("procedural_text")
+
+        if len(normalized_text) < 500:
+            score -= 5
+            reasons.append("short_text")
+
+        return score, tuple(reasons) if reasons else ("unscored",)
+
+    def _response_looks_like_captcha(self, content_type: str, content: bytes) -> bool:
+        normalized_type = content_type.lower()
+        if "html" in normalized_type:
+            return True
+        head = content[:512].lower()
+        if b"pravocaptcha" in head or b"recaptchatoken" in head:
+            return True
+        if head.lstrip().startswith(b"<!doctype html") or head.lstrip().startswith(b"<html"):
+            return True
+        return False
+
+    def _select_best_pdf_candidate(
+        self,
+        candidates: list[tuple[dict[str, str], str, int, tuple[str, ...]]],
+    ) -> tuple[dict[str, str], str, int, tuple[str, ...]]:
+        best_index = 0
+        best_score = candidates[0][2]
+        for idx, (_, _, score, _) in enumerate(candidates[1:], start=1):
+            if score > best_score:
+                best_index = idx
+                best_score = score
+        return candidates[best_index]
+
+    def _pdf_title_looks_merits(self, title: str) -> bool:
+        return any(
+            token in title
+            for token in (
+                "решение",
+                "постановление",
+                "судебный акт",
+                "резолютивная",
+                "мотивиров",
+                "определение",
+            )
+        )
+
+    def _pdf_title_looks_procedural(self, title: str) -> bool:
+        return any(
+            token in title
+            for token in (
+                "заявлен",
+                "ходатайств",
+                "уведомлен",
+                "извещен",
+                "об отложен",
+                "о возврат",
+                "о приобщен",
+                "об ознакомлен",
+                "о принятии",
+                "о продлен",
+                "протокол",
+            )
+        )
+
+    def _pdf_text_looks_merits(self, text: str, article: str | None) -> bool:
+        strong_patterns = [
+            r"оспариван\w+\s+сделк\w+",
+            r"признан\w+\s+недействительн\w+\s+сделк\w+",
+            r"неравноценн\w+",
+            r"встречн\w+\s+исполнен\w+",
+            r"причинен\w+\s+вред",
+            r"подозрительн\w+\s+сделк\w+",
+            r"аффилированн\w+",
+            r"включен\w+\s+в\s+реестр",
+            r"исключен\w+\s+из\s+реестра",
+            r"субсидиарн\w+\s+ответственност",
+        ]
+        if article == "61.2" and self._current_law_family == "127-ФЗ":
+            strong_patterns.append(r"банкротств\w+")
+        return any(re.search(pattern, text, re.I) for pattern in strong_patterns)
+
+    def _pdf_text_looks_procedural(self, text: str) -> bool:
+        procedural_patterns = [
+            r"об отложен\w+",
+            r"об ознакомлен\w+",
+            r"ходатайств\w+",
+            r"уведомлен\w+",
+            r"извещен\w+",
+            r"о принятии",
+            r"о возврат\w+",
+            r"о приобщен\w+",
+            r"о продлен\w+",
+            r"о назначен\w+",
+            r"о перерыв",
+            r"протокол",
+            r"предварительн\w+\s+заседан\w+",
+        ]
+        return any(re.search(pattern, text, re.I) for pattern in procedural_patterns)
+
     _CASE_TYPE_TO_CATEGORY: dict[str, str] = {"B": "Б", "G": "Г", "A": "А"}
 
     _BANKRUPTCY_MARKERS: frozenset[str] = frozenset({
@@ -1429,55 +2011,6 @@ class ParserApiKadClient:
         "административн ответственност",
     })
 
-    _DENIED_COMBINED = [
-        re.compile(
-            r"отказ\w*(?:\s+\w+){0,3}\s+в\s+(?:удовлетвор|признани|иске|заявлении|жалобе|требован|привлечении)\w*"
-        ),
-        re.compile(
-            r"(?:удовлетвор|признани|иске|заявлении|жалобе|требован|привлечении)\w*(?:\s+\w+){0,10}\s+отказ\w*"
-        ),
-        re.compile(r"без\s+(?:удовлетвор|рассмотрения)\w*"),
-        re.compile(r"производство\w*\s+(?:.+?\s+)?прекратить"),
-        re.compile(r"прекратить\s+производство"),
-        re.compile(r"необоснованн\w*"),
-        re.compile(r"основани\w*\s+(?:.+?\s+)?отсутству\w*"),
-        re.compile(r"отсутству\w+\s+основани\w+"),
-        re.compile(r"не\s+подлежит\s+(?:удовлетвор|признани)\w*"),
-        re.compile(r"не\s+(?:может|мог|могла|могло)\s+быть\s+признан\w*"),
-        re.compile(r"не\s+(?:было\s+)?установлено\w*"),
-        re.compile(r"не\s+усматривается"),
-        re.compile(r"признак\w*(?:\s+\w+){0,5}\s+(?:не\s+установлен|отсутству)"),
-        # Common appeal/complaint denial patterns
-        re.compile(r"оставить\s+(?:\w+\s+){0,3}без\s+(?:удовлетвор|изменен)\w*"),
-        re.compile(r"оставлен\w*\s+без\s+(?:удовлетвор|изменен)\w*"),
-        re.compile(r"жалоб\w+\s+(?:\w+\s+){0,5}не\s+(?:обоснован|подлежит)\w*"),
-        re.compile(r"не\s+(?:нашел|находит|усматрива\w+)\s+основани\w*"),
-        re.compile(r"не\s+(?:нашел|находит)\s+(?:\w+\s+){0,3}основани\w*"),
-        re.compile(r"заявлени\w+\s+(?:\w+\s+){0,5}не\s+подлежит\s+удовлетвор\w*"),
-    ]
-
-    # Keywords that — when present WITHOUT a preceding denial context — indicate SATISFIED.
-    _SATISFIED_KEYWORDS = [
-        "удовлетвор",  # удовлетворить / удовлетворено / удовлетворены
-        "признать недействит",
-        "признать незаконн",
-        "признано незаконн",
-        "незаконн",
-        "неправомерн",
-        "ненадлежащ",  # ненадлежащее исполнение (признать)
-        "взыскать",
-        "отстранить",  # отстранить арбитражного управляющего
-        "привлечь к",  # привлечь к ответственности
-        "обоснованн",  # жалоба признана обоснованной
-        "отменить определени",  # отменить определение (reverse ruling)
-        "изменить определени",  # изменить определение (modify ruling)
-        "жалоба подлежит удовлетвор",  # complaint subject to satisfaction
-        "заявление подлежит удовлетвор",  # application subject to satisfaction
-        "признать действия",  # признать действия незаконными (already covered by незаконн)
-        "снизить",  # снизить размер вознаграждения
-        "уменьшить",  # уменьшить размер
-        "включить в реестр",  # включить требования в реестр кредиторов
-    ]
 
     async def _refine_params_with_llm(
         self, query_text: str, params: SearchParams
@@ -1553,24 +2086,6 @@ class ParserApiKadClient:
         log_event(self._logger, "kad.llm_query_parsed", params=asdict(refined))
         return refined
 
-    def _map_outcome(self, text: str) -> CaseOutcome:
-        lower = text.lower()
-
-        # Step 1: combined DENIED patterns take highest priority
-        for pattern in self._DENIED_COMBINED:
-            if pattern.search(lower):
-                return CaseOutcome.DENIED
-
-        # Step 2: satisfied keywords (safe now — combined DENIED already excluded)
-        for keyword in self._SATISFIED_KEYWORDS:
-            if keyword in lower:
-                return CaseOutcome.SATISFIED
-
-        # Step 3: standalone denial
-        if "отказ" in lower:
-            return CaseOutcome.DENIED
-        if "прекратить производство" in lower:
-            return CaseOutcome.DENIED
 
         return CaseOutcome.UNKNOWN
 

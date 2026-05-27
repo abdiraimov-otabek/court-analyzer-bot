@@ -1,0 +1,50 @@
+[2m21:09:39[0m [32mINFO   [0m __main__: Initializing components...
+[2m21:09:39[0m [32mINFO   [0m request_processor: analysis.started [2m{"query_text": "Практика АС Москвы по статье 61.2 Закона о банкротстве за 2024 год", "max_cases": 50, "max_documents_per_case": 5, "max_pages": 80}[0m
+[2m21:09:39[0m [32mINFO   [0m case_pipeline: Starting Pipeline Stage A: Retrieval
+[2m21:09:40[0m [32mINFO   [0m llm_reason_extractor: llm.parse_query.v2 [2m{"article": "61.2", "full_article": "ст. 61.2 Закона о банкротстве", "court": "АС города Москвы", "year": 2024, "quarter": null, "case_type": "Б", "date_from": null, "date_to": null}[0m
+[2m21:09:40[0m [32mINFO   [0m kad_client: kad.llm_query_parsed [2m{"params": {"inn_or_name": null, "inn_type": "Any", "date_from": "2024-01-01", "date_to": "2024-12-31", "court": "АС города Москвы", "case_type": "B", "case_number": null, "article": "61.2", "full_article": "ст. 61.2 Закона о банкротстве", "law_family": "127-ФЗ", "law_display_name": "Закона о банкротстве", "law_inferred": false, "part": null, "paragraph": null, "subparagraph": null, "issue_phrase": null, "use_court_filter": true, "_regex_quarter": null}}[0m
+[2m21:09:40[0m [32mINFO   [0m request_processor: analysis.phase [2m{"phase": "collecting"}[0m
+[2m21:09:45[0m [32mINFO   [0m request_processor: analysis.phase [2m{"phase": "analyzing"}[0m
+Traceback (most recent call last):
+  File "/Users/otabek-abdiraimov/Projects/test_bot/run_cli_test.py", line 52, in main
+    result = await processor.process(user_id, query, test_settings)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/otabek-abdiraimov/Projects/test_bot/src/services/request_processor.py", line 140, in process
+    pipeline_result = await pipeline.run(
+                      ^^^^^^^^^^^^^^^^^^^
+    ...<14 lines>...
+    )
+    ^
+  File "/Users/otabek-abdiraimov/Projects/test_bot/src/services/pipeline/pipeline.py", line 67, in run
+    retrieval_result = await self.case_client.fetch_decisions(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<8 lines>...
+    )
+    ^
+  File "/Users/otabek-abdiraimov/Projects/test_bot/src/services/kad_client.py", line 349, in fetch_decisions
+    outcome = await task
+              ^^^^^^^^^^
+  File "/Users/otabek-abdiraimov/Projects/test_bot/src/services/kad_client.py", line 757, in _fetch_case_decision_with_metrics
+    decision = self._build_decision_from_case(
+        case,
+        settings.max_documents_per_case,
+        fallback_case_id=case_id,
+    )
+  File "/Users/otabek-abdiraimov/Projects/test_bot/src/services/kad_client.py", line 1110, in _build_decision_from_case
+    self._extract_outcome_and_reasons(events)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "/Users/otabek-abdiraimov/Projects/test_bot/src/services/kad_client.py", line 1352, in _extract_outcome_and_reasons
+    outcome = CaseOutcome.UNKNOWN
+              ^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'CaseOutcome' where it is not associated with a value
+KAD API Key: Set
+OpenRouter API Key: Set
+
+=============================================
+Executing End-to-End Test
+Query: Практика АС Москвы по статье 61.2 Закона о банкротстве за 2024 год
+Max cases: 50
+=============================================
+
+
+Pipeline failed with error: cannot access local variable 'CaseOutcome' where it is not associated with a value

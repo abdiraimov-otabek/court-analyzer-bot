@@ -18,6 +18,35 @@ def test_article_validator_matches_exact_article_with_text_reference() -> None:
     assert tier in {EvidenceTier.TIER_A_EXPLICIT_MATCH, EvidenceTier.TIER_B_PROBABLE_MATCH}
 
 
+def test_article_validator_accepts_substantive_61_2_without_explicit_article() -> None:
+    validator = ArticleValidator(
+        target_article="61.2",
+        law_family="127-ФЗ",
+        law_display_name="Закона о банкротстве",
+    )
+
+    tier, _, quote = validator.validate(
+        "Суд установил неравноценное встречное исполнение по Закону о банкротстве и признал сделку недействительной."
+    )
+
+    assert tier in {EvidenceTier.TIER_A_EXPLICIT_MATCH, EvidenceTier.TIER_B_PROBABLE_MATCH}
+    assert quote != "N/A"
+
+
+def test_article_validator_rejects_procedural_61_2_without_substantive_markers() -> None:
+    validator = ArticleValidator(
+        target_article="61.2",
+        law_family="127-ФЗ",
+        law_display_name="Закона о банкротстве",
+    )
+
+    tier, _, _ = validator.validate(
+        "Назначить судебное разбирательство по заявлению об оспаривании сделки на 10.10.2024."
+    )
+
+    assert tier == EvidenceTier.TIER_D_NO_MATCH
+
+
 def test_article_validator_marks_61_3_list_mention_as_noise_without_preference_context() -> None:
     validator = ArticleValidator(
         target_article="61.3",

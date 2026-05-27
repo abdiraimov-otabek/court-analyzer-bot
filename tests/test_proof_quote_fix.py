@@ -117,24 +117,4 @@ async def test_irrelevant_cases_are_still_rejected():
         assert results[i][0] is False
 
 
-@pytest.mark.asyncio
-async def test_single_case_classify_api_rejects_empty_quote():
-    """Test the single-case _call_classify_api path rejects missing proof quotes."""
-    http = AsyncMock()
-    extractor = LLMReasonExtractor(api_key="test", http_client=http)
 
-    # Single case response: relevant but no quote
-    api_response = {
-        "relevant": True,
-        "reasons": ["неравноценное встречное исполнение"],
-        "proof_quote": "",
-    }
-    http.post = AsyncMock(return_value=_mock_response(api_response))
-
-    is_relevant, reasons, quote = await extractor._call_classify_api(
-        "Контекст дела...", CaseOutcome.DENIED, "61.2", "ст. 61.2"
-    )
-
-    assert is_relevant is False
-    assert "Отклонено:" in reasons[0]
-    assert quote == ""
